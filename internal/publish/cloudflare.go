@@ -335,9 +335,14 @@ func (c *Cloudflare) Deploy(ctx context.Context, dir string, prev, next Manifest
 }
 
 // cfAssetKey は Pages の asset store でのファイルのキー（32文字の16進数）。同じ内容でも拡張子で Content-Type が
-// 変わるため、拡張子も含めて決める。
+// 変わるため、拡張子も含めて決める。Content-Type を cfFixedTypes で決める拡張子は、その Content-Type もキーに含める
+// （以前に違う Content-Type で送った同じ内容のファイルを、Cloudflare にあるものとみなさず送り直す）。
 func cfAssetKey(name string, f File) string {
-	sum := sha256.Sum256([]byte(f.SHA256 + ":" + strings.TrimPrefix(path.Ext(name), ".")))
+	seed := f.SHA256 + ":" + strings.TrimPrefix(path.Ext(name), ".")
+	if t, ok := cfFixedTypes[strings.ToLower(path.Ext(name))]; ok {
+		seed += ":" + t
+	}
+	sum := sha256.Sum256([]byte(seed))
 	return hex.EncodeToString(sum[:])[:32]
 }
 
@@ -364,8 +369,18 @@ func cfUploadPayload(dir string, bucket []cfAsset) ([]byte, error) {
 	return json.Marshal(items)
 }
 
+// cfFixedTypes は、送るパソコンの MIME の設定（/etc/mime.types・Windows のレジストリ）によらずに決める Content-Type。
+// Go の標準の表には .txt が無いため、設定の無い環境では書き出しの llms.txt・llms-full.txt・robots.txt が
+// application/octet-stream で公開され、ブラウザではダウンロードになり、AI のクローラーや検索エンジンが文字として読めない。
+var cfFixedTypes = map[string]string{
+	".txt": "text/plain; charset=utf-8",
+}
+
 // contentType はファイル名の拡張子から決めた Content-Type。分からなければ application/octet-stream。
 func contentType(name string) string {
+	if t, ok := cfFixedTypes[strings.ToLower(path.Ext(name))]; ok {
+		return t
+	}
 	if t := mime.TypeByExtension(path.Ext(name)); t != "" {
 		return t
 	}
