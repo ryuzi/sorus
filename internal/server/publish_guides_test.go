@@ -112,19 +112,40 @@ func TestPublishPageFirstSetupFlow(t *testing.T) {
 	expectContains(t, form, "さくらのレンタルサーバー、エックスサーバー", "指定がある場合のみ入力（既定: 22）", "暗号化なし（非推奨）")
 	expectContains(t, res.Body, "反映仕様")
 	expectNotContains(t, form, `type="checkbox" name="cdn_purge_enabled"`)
-	// どちらも未設定なら、公開方法の2択（① 公開サーバー ② 静的サイト）をフォームより前に出す。
-	choice := between(t, res.Body, `<section id="publish-method-choice"`, `</section>`)
-	expectContains(t, choice, ">公開方法を選ぶ</h2>",
-		`href="/admin/settings/remote" id="publish-choice-remote" data-publish-choice="remote"`, "① 公開サーバーに接続する",
-		`href="#publish-form" id="publish-choice-static" data-publish-choice="static"`, "② 静的サイトとして公開する")
-	if strings.Index(res.Body, `id="publish-method-choice"`) > strings.Index(res.Body, `<form id="publish-form"`) {
-		t.Error("the method choice must come before the static site form")
+	// 方式は上部のタブ（公開サーバー｜静的サイト）だけで選ぶ。この画面はすでに「静的サイト」のタブなので、方式の2択は重ねて出さず、
+	// 導入文は常に静的サイトの説明、フォームの見出しは番号を付けずに「公開先を選ぶ」とする。
+	expectNotContains(t, res.Body, `id="publish-method-choice"`, `data-publish-choice=`, "公開方法を選ぶ", "① 公開サーバーに接続する", "② 静的サイトとして公開する")
+	expectContains(t, res.Body, `<p class="mt-1 text-sm text-neutral-600">書いた記事を HTML ファイルにして、選んだ公開先へ送ります。</p>`)
+	tabs := between(t, res.Body, `<nav id="publish-method-tabs"`, `</nav>`)
+	expectContains(t, tabs, `href="/admin/settings/remote" id="publish-tab-remote" class="publish-tab">公開サーバー</a>`,
+		`href="/admin/publish?view=static" id="publish-tab-static" class="publish-tab is-current" aria-current="page">静的サイト</a>`)
+	if strings.Index(res.Body, `id="publish-method-tabs"`) > strings.Index(res.Body, `<form id="publish-form"`) {
+		t.Error("the method tabs must come before the static site form")
 	}
-	expectContains(t, form, "><span>② 静的サイトとして公開する: 公開先を選ぶ</span>")
+	expectContains(t, form, `<h2 id="publish-form-title" class="flex items-center text-base font-semibold text-neutral-900"><span>公開先を選ぶ</span>`)
 	// 反映仕様は見出しの ? にまとめ、画面に長い説明の欄を出さない。
 	expectContains(t, between(t, form, `id="publish-form-title"`, `</h2>`), `id="publish-rules" hidden`, "反映仕様", "初回反映では")
 	expectNotContains(t, res.Body, `id="publish-rules-title"`, `id="publish-manage"`)
 	expectNotContains(t, res.Body, `id="publish-current-method"`, `id="publish-remote-title"`, `id="publish-switch-to-remote"`)
+}
+
+// 未設定のまま上部のタブから静的サイト（?view=static）を開いても、方式の2択は出さず、タブと設定フォームだけを見せる。英語でも同じ。
+func TestPublishStaticViewUnconfiguredIsSimple(t *testing.T) {
+	env := newTestEnv(t)
+	c := env.loggedIn(admin)
+	res := c.get("/admin/publish?view=static")
+	expectStatus(t, res, http.StatusOK)
+	expectContains(t, res.Body, `id="publish-method-tabs"`, `<form id="publish-form"`, "書いた記事を HTML ファイルにして、選んだ公開先へ送ります。",
+		`id="publish-tab-static" class="publish-tab is-current" aria-current="page">静的サイト</a>`,
+		`<span>公開先を選ぶ</span>`)
+	expectNotContains(t, res.Body, `id="publish-method-choice"`, `data-publish-choice=`, "公開方法を選ぶ", "② 静的サイトとして公開する")
+
+	c.useEnglish()
+	res = c.get("/admin/publish?view=static")
+	expectStatus(t, res, http.StatusOK)
+	expectContains(t, res.Body, `id="publish-method-tabs"`, `<form id="publish-form"`,
+		"Turns your articles into HTML files and sends them to the destination you choose.", `<span>Choose a destination</span>`)
+	expectNotContains(t, res.Body, `id="publish-method-choice"`, "Choose how to publish", "2. Publish as a static site", ": choose a destination")
 }
 
 // 公開先を設定済みなら、現在の方式とその入力欄だけを出し、ほかの方式への切り替えは閉じた折りたたみに収める。
@@ -140,6 +161,7 @@ func TestPublishPageShowsCurrentTargetOnly(t *testing.T) {
 		`<details id="publish-target-switch" class="mt-6 border-t border-neutral-100 pt-5">`, `>別の公開先に切り替える</summary>`,
 		`<div data-kind-panel="folder" class="mt-6 space-y-4">`, `<div data-kind-panel="cloudflare" class="mt-6 space-y-4" hidden>`)
 	expectNotContains(t, form, `id="publish-guide"`, `>公開先の種類を選ぶ</summary>`)
+	expectContains(t, page, "書いた記事を HTML ファイルにして、選んだ公開先へ送ります。", `<span>公開先を選ぶ</span>`)
 	// 静的サイトを設定済みなら、先頭のタブで静的サイトが「動作中」であることを示す。選んでいるタブ（静的サイト）の内容だけを出し、
 	// 未設定の公開サーバーのカード・導線は重ねて出さない。片方だけの設定なら、どちらが有効かの1行も出さない。
 	tabs := between(t, page, `<nav id="publish-method-tabs"`, `</nav>`)

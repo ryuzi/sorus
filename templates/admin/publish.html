@@ -5,29 +5,13 @@
     <div class="min-w-0">
   <div class="mb-5">
     <h1 class="text-xl font-bold text-neutral-900">{{$.T "settings_nav_publish"}}</h1>
-    <p class="mt-1 text-sm text-neutral-600">{{if or $d.Configured $d.RemoteConnected}}{{$.T "publish_static_intro"}}{{else}}{{$.T "publish_choose_method_desc"}}{{end}}</p>
+    <p class="mt-1 text-sm text-neutral-600">{{$.T "publish_static_intro"}}</p>
   </div>
 
   {{/* 公開方法は「公開サーバー」か「静的サイト」のどちらか1つ。先頭に方式のタブを置く（動作中・待機中はタブのバッジで示す）。
+       方式はこのタブだけで選ぶ（この画面はすでに「静的サイト」のタブなので、画面の中で方式の2択を重ねて出さない）。
        最初に目に入る位置には主な操作（サイトに反映）だけを置き、設定の削除は最下部の「接続・設定の管理」（#publish-manage）に収める。 */}}
   {{template "publish_method_banner" $}}
-  {{if not (or $d.Configured $d.RemoteConnected)}}
-  <section id="publish-method-choice" class="mb-6" aria-labelledby="publish-method-choice-title">
-    <h2 id="publish-method-choice-title" class="text-base font-semibold text-neutral-900">{{$.T "publish_choose_method"}}</h2>
-    <div class="mt-3 grid gap-4 sm:grid-cols-2">
-      <a href="/admin/settings/remote" id="publish-choice-remote" data-publish-choice="remote" class="group flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-sky-400 hover:shadow focus-visible:border-sky-500">
-        <span class="text-base font-semibold text-neutral-900">{{$.T "publish_choice_remote_title"}}</span>
-        <span class="text-sm text-neutral-600">{{$.T "publish_choice_remote_desc"}}</span>
-        <span class="mt-auto pt-2 text-sm font-medium text-sky-800 group-hover:underline">{{$.T "publish_choice_remote_action"}}</span>
-      </a>
-      <a href="#publish-form" id="publish-choice-static" data-publish-choice="static" class="group flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-emerald-400 hover:shadow focus-visible:border-emerald-500">
-        <span class="text-base font-semibold text-neutral-900">{{$.T "publish_choice_static_title"}}</span>
-        <span class="text-sm text-neutral-600">{{$.T "publish_choice_static_desc"}}</span>
-        <span class="mt-auto pt-2 text-sm font-medium text-emerald-800 group-hover:underline">{{$.T "publish_choice_static_action"}}</span>
-      </a>
-    </div>
-  </section>
-  {{end}}
 
   {{with $d.Errors}}
   <div id="publish-errors" class="notice notice-error mb-6" role="alert">
@@ -118,7 +102,7 @@
   <form id="publish-form" method="post" action="/admin/publish" autocomplete="off"
         class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="publish-form-title">
     <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-    <h2 id="publish-form-title" class="flex items-center text-base font-semibold text-neutral-900"><span>{{if $d.Configured}}{{if $ja}}公開先を選ぶ{{else}}Choose a destination{{end}}{{else}}{{$.T "publish_choice_static_title"}}{{if $ja}}: 公開先を選ぶ{{else}}: choose a destination{{end}}{{end}}</span><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" id="publish-rules" hidden><strong class="block font-semibold">{{if $ja}}反映仕様{{else}}How updates work{{end}}</strong><span>{{if $ja}}不要になった、sorus が送信済みのファイルを削除します。{{else}}Files that sorus sent before and are no longer needed are deleted.{{end}}</span><span>{{if $ja}}初回反映では、公開先に既存のファイルがあっても削除しません。{{else}}The first update never deletes files already at the destination.{{end}}</span><span>{{if $ja}}フォルダに初めて書き出すとき、トップページ（index.html）がすでにあれば、上書きする前に置き換えるかを確認します。{{else}}When exporting to a folder for the first time, if a top page (index.html) already exists, you are asked before it is replaced.{{end}}</span><span>{{if $ja}}レンタルサーバーでは、指定したフォルダ内だけを更新します。{{else}}On a rental server, only the specified folder is updated.{{end}}</span><span>{{if $ja}}Cloudflare Pages と Netlify は、反映時にサイト全体を新しい版へ置き換えます。{{else}}Cloudflare Pages and Netlify replace the whole site with the new version on each update.{{end}}</span></span></span></h2>
+    <h2 id="publish-form-title" class="flex items-center text-base font-semibold text-neutral-900"><span>{{if $ja}}公開先を選ぶ{{else}}Choose a destination{{end}}</span><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" id="publish-rules" hidden><strong class="block font-semibold">{{if $ja}}反映仕様{{else}}How updates work{{end}}</strong><span>{{if $ja}}不要になった、sorus が送信済みのファイルを削除します。{{else}}Files that sorus sent before and are no longer needed are deleted.{{end}}</span><span>{{if $ja}}初回反映では、公開先に既存のファイルがあっても削除しません。{{else}}The first update never deletes files already at the destination.{{end}}</span><span>{{if $ja}}フォルダに初めて書き出すとき、トップページ（index.html）がすでにあれば、上書きする前に置き換えるかを確認します。{{else}}When exporting to a folder for the first time, if a top page (index.html) already exists, you are asked before it is replaced.{{end}}</span><span>{{if $ja}}レンタルサーバーでは、指定したフォルダ内だけを更新します。{{else}}On a rental server, only the specified folder is updated.{{end}}</span><span>{{if $ja}}Cloudflare Pages と Netlify は、反映時にサイト全体を新しい版へ置き換えます。{{else}}Cloudflare Pages and Netlify replace the whole site with the new version on each update.{{end}}</span></span></span></h2>
     {{if $d.Configured}}<section class="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4" aria-live="polite">
       <p class="text-xs font-medium text-neutral-500">{{if $ja}}現在の公開先{{else}}Current destination{{end}}</p>
       {{if $d.Configured}}

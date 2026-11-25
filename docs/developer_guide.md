@@ -1058,7 +1058,7 @@ PC 上で使う配布版の動作モードです。管理画面は `127.0.0.1` �
 
 「設定」→「公開先」（`/admin/publish`、管理者のみ）で公開先を1つ保存し、「サイトに反映」（`POST /admin/publish/reflect`）で静的出力を送ります。反映はバックグラウンドで行い、画面は `/admin/publish/status` で進み具合を取得します。
 
-公開方法は「公開サーバー」（sorus 公開サーバー同期、`/admin/settings/remote`）か「静的サイト」（`/admin/publish`）のどちらか1つなので、左メニュー・設定の入口は「公開先」1項目にまとめ、両方の画面で選択中にします（`settings_subnav.html` の `.AtPath "/admin/publish" "/admin/settings/remote"`）。公開サーバーに接続済みなら `/admin/publish` は `/admin/settings/remote` へ送り（`?view=static` で静的サイトの設定を開ける）、どちらも未設定なら `/admin/publish` に「公開方法を選ぶ」2択（`#publish-method-choice`）を出します。両方の画面の上には「現在の公開方式」（`#publish-current-method`・`#remote-current-method` の `data-publish-method`）を出し、もう一方の方式へは主ボタンではなく控えめなリンクだけを置きます。回帰テストは `publish_guides_test.go`。
+公開方法は「公開サーバー」（sorus 公開サーバー同期、`/admin/settings/remote`）か「静的サイト」（`/admin/publish`）のどちらか1つなので、左メニュー・設定の入口は「公開先」1項目にまとめ、両方の画面で選択中にします（`settings_subnav.html` の `.AtPath "/admin/publish" "/admin/settings/remote"`）。公開サーバーに接続済みなら `/admin/publish` は `/admin/settings/remote` へ送ります（`?view=static` で静的サイトの設定を開ける）。方式の選択・切り替えは、両方の画面の先頭に置く共通のタブ（`partials/publish_method_banner.html` の `#publish-method-tabs`、動作中・待機中はタブのバッジ）だけで行い、画面の中に方式の2択は重ねて出しません（どちらも未設定でも、`/admin/publish` は「静的サイト」タブとして導入文 `publish_static_intro` と設定フォーム `#publish-form`（見出しは「公開先を選ぶ」）だけを出し、`/admin/settings/remote` は導入文 `publish_remote_intro` と `#publish-method-none` の案内を出します）。両方を設定済みのときだけ、どちらが有効かの1行（`#publish-method-status`）と切り替えボタンを出します。回帰テストは `publish_guides_test.go`。
 
 | 公開先 | 実装 | 主な扱い |
 | :--- | :--- | :--- |
