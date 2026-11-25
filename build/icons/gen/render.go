@@ -4,109 +4,128 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"math"
 
 	xdraw "golang.org/x/image/draw"
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/sfnt"
-	"golang.org/x/image/math/fixed"
 	"golang.org/x/image/vector"
 )
 
-// 標準のデザイン。static/icon.svg（viewBox 512）と同じ: 角丸（rx 128）の濃紺の正方形に、白い太字の「s」を中央
-// （x 50%・y 54%）に置く。SVG の font-family（system-ui）の代わりに、Go に同梱の Go Bold を使う。
-var (
-	designBackground = color.NRGBA{0x0f, 0x17, 0x2a, 0xff} // #0f172a
-	designForeground = color.NRGBA{0xf8, 0xfa, 0xfc, 0xff} // #f8fafc
-)
-
+// 標準のデザイン（アイコン static/icon.svg と、ロゴ docs/images/sorus-logo.svg のシンボルマークの形と色）。
+//
+// シンボルマークは、白い円（designPlate）の上に、#255799（コバルト・スレート）の端の丸い線 5 本（designLines）と
+// 円 6 つ（designDots）で、中心 (112, 133) から枝分かれする形を描く。座標はロゴの座標系（viewBox 600x250）で、
+// アイコンでは designIconTranslate・designIconScale で 256x256 に収める。値は static/icon.svg と同じにする
+// （TestRenderDefaultFollowsTheSVGDesign が確かめる）。
 const (
-	designViewBox  = 512.0
-	designRadius   = 128.0
-	designFontSize = 280.0
-	designCenterX  = 0.50
-	designCenterY  = 0.54
-	designGlyph    = 's'
+	designStrokeWidth      = 5.5 // 線の太さ（stroke-width）
+	designPlateStrokeWidth = 4.0 // アイコンの白い円の外枠線の太さ
+
+	designIconViewBox = 256.0 // アイコンの viewBox（正方形）
+	designIconScale   = 1.353 // アイコンの transform="translate(-31.7, -41.2) scale(1.353)"
 )
 
-// RenderDefault は標準のデザインを size x size で描く。
-func RenderDefault(size int) *image.NRGBA {
-	s := float32(size) / designViewBox
-	dst := image.NewRGBA(image.Rect(0, 0, size, size))
+var (
+	designPrimaryColor = color.NRGBA{0x25, 0x57, 0x99, 0xff} // #255799
+	designPlateColor   = color.NRGBA{0xff, 0xff, 0xff, 0xff} // #FFFFFF
 
-	bg := vector.NewRasterizer(size, size)
-	roundedRect(bg, float32(size), designRadius*s)
-	bg.Draw(dst, dst.Bounds(), image.NewUniform(designBackground), image.Point{})
+	designIconTranslate = [2]float64{-31.7, -41.2}
+)
 
-	fg := vector.NewRasterizer(size, size)
-	if glyphPath(fg, float64(size), designFontSize*float64(s)) {
-		fg.Draw(dst, dst.Bounds(), image.NewUniform(designForeground), image.Point{})
+// designCircle は SVG の <circle>（中心 cx, cy・半径 r）。designLine は SVG の <line>（端点 x1, y1 と x2, y2）。
+type designCircle struct{ cx, cy, r float64 }
+type designLine struct{ x1, y1, x2, y2 float64 }
+
+var (
+	designPlate = designCircle{118, 125, 87}
+	designLines = []designLine{
+		{112, 133, 88, 90},
+		{112, 133, 156, 85},
+		{112, 133, 168, 125},
+		{112, 133, 142, 169},
+		{112, 133, 76, 163},
 	}
+	designDots = []designCircle{
+		{112, 133, 16.5},
+		{88, 90, 8.5},
+		{156, 85, 12.5},
+		{168, 125, 8},
+		{142, 169, 11},
+		{76, 163, 11.5},
+	}
+)
+
+// RenderDefault は標準のデザイン（static/icon.svg と同じ）を size x size で描く。背景は透明で、
+// SVG と同じ transform="translate(-31.7, -41.2) scale(1.353)" で、#255799 の外枠線（太さ 4）付きの白い円と、
+// その上の #255799 の端の丸い線 5 本・円 6 つを描く。
+func RenderDefault(size int) *image.NRGBA {
+	s := float64(size) / designIconViewBox
+	// pt はシンボルの座標（ロゴの座標系）を画像の座標にする。
+	pt := func(x, y float64) (float32, float32) {
+		return float32((x*designIconScale + designIconTranslate[0]) * s), float32((y*designIconScale + designIconTranslate[1]) * s)
+	}
+	scale := designIconScale * s
+	dst := image.NewRGBA(image.Rect(0, 0, size, size))
+	fill := func(c color.NRGBA, add func(z *vector.Rasterizer)) {
+		z := vector.NewRasterizer(size, size)
+		add(z)
+		z.Draw(dst, dst.Bounds(), image.NewUniform(c), image.Point{})
+	}
+
+	// 外枠線は円の縁を中心に内外へ半分ずつ。外側の円を #255799 で塗り、内側の円を白で塗り重ねる。
+	p := designPlate
+	fill(designPrimaryColor, func(z *vector.Rasterizer) {
+		circlePath(z, pt, p.cx, p.cy, (p.r+designPlateStrokeWidth/2)*scale)
+	})
+	fill(designPlateColor, func(z *vector.Rasterizer) {
+		circlePath(z, pt, p.cx, p.cy, (p.r-designPlateStrokeWidth/2)*scale)
+	})
+
+	// 線と円は同じ向きの輪郭として 1 つのラスタライザーに加える（重なりは足し合わせて 1 で止まるため、
+	// 合わせた形の縁にだけアンチエイリアスがかかり、重なりの境目に筋が出ない）。
+	fill(designPrimaryColor, func(z *vector.Rasterizer) {
+		for _, l := range designLines {
+			capsulePath(z, pt, l, designStrokeWidth/2, scale)
+		}
+		for _, c := range designDots {
+			circlePath(z, pt, c.cx, c.cy, c.r*scale)
+		}
+	})
+
 	out := image.NewNRGBA(dst.Bounds())
 	draw.Draw(out, out.Bounds(), dst, image.Point{}, draw.Src)
 	return out
 }
 
-// roundedRect は一辺 w、角の半径 r の角丸の正方形の輪郭を z に加える。
-func roundedRect(z *vector.Rasterizer, w, r float32) {
+// circlePath は、シンボルの座標で中心 (cx, cy) の、画像の座標で半径 r の円を z に加える（pt で中心を画像の座標に
+// する。4 分の 1 円ずつ 3 次ベジェで近似する。画面の座標で時計回り）。
+func circlePath(z *vector.Rasterizer, pt func(x, y float64) (float32, float32), cx, cy, r float64) {
 	const k = 0.5522847498 // 4 分の 1 円を 3 次ベジェで近似する係数
-	c := r * k
-	z.MoveTo(r, 0)
-	z.LineTo(w-r, 0)
-	z.CubeTo(w-r+c, 0, w, r-c, w, r)
-	z.LineTo(w, w-r)
-	z.CubeTo(w, w-r+c, w-r+c, w, w-r, w)
-	z.LineTo(r, w)
-	z.CubeTo(r-c, w, 0, w-r+c, 0, w-r)
-	z.LineTo(0, r)
-	z.CubeTo(0, r-c, r-c, 0, r, 0)
+	x, y := pt(cx, cy)
+	rr := float32(r)
+	d := rr * k
+	z.MoveTo(x+rr, y)
+	z.CubeTo(x+rr, y+d, x+d, y+rr, x, y+rr)
+	z.CubeTo(x-d, y+rr, x-rr, y+d, x-rr, y)
+	z.CubeTo(x-rr, y-d, x-d, y-rr, x, y-rr)
+	z.CubeTo(x+d, y-rr, x+rr, y-d, x+rr, y)
 	z.ClosePath()
 }
 
-// glyphPath は designGlyph の輪郭を、大きさ px で、外接矩形の中心が (designCenterX, designCenterY) に来るよう z に加える。
-func glyphPath(z *vector.Rasterizer, size, px float64) bool {
-	f, err := sfnt.Parse(gobold.TTF)
-	if err != nil {
-		panic("gen: parse Go Bold: " + err.Error())
+// capsulePath は線分 l（シンボルの座標）を、太さ 2*hw の端の丸い線（stroke-linecap="round"）として z に加える
+// （pt で座標を、scale で太さを画像の座標にする）。線の本体の長方形と、両端の半径 hw の円を、circlePath と同じ向きで加える。
+func capsulePath(z *vector.Rasterizer, pt func(x, y float64) (float32, float32), l designLine, hw, scale float64) {
+	dx, dy := l.x2-l.x1, l.y2-l.y1
+	if n := math.Hypot(dx, dy); n > 0 {
+		// 法線（-dy, dx）。この順の長方形は、画面の座標で circlePath と同じ時計回りになる。
+		nx, ny := -dy/n*hw, dx/n*hw
+		z.MoveTo(pt(l.x1-nx, l.y1-ny))
+		z.LineTo(pt(l.x2-nx, l.y2-ny))
+		z.LineTo(pt(l.x2+nx, l.y2+ny))
+		z.LineTo(pt(l.x1+nx, l.y1+ny))
+		z.ClosePath()
 	}
-	var buf sfnt.Buffer
-	idx, err := f.GlyphIndex(&buf, designGlyph)
-	if err != nil || idx == 0 {
-		return false
-	}
-	ppem := fixed.Int26_6(px * 64)
-	segs, err := f.LoadGlyph(&buf, idx, ppem, nil)
-	if err != nil || len(segs) == 0 {
-		return false
-	}
-	b := segs.Bounds()
-	minX, minY := float64(b.Min.X)/64, float64(b.Min.Y)/64
-	maxX, maxY := float64(b.Max.X)/64, float64(b.Max.Y)/64
-	dx := size*designCenterX - (minX+maxX)/2
-	dy := size*designCenterY - (minY+maxY)/2
-	pt := func(p fixed.Point26_6) (float32, float32) {
-		return float32(float64(p.X)/64 + dx), float32(float64(p.Y)/64 + dy)
-	}
-	for _, seg := range segs {
-		switch seg.Op {
-		case sfnt.SegmentOpMoveTo:
-			x, y := pt(seg.Args[0])
-			z.MoveTo(x, y)
-		case sfnt.SegmentOpLineTo:
-			x, y := pt(seg.Args[0])
-			z.LineTo(x, y)
-		case sfnt.SegmentOpQuadTo:
-			x1, y1 := pt(seg.Args[0])
-			x, y := pt(seg.Args[1])
-			z.QuadTo(x1, y1, x, y)
-		case sfnt.SegmentOpCubeTo:
-			x1, y1 := pt(seg.Args[0])
-			x2, y2 := pt(seg.Args[1])
-			x, y := pt(seg.Args[2])
-			z.CubeTo(x1, y1, x2, y2, x, y)
-		}
-	}
-	z.ClosePath()
-	return true
+	circlePath(z, pt, l.x1, l.y1, hw*scale)
+	circlePath(z, pt, l.x2, l.y2, hw*scale)
 }
 
 // Resize は img を size x size に縮小・拡大する（Catmull-Rom。縮小では範囲を広げて平均するため、小さいアイコンでも

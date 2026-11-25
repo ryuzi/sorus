@@ -4,10 +4,15 @@ import (
 	"bytes"
 	"debug/pe"
 	"encoding/binary"
+	"encoding/xml"
+	"fmt"
+	"image/color"
 	"image/png"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -44,34 +49,152 @@ func TestCommittedIconsMatchMaster(t *testing.T) {
 	}
 }
 
-// 標準のデザインは static/icon.svg と同じ配色・形（角は透明、縁は濃紺、中央付近に白い「s」）。
+// iconSVG は static/icon.svg の要素（transform の付いたグループの中に、外枠線付きの白い円と、線・円のグループ）。
+type iconSVG struct {
+	ViewBox string     `xml:"viewBox,attr"`
+	Rects   []struct{} `xml:"rect"`
+	Texts   []struct{} `xml:"text"`
+	Body    []struct {
+		Transform string      `xml:"transform,attr"`
+		Circles   []svgCircle `xml:"circle"`
+		Groups    []struct {
+			Stroke      string      `xml:"stroke,attr"`
+			StrokeWidth float64     `xml:"stroke-width,attr"`
+			LineCap     string      `xml:"stroke-linecap,attr"`
+			Fill        string      `xml:"fill,attr"`
+			Lines       []svgLine   `xml:"line"`
+			Circles     []svgCircle `xml:"circle"`
+		} `xml:"g"`
+	} `xml:"g"`
+}
+
+type svgCircle struct {
+	CX          float64 `xml:"cx,attr"`
+	CY          float64 `xml:"cy,attr"`
+	R           float64 `xml:"r,attr"`
+	Fill        string  `xml:"fill,attr"`
+	Stroke      string  `xml:"stroke,attr"`
+	StrokeWidth float64 `xml:"stroke-width,attr"`
+}
+
+type svgLine struct {
+	X1 float64 `xml:"x1,attr"`
+	Y1 float64 `xml:"y1,attr"`
+	X2 float64 `xml:"x2,attr"`
+	Y2 float64 `xml:"y2,attr"`
+}
+
+func hexColor(c color.NRGBA) string { return fmt.Sprintf("#%02X%02X%02X", c.R, c.G, c.B) }
+
+// 標準のデザインは static/icon.svg と同じ配色・形（背景は透明、transform="translate(-31.7, -41.2) scale(1.353)" の中に、
+// #255799 の外枠線付きの白い円と、その上の #255799 の線 5 本と円 6 つ）。render.go のデザインの値が SVG の値と一致し、
+// RenderDefault で描いた画像もその配色・形になっていること。
 func TestRenderDefaultFollowsTheSVGDesign(t *testing.T) {
-	svg, err := os.ReadFile(filepath.Join("..", "..", "..", "static", "icon.svg"))
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "static", "icon.svg"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`rx="128"`, `fill="#0f172a"`, `fill="#f8fafc"`, `font-size="280"`, `>s</text>`} {
-		if !strings.Contains(string(svg), want) {
-			t.Fatalf("static/icon.svg changed (missing %s); update the design constants in render.go", want)
+	var svg iconSVG
+	if err := xml.Unmarshal(data, &svg); err != nil {
+		t.Fatalf("static/icon.svg: %v", err)
+	}
+	changed := func(format string, args ...any) {
+		t.Helper()
+		t.Fatalf("static/icon.svg changed ("+format+"); update the design values in render.go and run: go run ./build/icons/gen -render", args...)
+	}
+	if svg.ViewBox != fmt.Sprintf("0 0 %g %g", designIconViewBox, designIconViewBox) {
+		changed("viewBox %q", svg.ViewBox)
+	}
+	if len(svg.Rects) != 0 || len(svg.Texts) != 0 {
+		changed("has %d <rect> and %d <text>; the default design has a transparent background and no text", len(svg.Rects), len(svg.Texts))
+	}
+	if len(svg.Body) != 1 {
+		changed("%d top-level groups, want 1", len(svg.Body))
+	}
+	body := svg.Body[0]
+	if want := fmt.Sprintf("translate(%g, %g) scale(%g)", designIconTranslate[0], designIconTranslate[1], designIconScale); body.Transform != want {
+		changed("transform %q, want %q", body.Transform, want)
+	}
+	if len(body.Circles) != 1 {
+		changed("%d circles directly in the group, want 1 plate", len(body.Circles))
+	}
+	if p := body.Circles[0]; (designCircle{p.CX, p.CY, p.R}) != designPlate || !strings.EqualFold(p.Fill, hexColor(designPlateColor)) ||
+		!strings.EqualFold(p.Stroke, hexColor(designPrimaryColor)) || p.StrokeWidth != designPlateStrokeWidth {
+		changed("plate %+v", p)
+	}
+	var lines []designLine
+	var dots []designCircle
+	for _, g := range body.Groups {
+		if len(g.Lines) > 0 {
+			if !strings.EqualFold(g.Stroke, hexColor(designPrimaryColor)) || g.StrokeWidth != designStrokeWidth || g.LineCap != "round" {
+				changed("line group stroke=%q width=%g linecap=%q", g.Stroke, g.StrokeWidth, g.LineCap)
+			}
+			for _, l := range g.Lines {
+				lines = append(lines, designLine{l.X1, l.Y1, l.X2, l.Y2})
+			}
 		}
-	}
-	img := RenderDefault(256)
-	if c := img.NRGBAAt(0, 0); c.A != 0 {
-		t.Errorf("corner = %v, want transparent (rounded)", c)
-	}
-	if c := img.NRGBAAt(128, 4); c != designBackground {
-		t.Errorf("top edge = %v, want %v", c, designBackground)
-	}
-	white := 0
-	for y := 80; y < 200; y++ {
-		for x := 80; x < 176; x++ {
-			if img.NRGBAAt(x, y) == designForeground {
-				white++
+		if len(g.Circles) > 0 {
+			if !strings.EqualFold(g.Fill, hexColor(designPrimaryColor)) {
+				changed("circle group fill=%q", g.Fill)
+			}
+			for _, c := range g.Circles {
+				dots = append(dots, designCircle{c.CX, c.CY, c.R})
 			}
 		}
 	}
-	if white < 1500 {
-		t.Errorf("only %d glyph pixels in the center; the letter is missing or misplaced", white)
+	if !slices.Equal(lines, designLines) {
+		changed("lines %v, render.go has %v", lines, designLines)
+	}
+	if !slices.Equal(dots, designDots) {
+		changed("circles %v, render.go has %v", dots, designDots)
+	}
+
+	// 256px（SVG と同じ大きさ）で描いて、場所ごとの色を確かめる。px はシンボルの座標を画像の画素にする。
+	img := RenderDefault(256)
+	px := func(x, y float64) (int, int) {
+		return int(x*designIconScale + designIconTranslate[0]), int(y*designIconScale + designIconTranslate[1])
+	}
+	at := func(x, y float64) color.NRGBA { return img.NRGBAAt(px(x, y)) }
+	for _, p := range [][2]int{{0, 0}, {255, 0}, {0, 255}, {255, 255}} {
+		if c := img.NRGBAAt(p[0], p[1]); c.A != 0 {
+			t.Errorf("corner %v = %v, want transparent", p, c)
+		}
+	}
+	p := designPlate
+	// 外枠線（円の縁、太さ 4）は #255799 で、その外（縁から 6 離れた所）は透明。
+	for _, dir := range [][2]float64{{0, -1}, {-1, 0}, {1, 0}, {0, 1}} {
+		if c := at(p.cx+dir[0]*p.r, p.cy+dir[1]*p.r); c != designPrimaryColor {
+			t.Errorf("plate outline toward %v = %v, want %v", dir, c, designPrimaryColor)
+		}
+		if c := at(p.cx+dir[0]*(p.r+6), p.cy+dir[1]*(p.r+6)); c.A != 0 {
+			t.Errorf("outside the plate toward %v = %v, want transparent", dir, c)
+		}
+	}
+	// 白い円の縁の内側（上・左・右・下）で、線・円から離れた所は白。
+	for _, q := range [][2]float64{{p.cx, p.cy - p.r + 6}, {p.cx - p.r + 6, p.cy}, {p.cx + p.r - 6, p.cy}, {p.cx, p.cy + p.r - 6}} {
+		if c := at(q[0], q[1]); c != designPlateColor {
+			t.Errorf("plate at %v = %v, want %v", q, c, designPlateColor)
+		}
+	}
+	// 円の中心と、線の中ほどは #255799。
+	for _, c := range designDots {
+		if got := at(c.cx, c.cy); got != designPrimaryColor {
+			t.Errorf("dot center %v = %v, want %v", c, got, designPrimaryColor)
+		}
+	}
+	for _, l := range designLines {
+		// 中心の円（半径 16.5）の外で、端の円に届く前の、線の 60% の所。
+		if got := at(l.x1+(l.x2-l.x1)*0.6, l.y1+(l.y2-l.y1)*0.6); got != designPrimaryColor {
+			t.Errorf("line %v at 60%% = %v, want %v", l, got, designPrimaryColor)
+		}
+	}
+	// 線の太さ（5.5）より外は白い円のまま（線が太すぎない）。右上へ伸びる線の 60% の所で、法線の向きに 6 離れた所。
+	l := designLines[1]
+	mx, my := l.x1+(l.x2-l.x1)*0.6, l.y1+(l.y2-l.y1)*0.6
+	n := math.Hypot(l.x2-l.x1, l.y2-l.y1)
+	nx, ny := -(l.y2-l.y1)/n, (l.x2-l.x1)/n
+	if got := at(mx+6*nx, my+6*ny); got != designPlateColor {
+		t.Errorf("beside the line = %v, want the plate %v", got, designPlateColor)
 	}
 }
 

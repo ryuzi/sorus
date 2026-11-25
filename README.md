@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/sorus-logo.svg" alt="SORUS - Plant your ideas anywhere. Let them live everywhere." width="600">
+</p>
+
 # sorus
 
 外部依存（Node.js・PostgreSQL・Redis 等）を一切排除した、シングルバイナリの Go 製 CMS & 静的サイトジェネレーターです。

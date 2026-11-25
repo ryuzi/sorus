@@ -4,6 +4,8 @@
 //	go run ./build/icons/gen -src my.png # 独自のアイコン（正方形の PNG）を元画像にしてから作り直す
 //	go run ./build/icons/gen -render    # 標準のデザイン（static/icon.svg と同じ）を元画像に描き直してから作り直す
 //
+// ロゴ docs/images/sorus-logo.svg とアイコン static/icon.svg は完成版をそのままコミットしてあり、このコマンドでは作らない。
+//
 // 作るもの（すべて元画像 sorus.png（1024x1024）から作る。同じ元画像からは同じバイト列になる）:
 //
 //	sorus.ico                       Windows 用のアイコン（16〜256px）

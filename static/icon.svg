@@ -1,4 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="128" fill="#0f172a"/>
-  <text x="50%" y="54%" font-family="system-ui, -apple-system, sans-serif" font-size="280" font-weight="700" fill="#f8fafc" text-anchor="middle" dominant-baseline="middle">s</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <g transform="translate(-31.7, -41.2) scale(1.353)">
+    <circle cx="118" cy="125" r="87" fill="#FFFFFF" stroke="#255799" stroke-width="4" />
+
+    <g stroke="#255799" stroke-width="5.5" stroke-linecap="round">
+      <line x1="112" y1="133" x2="88" y2="90" />
+      <line x1="112" y1="133" x2="156" y2="85" />
+      <line x1="112" y1="133" x2="168" y2="125" />
+      <line x1="112" y1="133" x2="142" y2="169" />
+      <line x1="112" y1="133" x2="76" y2="163" />
+    </g>
+    <g fill="#255799">
+      <circle cx="112" cy="133" r="16.5" />
+      <circle cx="88" cy="90" r="8.5" />
+      <circle cx="156" cy="85" r="12.5" />
+      <circle cx="168" cy="125" r="8" />
+      <circle cx="142" cy="169" r="11" />
+      <circle cx="76" cy="163" r="11.5" />
+    </g>
+  </g>
 </svg>

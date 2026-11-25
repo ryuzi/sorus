@@ -122,7 +122,7 @@ make test
 * コード署名・公証はまだ行っていません。差し込み位置は `release.yml` にコメントで用意しています。
 
 ### アプリアイコン（既定のアイコンと差し替え）
-配布版のアプリアイコンは `build/icons/` に置いた資材から組み込みます。既定のアイコンは `static/icon.svg`（管理画面・PWA のアイコン）と同じデザインです（角丸の濃紺の正方形に白い太字の「a」。文字は Go に同梱の Go Bold で描きます）。
+配布版のアプリアイコンは `build/icons/` に置いた資材から組み込みます。既定のアイコンは `static/icon.svg`（管理画面・PWA のアイコン）と同じデザインです（背景は透明で、#255799（コバルト・スレート）の外枠線を付けた白い円の上に、同じ色の端の丸い線 5 本と円 6 つで中心から枝分かれする形を描きます。`build/icons/gen/render.go` が SVG と同じ座標・transform でアンチエイリアス付きで描きます）。README の先頭のロゴ `docs/images/sorus-logo.svg` も同じシンボルマークを使います。
 
 | ファイル | 使う場所 |
 | --- | --- |
@@ -135,7 +135,8 @@ make test
 * 資材は外部のツール（ImageMagick・rsrc・windres など）を使わず、Go と `golang.org/x/image` だけで作ります（`build/icons/gen`）。CI・Linux でも同じバイト列になり、`release.sh` はコミット済みの資材をそのまま使います。資材が無いときは警告を出してアイコンなしで作ります。
 * アイコンの入っていない古い版のアーカイブを `install.sh` で入れたときは、前に入れたアイコンがあればそれを使い、無ければ設定しません（OS の標準のアイコンになるだけで、インストールは続けます）。
 * `go build` や `make dev` で手元で作った実行ファイルにはアイコンは入りません（`.syso` を置くのは `release.sh` だけです）。
-* 試験: `build/icons/gen/gen_test.go`（コミット済みの資材が元画像と一致すること、`.ico`・`.icns` の形式、`.syso` の構造、Windows 向けの小さなプログラムをクロスビルドしてリソースが入ること）、`install/install_test.go`（`TestReleaseScriptAppIcons`・`TestInstallShLinux`・`TestInstallShMacAppAssembly`・`TestInstallPs1`）。
+* ロゴ `docs/images/sorus-logo.svg` とアイコン `static/icon.svg` は完成版の SVG をそのままコミットしてあり、生成ツールでは作りません（`build/icons/gen` が作るのはアプリアイコンの資材だけです）。
+* 試験: `build/icons/gen/gen_test.go`（コミット済みの資材が元画像と一致すること、`.ico`・`.icns` の形式、`.syso` の構造、Windows 向けの小さなプログラムをクロスビルドしてリソースが入ること、`render.go` のデザインの値と描いた画像が `static/icon.svg` と一致すること）、`install/install_test.go`（`TestReleaseScriptAppIcons`・`TestInstallShLinux`・`TestInstallShMacAppAssembly`・`TestInstallPs1`）。
 
 **独自のアイコンに差し替える手順**
 
@@ -148,7 +149,7 @@ make test
 4. `go test ./build/...` が通ることを確かめ、`build/icons/` の変更をすべてコミットします。次のリリース（`scripts/release.sh`）から新しいアイコンになります。
 
 * 元画像だけを手で差し替えたときは、`go run ./build/icons/gen` で残りを作り直します（作り直さないと `TestCommittedIconsMatchMaster` が失敗します）。
-* 既定のデザインに戻すときは `go run ./build/icons/gen -render` を実行します。`static/icon.svg` のデザインを変えたときは、`build/icons/gen/render.go` の値も合わせて変えてから実行します（`TestRenderDefaultFollowsTheSVGDesign` が食い違いを知らせます）。
+* 既定のデザインに戻すときは `go run ./build/icons/gen -render` を実行します。既定のデザインを変えるときは、`static/icon.svg`（と、同じシンボルマークを使うロゴ `docs/images/sorus-logo.svg`）を直し、`build/icons/gen/render.go` のデザインの値を同じに合わせてから `go run ./build/icons/gen -render` を実行します（SVG と描画・資材が食い違うと `TestRenderDefaultFollowsTheSVGDesign`・`TestCommittedIconsMatchMaster` が知らせます）。
 * 管理画面・公開サイトのファビコンと PWA のアイコンは別です（`static/icon.svg` と、サイト設定でアップロードする画像）。
 
 ### 自分の PC でビルドして試す（はじめての人向け）
