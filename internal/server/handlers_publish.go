@@ -28,7 +28,7 @@ import (
 	"sorus/templates"
 )
 
-// 「公開先」画面。公開する人が公開先を1つ選び（レンタルサーバーの FTP・SFTP、Cloudflare Pages、フォルダに書き出すだけ）、
+// 「公開先」画面。公開する人が公開先を1つ選び（レンタルサーバーの FTP・SFTP、Cloudflare Pages・Workers、フォルダに書き出すだけ）、
 // 接続を試してから保存する。設定は settings テーブルに保存し、パスワード・API トークン・秘密鍵はブラウザに返さない。
 // 「サイトに反映」はこの画面とダッシュボードに置き、反映は handlers_publish_run.go がバックグラウンドで行う。
 
@@ -39,10 +39,12 @@ const (
 	// 種類を切り替えても、ほかの公開先の設定は残す。
 	publishSettingServer     = "publish_server"
 	publishSettingCloudflare = "publish_cloudflare"
-	publishSettingGitHub     = "publish_github"
-	publishSettingNetlify    = "publish_netlify"
-	publishSettingS3         = "publish_s3"
-	publishSettingFolder     = "publish_folder"
+	// publishSettingCloudflareWorkers は Cloudflare Workers（Static Assets）の設定。
+	publishSettingCloudflareWorkers = "publish_cloudflare_workers"
+	publishSettingGitHub            = "publish_github"
+	publishSettingNetlify           = "publish_netlify"
+	publishSettingS3                = "publish_s3"
+	publishSettingFolder            = "publish_folder"
 	// publishSettingKnownHosts は SFTP の接続先（host:port）ごとに、初めて接続したときに覚えた鍵の指紋（JSON）。
 	publishSettingKnownHosts = "publish_sftp_known_hosts"
 	// publishSettingManifestPrefix に公開先の識別子を付けたキーに、その公開先へ最後に反映できた書き出しの
@@ -57,10 +59,12 @@ const (
 
 	publishKindServer     = "server"
 	publishKindCloudflare = "cloudflare"
-	publishKindGitHub     = "github"
-	publishKindNetlify    = "netlify"
-	publishKindS3         = "s3"
-	publishKindFolder     = "folder"
+	// publishKindCloudflareWorkers は Cloudflare Workers の静的アセット（Static Assets）。
+	publishKindCloudflareWorkers = "cloudflare_workers"
+	publishKindGitHub            = "github"
+	publishKindNetlify           = "netlify"
+	publishKindS3                = "s3"
+	publishKindFolder            = "folder"
 
 	publishProtocolFTP  = "ftp"
 	publishProtocolSFTP = "sftp"
@@ -198,6 +202,18 @@ func (c publishCloudflareConfig) client() publish.CloudflareConfig {
 	return publish.CloudflareConfig{AccountID: c.AccountID, APIToken: c.APIToken, Project: c.Project, API: publishCloudflareAPI}
 }
 
+// publishCloudflareWorkersConfig は Cloudflare Workers（Static Assets）の設定。
+type publishCloudflareWorkersConfig struct {
+	AccountID string `json:"account_id"`
+	Script    string `json:"script"`
+	APIToken  string `json:"api_token,omitempty"`
+}
+
+// client は Workers の API クライアントの設定。API の起点は Cloudflare Pages と同じ publishCloudflareAPI。
+func (c publishCloudflareWorkersConfig) client() publish.CloudflareWorkersConfig {
+	return publish.CloudflareWorkersConfig{AccountID: c.AccountID, APIToken: c.APIToken, Script: c.Script, API: publishCloudflareAPI}
+}
+
 // publishFolderConfig は「フォルダに書き出すだけ」の設定。
 type publishFolderConfig struct {
 	Path string `json:"path"`
@@ -208,16 +224,19 @@ type publishConfig struct {
 	Kind       string
 	Server     publishServerConfig
 	Cloudflare publishCloudflareConfig
-	GitHub     publishGitHubConfig
-	Netlify    publishNetlifyConfig
-	S3         publishS3Config
-	Folder     publishFolderConfig
+	// CloudflareWorkers は Cloudflare Workers（Static Assets）の設定。
+	CloudflareWorkers publishCloudflareWorkersConfig
+	GitHub            publishGitHubConfig
+	Netlify           publishNetlifyConfig
+	S3                publishS3Config
+	Folder            publishFolderConfig
 }
 
 func (s *Server) loadPublishConfig() publishConfig {
 	cfg := publishConfig{Kind: s.getSetting(publishSettingKind, "")}
 	_ = json.Unmarshal([]byte(s.getSetting(publishSettingServer, "{}")), &cfg.Server)
 	_ = json.Unmarshal([]byte(s.getSetting(publishSettingCloudflare, "{}")), &cfg.Cloudflare)
+	_ = json.Unmarshal([]byte(s.getSetting(publishSettingCloudflareWorkers, "{}")), &cfg.CloudflareWorkers)
 	_ = json.Unmarshal([]byte(s.getSetting(publishSettingGitHub, "{}")), &cfg.GitHub)
 	_ = json.Unmarshal([]byte(s.getSetting(publishSettingNetlify, "{}")), &cfg.Netlify)
 	_ = json.Unmarshal([]byte(s.getSetting(publishSettingS3, "{}")), &cfg.S3)
@@ -226,7 +245,9 @@ func (s *Server) loadPublishConfig() publishConfig {
 }
 
 func (s *Server) savePublishConfig(cfg publishConfig) error {
-	values := map[string]any{publishSettingServer: cfg.Server, publishSettingCloudflare: cfg.Cloudflare, publishSettingGitHub: cfg.GitHub, publishSettingNetlify: cfg.Netlify, publishSettingS3: cfg.S3, publishSettingFolder: cfg.Folder}
+	values := map[string]any{publishSettingServer: cfg.Server, publishSettingCloudflare: cfg.Cloudflare,
+		publishSettingCloudflareWorkers: cfg.CloudflareWorkers, publishSettingGitHub: cfg.GitHub, publishSettingNetlify: cfg.Netlify,
+		publishSettingS3: cfg.S3, publishSettingFolder: cfg.Folder}
 	tx, err := s.db.Beginx()
 	if err != nil {
 		return err
@@ -267,6 +288,8 @@ func (c publishConfig) configured() bool {
 			(c.Server.Password != "" || c.Server.PrivateKey != "")
 	case publishKindCloudflare:
 		return c.Cloudflare.client().Validate() == nil
+	case publishKindCloudflareWorkers:
+		return c.CloudflareWorkers.client().Validate() == nil
 	case publishKindGitHub:
 		return c.GitHub.client().Validate() == nil
 	case publishKindNetlify:
@@ -290,6 +313,8 @@ func (c publishConfig) labelIn(lang string) string {
 			return "Rental server (" + strings.ToUpper(c.Server.Protocol) + ": " + c.Server.Root + " on " + c.Server.Host + ")"
 		case publishKindCloudflare:
 			return "Cloudflare Pages (" + c.Cloudflare.Project + ")"
+		case publishKindCloudflareWorkers:
+			return "Cloudflare Workers (" + c.CloudflareWorkers.Script + ")"
 		case publishKindGitHub:
 			return "GitHub Pages (" + c.GitHub.Owner + "/" + c.GitHub.Repository + ")"
 		case publishKindNetlify:
@@ -306,6 +331,8 @@ func (c publishConfig) labelIn(lang string) string {
 		return "レンタルサーバー（" + strings.ToUpper(c.Server.Protocol) + ": " + c.Server.Host + " の " + c.Server.Root + "）"
 	case publishKindCloudflare:
 		return "Cloudflare Pages（" + c.Cloudflare.Project + "）"
+	case publishKindCloudflareWorkers:
+		return "Cloudflare Workers（" + c.CloudflareWorkers.Script + "）"
 	case publishKindGitHub:
 		return "GitHub Pages（" + c.GitHub.Owner + "/" + c.GitHub.Repository + "）"
 	case publishKindNetlify:
@@ -327,6 +354,8 @@ func (c publishConfig) destinationID() string {
 		key = strings.Join([]string{c.Kind, c.Server.Protocol, strings.ToLower(c.Server.addr()), c.Server.User, c.Server.Root}, "\x00")
 	case publishKindCloudflare:
 		key = strings.Join([]string{c.Kind, c.Cloudflare.AccountID, c.Cloudflare.Project}, "\x00")
+	case publishKindCloudflareWorkers:
+		key = strings.Join([]string{c.Kind, c.CloudflareWorkers.AccountID, c.CloudflareWorkers.Script}, "\x00")
 	case publishKindGitHub:
 		key = strings.Join([]string{c.Kind, c.GitHub.Owner, c.GitHub.Repository, c.GitHub.Branch, c.GitHub.Directory}, "\x00")
 	case publishKindNetlify:
@@ -518,9 +547,11 @@ type publishPageData struct {
 	Label      string
 	Server     publishServerView
 	Cloudflare publishCloudflareView
-	GitHub     publishGitHubView
-	Netlify    publishNetlifyView
-	S3         publishS3View
+	// CloudflareWorkers は Cloudflare Workers（Static Assets）の欄。
+	CloudflareWorkers publishCloudflareWorkersView
+	GitHub            publishGitHubView
+	Netlify           publishNetlifyView
+	S3                publishS3View
 	// FolderPath は書き出し先のフォルダ（未設定なら既定のフォルダ）。
 	FolderPath string
 	// SiteURL は公開サイトのURL（サイト基本設定の base_url）。
@@ -553,6 +584,12 @@ type publishCloudflareView struct {
 	AccountID, Project string
 	HasToken           bool
 	TokenPreview       string
+}
+
+type publishCloudflareWorkersView struct {
+	AccountID, Script string
+	HasToken          bool
+	TokenPreview      string
 }
 
 type publishS3View struct {
@@ -592,6 +629,15 @@ func (s *Server) publishPageData(c echo.Context, cfg publishConfig) publishPageD
 	}
 	if d.Cloudflare.HasToken {
 		d.Cloudflare.TokenPreview = maskToken(cfg.Cloudflare.APIToken)
+	}
+	d.CloudflareWorkers = publishCloudflareWorkersView{AccountID: cfg.CloudflareWorkers.AccountID, Script: cfg.CloudflareWorkers.Script,
+		HasToken: cfg.CloudflareWorkers.APIToken != ""}
+	if d.CloudflareWorkers.HasToken {
+		d.CloudflareWorkers.TokenPreview = maskToken(cfg.CloudflareWorkers.APIToken)
+	}
+	// Cloudflare Pages からの乗り換えでは、同じアカウント ID を入れておく（API トークンは権限が違うため引き継がない）。
+	if d.CloudflareWorkers.AccountID == "" {
+		d.CloudflareWorkers.AccountID = cfg.Cloudflare.AccountID
 	}
 	if d.FolderPath == "" {
 		d.FolderPath = s.defaultPublishFolder()
@@ -724,6 +770,27 @@ func (s *Server) publishForm(c echo.Context, saved publishConfig) (cfg publishCo
 				errs = append(errs, "アカウント ID は、Cloudflare の画面に出ている32文字の英数字を貼り付けてください")
 			case strings.HasSuffix(err.Error(), "project"):
 				errs = append(errs, "プロジェクト名は、半角の英小文字・数字・ハイフンで入力してください（例: my-site）")
+			default:
+				errs = append(errs, "API トークンを貼り付けてください")
+			}
+		}
+	case publishKindCloudflareWorkers:
+		wc := publishCloudflareWorkersConfig{
+			AccountID: strings.ToLower(strings.TrimSpace(c.FormValue("cfw_account_id"))),
+			Script:    strings.ToLower(strings.TrimSpace(c.FormValue("cfw_script"))),
+		}
+		keep := ""
+		if wc.AccountID == saved.CloudflareWorkers.AccountID {
+			keep = saved.CloudflareWorkers.APIToken
+		}
+		wc.APIToken = secret("cfw_api_token", keep)
+		cfg.CloudflareWorkers = wc
+		if err := wc.client().Validate(); err != nil {
+			switch {
+			case strings.HasSuffix(err.Error(), "account id"):
+				errs = append(errs, "アカウント ID は、Cloudflare の画面に出ている32文字の英数字を貼り付けてください")
+			case strings.HasSuffix(err.Error(), "script"):
+				errs = append(errs, "Worker 名は、半角の英小文字・数字・ハイフンで63文字までで入力してください（例: my-site）。先頭と末尾にハイフンは使えません")
 			default:
 				errs = append(errs, "API トークンを貼り付けてください")
 			}
@@ -877,6 +944,8 @@ func (s *Server) handlePublishSave(c echo.Context) error {
 			d.SiteURL = c.FormValue("server_site_url")
 		case publishKindCloudflare:
 			d.Cloudflare.AccountID, d.Cloudflare.Project = c.FormValue("cf_account_id"), c.FormValue("cf_project")
+		case publishKindCloudflareWorkers:
+			d.CloudflareWorkers.AccountID, d.CloudflareWorkers.Script = c.FormValue("cfw_account_id"), c.FormValue("cfw_script")
 		case publishKindGitHub:
 			d.GitHub.Owner, d.GitHub.Repository, d.GitHub.Branch, d.GitHub.Directory = c.FormValue("github_owner"), c.FormValue("github_repository"), c.FormValue("github_branch"), c.FormValue("github_directory")
 		case publishKindNetlify:
@@ -931,9 +1000,10 @@ func (s *Server) handlePublishSave(c echo.Context) error {
 				return err
 			}
 		}
-	case cfg.Kind == publishKindNetlify:
-		// The Netlify site endpoint provides its canonical public URL; reflection
-		// resolves it before export when no custom URL has been configured.
+	case cfg.Kind == publishKindNetlify, cfg.Kind == publishKindCloudflareWorkers:
+		// The Netlify site endpoint and the account's workers.dev subdomain provide the
+		// canonical public URL; reflection resolves it before export when no custom URL
+		// has been configured.
 	case siteURL != "":
 		if err := s.saveBaseURL(siteURL); err != nil {
 			return err
@@ -951,7 +1021,7 @@ func isCustomDomain(urlStr string) bool {
 		return false
 	}
 	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
-	if host == "" || host == "localhost" || host == "127.0.0.1" || strings.HasSuffix(host, ".github.io") || strings.HasSuffix(host, ".pages.dev") || strings.HasSuffix(host, ".netlify.app") {
+	if host == "" || host == "localhost" || host == "127.0.0.1" || strings.HasSuffix(host, ".github.io") || strings.HasSuffix(host, ".pages.dev") || strings.HasSuffix(host, ".netlify.app") || strings.HasSuffix(host, ".workers.dev") {
 		return false
 	}
 	return true
@@ -1025,6 +1095,9 @@ func (s *Server) handlePublishTest(c echo.Context) error {
 		}
 		return c.JSON(http.StatusOK, publishTestResult{OK: true, Message: "接続できました。",
 			Details: []string{"公開サイトの URL: " + p.URL()}})
+	}
+	if cfg.Kind == publishKindCloudflareWorkers {
+		return s.handleCloudflareWorkersPublishTest(c, cfg.CloudflareWorkers, ctx, fail)
 	}
 	if cfg.Kind == publishKindGitHub {
 		return s.handleGitHubPublishTest(c, cfg.GitHub, ctx, fail)
@@ -1225,7 +1298,7 @@ func (s *Server) handlePublishTrustHostKey(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, s.publishPageURL("publish_trusted"))
 }
 
-// handlePublishReplaceSite は「置き換える」。Cloudflare Pages・Netlify の公開中のサイト（フォルダでは、すでにある
+// handlePublishReplaceSite は「置き換える」。Cloudflare Pages・Cloudflare Workers・Netlify の公開中のサイト（フォルダでは、すでにある
 // トップページ）を sorus のサイトで置き換えることを、尋ねていた公開先への次の1回の反映だけで認め、反映を始める。
 // 尋ねていなければ何もしない。
 func (s *Server) handlePublishReplaceSite(c echo.Context) error {

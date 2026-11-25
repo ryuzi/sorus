@@ -102,14 +102,15 @@
   <form id="publish-form" method="post" action="/admin/publish" autocomplete="off"
         class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="publish-form-title">
     <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-    <h2 id="publish-form-title" class="flex items-center text-base font-semibold text-neutral-900"><span>{{if $ja}}公開先を選ぶ{{else}}Choose a destination{{end}}</span><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" id="publish-rules" hidden><strong class="block font-semibold">{{if $ja}}反映仕様{{else}}How updates work{{end}}</strong><span>{{if $ja}}不要になった、sorus が送信済みのファイルを削除します。{{else}}Files that sorus sent before and are no longer needed are deleted.{{end}}</span><span>{{if $ja}}初回反映では、公開先に既存のファイルがあっても削除しません。{{else}}The first update never deletes files already at the destination.{{end}}</span><span>{{if $ja}}フォルダに初めて書き出すとき、トップページ（index.html）がすでにあれば、上書きする前に置き換えるかを確認します。{{else}}When exporting to a folder for the first time, if a top page (index.html) already exists, you are asked before it is replaced.{{end}}</span><span>{{if $ja}}レンタルサーバーでは、指定したフォルダ内だけを更新します。{{else}}On a rental server, only the specified folder is updated.{{end}}</span><span>{{if $ja}}Cloudflare Pages と Netlify は、反映時にサイト全体を新しい版へ置き換えます。{{else}}Cloudflare Pages and Netlify replace the whole site with the new version on each update.{{end}}</span></span></span></h2>
+    <h2 id="publish-form-title" class="flex items-center text-base font-semibold text-neutral-900"><span>{{if $ja}}公開先を選ぶ{{else}}Choose a destination{{end}}</span><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" id="publish-rules" hidden><strong class="block font-semibold">{{if $ja}}反映仕様{{else}}How updates work{{end}}</strong><span>{{if $ja}}不要になった、sorus が送信済みのファイルを削除します。{{else}}Files that sorus sent before and are no longer needed are deleted.{{end}}</span><span>{{if $ja}}初回反映では、公開先に既存のファイルがあっても削除しません。{{else}}The first update never deletes files already at the destination.{{end}}</span><span>{{if $ja}}フォルダに初めて書き出すとき、トップページ（index.html）がすでにあれば、上書きする前に置き換えるかを確認します。{{else}}When exporting to a folder for the first time, if a top page (index.html) already exists, you are asked before it is replaced.{{end}}</span><span>{{if $ja}}レンタルサーバーでは、指定したフォルダ内だけを更新します。{{else}}On a rental server, only the specified folder is updated.{{end}}</span><span>{{if $ja}}Cloudflare Pages・Cloudflare Workers と Netlify は、反映時にサイト全体を新しい版へ置き換えます。{{else}}Cloudflare Pages, Cloudflare Workers, and Netlify replace the whole site with the new version on each update.{{end}}</span></span></span></h2>
     {{if $d.Configured}}<section class="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4" aria-live="polite">
       <p class="text-xs font-medium text-neutral-500">{{if $ja}}現在の公開先{{else}}Current destination{{end}}</p>
       {{if $d.Configured}}
-      <p class="mt-1 font-semibold text-neutral-900">{{if $ja}}{{if eq $d.Kind "server"}}レンタルサーバー{{else if eq $d.Kind "s3"}}S3互換ストレージ{{else if eq $d.Kind "cloudflare"}}Cloudflare Pages{{else if eq $d.Kind "github"}}GitHub Pages{{else if eq $d.Kind "netlify"}}Netlify{{else if eq $d.Kind "folder"}}フォルダに書き出す{{else}}未設定{{end}}{{else}}{{if eq $d.Kind "server"}}Rental server{{else if eq $d.Kind "s3"}}S3-compatible storage{{else if eq $d.Kind "cloudflare"}}Cloudflare Pages{{else if eq $d.Kind "github"}}GitHub Pages{{else if eq $d.Kind "netlify"}}Netlify{{else if eq $d.Kind "folder"}}Export to a folder{{else}}Not set{{end}}{{end}}</p>
+      <p class="mt-1 font-semibold text-neutral-900">{{if $ja}}{{if eq $d.Kind "server"}}レンタルサーバー{{else if eq $d.Kind "s3"}}S3互換ストレージ{{else if eq $d.Kind "cloudflare"}}Cloudflare Pages{{else if eq $d.Kind "cloudflare_workers"}}Cloudflare Workers{{else if eq $d.Kind "github"}}GitHub Pages{{else if eq $d.Kind "netlify"}}Netlify{{else if eq $d.Kind "folder"}}フォルダに書き出す{{else}}未設定{{end}}{{else}}{{if eq $d.Kind "server"}}Rental server{{else if eq $d.Kind "s3"}}S3-compatible storage{{else if eq $d.Kind "cloudflare"}}Cloudflare Pages{{else if eq $d.Kind "cloudflare_workers"}}Cloudflare Workers{{else if eq $d.Kind "github"}}GitHub Pages{{else if eq $d.Kind "netlify"}}Netlify{{else if eq $d.Kind "folder"}}Export to a folder{{else}}Not set{{end}}{{end}}</p>
       {{if and (eq $d.Kind "server") $d.Server.Host}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.Server.Host}}{{$d.Server.Root}}</p>{{end}}
       {{if and (eq $d.Kind "s3") $d.S3.Bucket}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.S3.Bucket}}</p>{{end}}
       {{if and (eq $d.Kind "cloudflare") $d.Cloudflare.Project}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.Cloudflare.Project}}.pages.dev</p>{{end}}
+      {{if and (eq $d.Kind "cloudflare_workers") $d.CloudflareWorkers.Script}}<p class="mt-1 break-all text-sm text-neutral-700">{{if $ja}}Worker 名: {{else}}Worker name: {{end}}{{$d.CloudflareWorkers.Script}}</p>{{end}}
       {{if and (eq $d.Kind "github") $d.GitHub.Owner}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.GitHub.Owner}}/{{$d.GitHub.Repository}}</p>{{end}}
       {{if and (eq $d.Kind "netlify") $d.Netlify.SiteID}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.Netlify.SiteID}}</p>{{end}}
       {{if and (eq $d.Kind "folder") $d.FolderPath}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.FolderPath}}</p>{{end}}
@@ -126,6 +127,10 @@
       <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
         <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="s3"{{if eq $d.Kind "s3"}} checked{{end}}>{{$.T "publish_s3_kind"}}</span>
         <span class="text-xs text-neutral-600">{{$.T "publish_s3_kind_desc"}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex flex-wrap items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="cloudflare_workers"{{if eq $d.Kind "cloudflare_workers"}} checked{{end}}>Cloudflare Workers<span class="badge bg-sky-50 text-sky-800">{{if $ja}}おすすめ{{else}}Recommended{{end}}</span></span>
+        <span class="text-xs text-neutral-600">{{if $ja}}Cloudflare がいま勧めている、無料で使える公開のしかたです。Pages と同じく、Cloudflare のアカウントで「API トークン」を1つ作って貼り付けます。{{else}}Cloudflare's currently recommended way to publish, free to use. As with Pages, create one "API token" in your Cloudflare account and paste it in.{{end}}</span>
       </label>
       <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
         <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="cloudflare"{{if eq $d.Kind "cloudflare"}} checked{{end}}>Cloudflare Pages</span>
@@ -300,6 +305,39 @@
     </section>
     </div>
 
+    {{$cfw := $d.CloudflareWorkers}}
+    <div data-kind-panel="cloudflare_workers" class="mt-6 space-y-4"{{if ne $d.Kind "cloudflare_workers"}} hidden{{end}}>
+      <details id="publish-hints-cloudflare-workers" class="publish-hints rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
+        <summary class="cursor-pointer select-none font-medium text-neutral-800">{{if $ja}}はじめに Cloudflare で用意するもの{{else}}What to prepare in Cloudflare first{{end}}</summary>
+        <ol class="mt-2 list-decimal space-y-1 pl-5">
+          <li>{{if $ja}}Cloudflare にログインし、画面の右上のアカウントのメニューから「アカウントのホーム」を開きます。アドレス欄の dash.cloudflare.com/ のあとに続く32文字の英数字が「アカウント ID」です。{{else}}Log in to Cloudflare and open "Account home" from the account menu at the top right. The 32 letters and digits after dash.cloudflare.com/ in the address bar are your "Account ID".{{end}}</li>
+          <li>{{if $ja}}左のメニューの「Workers & Pages」を一度開きます。初めてのときは、公開 URL に使う「workers.dev のサブドメイン」を決める画面が出ます。{{else}}Open "Workers & Pages" in the left menu once. The first time, you are asked to choose the "workers.dev subdomain" used in your public URL.{{end}}</li>
+          <li>{{if $ja}}右上の人のマークから「プロファイル」→「API トークン」→「トークンを作成する」を選び、「カスタム トークン」で、権限に「アカウント」「Workers スクリプト」「編集」を付けて作ります。{{else}}From the person icon at the top right, choose "Profile" → "API Tokens" → "Create Token", and create a "Custom token" with the permission "Account" / "Workers Scripts" / "Edit".{{end}}</li>
+          <li>{{if $ja}}表示されたトークンをコピーして、下の欄に貼り付けます（トークンはそのとき1回しか表示されません）。{{else}}Copy the token shown and paste it below (the token is shown only once).{{end}}</li>
+        </ol>
+        <p class="mt-2">{{if $ja}}Worker がまだ無ければ、最初に「サイトに反映」したときに作ります。Node.js や wrangler などの道具は要りません。{{else}}If the Worker does not exist yet, it is created the first time you press "Update site". No tools such as Node.js or wrangler are needed.{{end}}</p>
+        <dl class="mt-2 space-y-2">
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}Worker 名{{else}}Worker name{{end}}</dt><dd class="text-neutral-600">{{if $ja}}半角の英小文字・数字・ハイフンで入力します。公開サイトのURLは https://（Worker 名）.（workers.dev のサブドメイン）.workers.dev になり、独自ドメインを入れていなければ、反映したときに自動で入れます。{{else}}Use lowercase letters, digits, and hyphens. The public site URL becomes https://(Worker name).(workers.dev subdomain).workers.dev and is filled in automatically when you update the site, unless you have set your own domain.{{end}}</dd></div>
+        </dl>
+      </details>
+      <div>
+        <label for="publish-cfw-account" class="block text-sm font-medium">{{if $ja}}アカウント ID{{else}}Account ID{{end}}</label>
+        <input id="publish-cfw-account" name="cfw_account_id" type="text" value="{{$cfw.AccountID}}" autocapitalize="off" spellcheck="false"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+      <div>
+        <label for="publish-cfw-token" class="block text-sm font-medium">{{if $ja}}API トークン{{else}}API token{{end}}</label>
+        <input id="publish-cfw-token" name="cfw_api_token" type="password" autocomplete="new-password"
+               placeholder="{{if $cfw.HasToken}}{{if $ja}}保存済み: {{$cfw.TokenPreview}}（変えるときだけ貼り付け）{{else}}Saved: {{$cfw.TokenPreview}} (paste only to change){{end}}{{end}}"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+      <div>
+        <label for="publish-cfw-script" class="block text-sm font-medium">{{if $ja}}Worker 名{{else}}Worker name{{end}}</label>
+        <input id="publish-cfw-script" name="cfw_script" type="text" value="{{$cfw.Script}}" placeholder="{{if $ja}}例: my-media{{else}}e.g. my-media{{end}}" autocapitalize="off" spellcheck="false"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+    </div>
+
     {{$s3 := $d.S3}}
     <div data-kind-panel="s3" class="mt-6 space-y-4"{{if ne $d.Kind "s3"}} hidden{{end}}>
       <details id="publish-hints-s3" class="publish-hints rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
@@ -372,6 +410,10 @@
       <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
         <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="s3"{{if eq $d.Kind "s3"}} checked{{end}}>{{$.T "publish_s3_kind"}}</span>
         <span class="text-xs text-neutral-600">{{$.T "publish_s3_kind_desc"}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex flex-wrap items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="cloudflare_workers"{{if eq $d.Kind "cloudflare_workers"}} checked{{end}}>Cloudflare Workers<span class="badge bg-sky-50 text-sky-800">{{if $ja}}おすすめ{{else}}Recommended{{end}}</span></span>
+        <span class="text-xs text-neutral-600">{{if $ja}}Cloudflare がいま勧めている、無料で使える公開のしかたです。Pages と同じく、Cloudflare のアカウントで「API トークン」を1つ作って貼り付けます。{{else}}Cloudflare's currently recommended way to publish, free to use. As with Pages, create one "API token" in your Cloudflare account and paste it in.{{end}}</span>
       </label>
       <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
         <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="cloudflare"{{if eq $d.Kind "cloudflare"}} checked{{end}}>Cloudflare Pages</span>

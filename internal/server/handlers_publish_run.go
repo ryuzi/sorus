@@ -216,7 +216,7 @@ type publishState struct {
 	overdueOnce sync.Once
 	// hostKey は SFTP の接続先の鍵が変わっていたときの、確認待ちの新しい鍵。
 	hostKey *pendingHostKey
-	// liveSite は Cloudflare Pages・Netlify へ初めて反映しようとしたら公開中のサイトがあった（フォルダでは、トップページ
+	// liveSite は Cloudflare Pages・Cloudflare Workers・Netlify へ初めて反映しようとしたら公開中のサイトがあった（フォルダでは、トップページ
 	// index.html がすでにあった）ため、置き換えるかを尋ねている公開先（destinationID）。replaceLive は「置き換える」が
 	// 押された公開先で、次の1回の反映だけで使う。
 	liveSite, replaceLive string
@@ -270,7 +270,7 @@ type publishOutcome struct {
 	Error string `json:"error,omitempty"`
 	// HostKeyChanged は SFTP の接続先の鍵が変わっていて、確認を待っているか。
 	HostKeyChanged bool `json:"host_key_changed,omitempty"`
-	// ReplaceSite は Cloudflare Pages・Netlify へ初めて反映しようとしたら公開中のサイトがあった（フォルダでは
+	// ReplaceSite は Cloudflare Pages・Cloudflare Workers・Netlify へ初めて反映しようとしたら公開中のサイトがあった（フォルダでは
 	// トップページがすでにあった）ため、送らずに置き換えるかを尋ねているか（「置き換える」のボタンを出す）。
 	ReplaceSite bool `json:"replace_site,omitempty"`
 	// FixSiteURL は公開サイトURLが未設定・この PC 内のままで反映しなかったときの、「公開サイトのURL」の入力欄への
@@ -484,8 +484,10 @@ func (s *Server) runReflectWithCDN(ctx context.Context, st *publishState, trigge
 		return out
 	}
 	// 公開サイトURLが無いと、共有したときのリンクや検索エンジン向けの情報が正しく作られないため、書き出さずに断る
-	// （Cloudflare Pages では、下で https://<project>.pages.dev を入れる）。
-	if cfg.Kind != publishKindCloudflare && cfg.Kind != publishKindNetlify && len(baseURLWarnings(s.getBaseURL())) > 0 {
+	// （Cloudflare Pages では、下で https://<project>.pages.dev を入れる。Cloudflare Workers・Netlify では、公開先が教える
+	// URL で書き出す）。
+	if cfg.Kind != publishKindCloudflare && cfg.Kind != publishKindCloudflareWorkers && cfg.Kind != publishKindNetlify &&
+		len(baseURLWarnings(s.getBaseURL())) > 0 {
 		return s.siteURLMissing(out, cfg)
 	}
 	if cfg.Kind == publishKindFolder {
@@ -498,8 +500,12 @@ func (s *Server) runReflectWithCDN(ctx context.Context, st *publishState, trigge
 	var pages *publish.Cloudflare
 	var githubPages *publish.GitHubPages
 	var netlify *publish.Netlify
+	var workers *publish.CloudflareWorkers
 	var projectURL string
 	var netlifySiteURL string
+	// workersSiteURL は、公開サイトURLを Worker の workers.dev の URL にするとき（独自ドメインが入っていないとき）の URL。
+	// 書き出しに使い、反映に成功してから保存する（Netlify と同じ）。
+	var workersSiteURL string
 	if cfg.Kind == publishKindCloudflare {
 		client := cfg.Cloudflare.client()
 		client.ReplaceLiveSite = replaceLive
@@ -513,6 +519,22 @@ func (s *Server) runReflectWithCDN(ctx context.Context, st *publishState, trigge
 		}
 		projectURL = project.URL()
 		if err := s.fillPagesBaseURL(cfg.Cloudflare.Project, projectURL); err != nil {
+			return fail(err)
+		}
+	} else if cfg.Kind == publishKindCloudflareWorkers {
+		client := cfg.CloudflareWorkers.client()
+		client.ReplaceLiveSite = replaceLive
+		workers = publish.NewCloudflareWorkers(client)
+		u, err := workers.URL(ctx)
+		switch {
+		case err == nil:
+			projectURL = u
+			if !isCustomDomain(s.getBaseURL()) {
+				workersSiteURL = u
+			}
+		case errors.Is(err, publish.ErrWorkersSubdomainNotFound) && isCustomDomain(s.getBaseURL()):
+			// 独自ドメインの公開サイトURLが入っていれば、workers.dev の URL が無くても書き出せる。
+		default:
 			return fail(err)
 		}
 	} else if cfg.Kind == publishKindGitHub {
@@ -544,6 +566,9 @@ func (s *Server) runReflectWithCDN(ctx context.Context, st *publishState, trigge
 	if cfg.Kind == publishKindNetlify && netlifySiteURL != "" && !isCustomDomain(s.getBaseURL()) {
 		exportOpts.BaseURL = netlifySiteURL
 	}
+	if workersSiteURL != "" {
+		exportOpts.BaseURL = workersSiteURL
+	}
 	// 復元の途中のデータを書き出さないよう、完全バックアップの作成と同じく読み取りの側で排他する。
 	s.backupMu.RLock()
 	dir, rep, err := s.ExportToTemp(ctx, exportOpts)
@@ -571,6 +596,8 @@ func (s *Server) runReflectWithCDN(ctx context.Context, st *publishState, trigge
 		res, err = githubPages.Deploy(ctx, dir, prev, next, st.setProgress)
 	} else if netlify != nil {
 		res, err = netlify.Deploy(ctx, dir, prev, next, st.setProgress)
+	} else if workers != nil {
+		res, err = workers.Deploy(ctx, dir, prev, next, st.setProgress)
 	} else if replacedTopPage, err = s.checkFolderTopPage(cfg, prev, replaceLive); err == nil {
 		res, err = publish.Sync(ctx, remote, dir, prev, next, st.setProgress)
 	}
@@ -589,6 +616,8 @@ func (s *Server) runReflectWithCDN(ctx context.Context, st *publishState, trigge
 			return out
 		case publishKindNetlify:
 			out.Message = "この Netlify サイトには、すでに公開中のサイトがあります。sorus のサイトで置き換えますか？"
+		case publishKindCloudflareWorkers:
+			out.Message = "Cloudflare Workers には、すでに同じ名前の Worker「" + cfg.CloudflareWorkers.Script + "」があります。sorus のサイトで置き換えますか？"
 		default:
 			out.Message = "この Cloudflare Pages のプロジェクトには、すでに公開中のサイトがあります。sorus のサイトで置き換えますか？"
 		}
@@ -610,6 +639,11 @@ func (s *Server) runReflectWithCDN(ctx context.Context, st *publishState, trigge
 			return fail(err)
 		}
 	}
+	if workersSiteURL != "" {
+		if err := s.saveBaseURL(workersSiteURL); err != nil {
+			return fail(err)
+		}
+	}
 
 	out.OK = true
 	out.Uploaded, out.Deleted, out.Unchanged = res.Uploaded, res.Deleted, res.Unchanged
@@ -625,7 +659,7 @@ func (s *Server) runReflectWithCDN(ctx context.Context, st *publishState, trigge
 		out.Message += "変わったところはありませんでした。"
 	}
 	removed := "消したファイル"
-	if pages != nil {
+	if pages != nil || workers != nil {
 		removed = "公開をやめたファイル"
 	}
 	out.Details = append(out.Details,
@@ -773,13 +807,15 @@ func describePublishError(err error) string {
 	case errors.Is(err, publish.ErrFTPNoEncryption):
 		return "このサーバーは、暗号化して送る方法に対応していません。サーバー会社が SFTP に対応していれば、「接続のしかた」で SFTP を選んでください。どうしても FTP で送るときは、「暗号化しないで送る」にチェックを入れて保存してください（パスワードが読み取られるおそれがあるため、おすすめしません）。"
 	case errors.Is(err, publish.ErrAuth):
-		return "ユーザー名とパスワード（または API トークン・鍵）を受け付けてもらえませんでした。入力を確かめてください。Cloudflare の場合は、API トークンに「Cloudflare Pages の編集」の権限があるかも確かめてください。"
+		return "ユーザー名とパスワード（または API トークン・鍵）を受け付けてもらえませんでした。入力を確かめてください。Cloudflare の場合は、API トークンに「Cloudflare Pages の編集」（Cloudflare Workers では「Workers スクリプトの編集」）の権限があるかも確かめてください。"
 	case errors.Is(err, publish.ErrFileTooLarge):
-		return "25MB より大きいファイルは Cloudflare Pages に置けません。大きな動画や資料は別の場所に置き、記事からリンクしてください。"
+		return "25MB より大きいファイルは Cloudflare（Pages・Workers）に置けません。大きな動画や資料は別の場所に置き、記事からリンクしてください。"
 	case errors.Is(err, publish.ErrGitHubFileTooLarge):
 		return "100MB より大きいファイルは GitHub Pages に置けません。動画などの大きいファイルは外部ストレージに置くか、小さくしてください。"
 	case errors.Is(err, publish.ErrTooManyFiles):
-		return "ファイルの数が Cloudflare Pages の上限（2万件）を超えています。"
+		return "ファイルの数が Cloudflare の上限を超えています（Cloudflare Pages は2万件、Cloudflare Workers は無料プランで2万件・有料プランで10万件まで）。"
+	case errors.Is(err, publish.ErrWorkersSubdomainNotFound):
+		return "Cloudflare のアカウントに workers.dev のサブドメインがまだありません。Cloudflare の画面で「Workers & Pages」を一度開いてサブドメインを決めてから、もう一度試してください（独自ドメインで公開するときは、「サイト基本設定」の公開サイトURLにそのアドレスを入れてください）。"
 	case errors.Is(err, publish.ErrTopPageIsFolder):
 		return "書き出すフォルダの中に「index.html」という名前のフォルダがあるため、トップページを書き出せません。まだ何も書き換えていません。空のフォルダか新しいフォルダを指定してください。"
 	case errors.Is(err, ErrUnsafeExportDir), errors.Is(err, errPublishFolderInData):
@@ -793,7 +829,7 @@ func describePublishError(err error) string {
 	case errors.As(err, &op) && op.Op == "dial":
 		return "接続できませんでした。ホスト名・ポート番号と、インターネットにつながっているかを確かめてください。"
 	case errors.As(err, &cf):
-		return "Cloudflare から「" + cf.Message + "」と返されました。アカウント ID とプロジェクト名を確かめるか、しばらくしてからもう一度試してください。"
+		return "Cloudflare から「" + cf.Message + "」と返されました。アカウント ID とプロジェクト名（Cloudflare Workers では Worker 名）を確かめるか、しばらくしてからもう一度試してください。"
 	}
 	return "もう一度試しても直らないときは、下の「詳しい情報」を確かめてください。"
 }
