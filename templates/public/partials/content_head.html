@@ -1,0 +1,14 @@
+{{/* 記事・ページの <head> の追加分。Data は articleData（OGP 画像の代替テキスト・動的 OGP 画像・数式の KaTeX）。 */}}
+{{define "content_head"}}{{with .OGImage}}
+  <meta property="og:image:alt" content="{{$.Data.Article.Title}}">
+  <meta name="twitter:image" content="{{.}}">{{end}}{{if .Data.GeneratedOGImage}}
+  {{/* アイキャッチの無い記事は、タイトルを描いた動的 OGP 画像（/og-image/<slug>.png）を使う。 */}}
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">{{end}}{{if .Data.HasMath}}
+  {{/* 数式のある記事だけローカル同梱の KaTeX を読み込む。 */}}
+  <link rel="stylesheet" href="{{asset "vendor/katex/katex.min.css"}}">
+  <script defer src="{{asset "vendor/katex/katex.min.js"}}"></script>
+  <script defer src="{{asset "vendor/katex/auto-render.min.js"}}"></script>
+  <script defer src="{{asset "js/math.js"}}"></script>
+{{end}}{{end}}

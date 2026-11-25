@@ -1,0 +1,97 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}
+<div class="flex min-h-screen items-center justify-center px-4">
+  <div class="w-full max-w-sm">
+    <div class="mb-6 text-center">
+      <h1 class="mt-2 text-2xl font-bold">{{if .SiteName}}{{.SiteName}}{{else}}sorus{{end}}</h1>
+      <p class="mt-1 text-sm text-neutral-500">{{if $d.Recovery}}{{if $ja}}パスワードを忘れたとき{{else}}Forgot your password{{end}}{{else}}{{.T "login_description"}}{{end}}</p>
+    </div>
+    {{with $d.Recovery}}
+    {{/* デスクトップモードの「パスワードを忘れたとき」（handlers_recovery.go）。この PC のデータの場所に書き出したコードで本人を確かめる。 */}}
+    <div id="recovery" class="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+      {{with .Errors}}
+      <div id="recovery-errors" class="rounded-lg border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-800" role="alert">
+        <ul class="list-disc space-y-0.5 pl-5">{{range .}}<li>{{.}}</li>{{end}}</ul>
+      </div>
+      {{end}}
+      {{if .CodeSent}}
+      <p class="text-sm text-neutral-700">{{if $ja}}この PC に「{{.File}}」というファイルを作り、そのフォルダを開きました。ファイルを開いて、中に書かれた8桁の数字を入力してください。{{else}}A file named "{{.File}}" was created on this PC and its folder was opened. Open the file and enter the 8-digit number written in it.{{end}}</p>
+      <p class="text-xs text-neutral-500">{{if $ja}}フォルダが開かないときは、次の場所を開いてください。<br>{{else}}If the folder did not open, open this location:<br>{{end}}<span id="recovery-folder" class="break-all font-mono text-neutral-700">{{.Folder}}</span></p>
+      <form id="recovery-form" method="post" action="/admin/login/recovery" class="space-y-4" onsubmit="this.querySelector('button[type=submit]').disabled = true">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        {{if and (not .AskUsername) .Username}}
+        {{/* ユーザーが1人のときは、その人のパスワードを変える。ログインに使うユーザー名を取り違えないよう見せておく。
+             見えない username の欄は、ブラウザのパスワードの保存機能が新しいパスワードをこのユーザー名で覚え直すため。 */}}
+        <div id="recovery-username" class="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+          <p>{{if $ja}}対象のユーザー名{{else}}User name{{end}}: <span class="font-mono font-semibold text-neutral-900">{{.Username}}</span></p>
+          <p class="mt-0.5 text-xs text-neutral-500">{{if $ja}}ログインするときは、このユーザー名と新しいパスワードを入力します。{{else}}To log in, enter this user name and your new password.{{end}}</p>
+        </div>
+        <input type="text" name="username" value="{{.Username}}" autocomplete="username" readonly hidden>
+        {{end}}
+        <div>
+          <label for="code" class="block text-sm font-medium">{{if $ja}}再設定コード（8桁の数字）{{else}}Reset code (8 digits){{end}}</label>
+          <input id="code" name="code" type="text" required inputmode="numeric" autocomplete="one-time-code" autofocus placeholder="1234-5678"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono tracking-widest focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+        </div>
+        {{if .AskUsername}}
+        <div>
+          <label for="username" class="block text-sm font-medium">{{if $ja}}ユーザー名{{else}}User name{{end}}</label>
+          <input id="username" name="username" type="text" required autocomplete="username" autocapitalize="off" spellcheck="false"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+        </div>
+        {{end}}
+        <div>
+          <label for="password" class="block text-sm font-medium">{{if $ja}}新しいパスワード{{else}}New password{{end}}</label>
+          <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+          <p class="mt-1 text-xs text-neutral-500">{{if $ja}}8文字以上。{{else}}8 or more characters.{{end}}</p>
+        </div>
+        <div>
+          <label for="password_confirm" class="block text-sm font-medium">{{if $ja}}新しいパスワード（確認のためもう一度）{{else}}New password (again to confirm){{end}}</label>
+          <input id="password_confirm" name="password_confirm" type="password" required minlength="8" autocomplete="new-password"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+        </div>
+        <button type="submit" class="btn btn-primary btn-md w-full">{{if $ja}}パスワードを変える{{else}}Change password{{end}}</button>
+      </form>
+      <form method="post" action="/admin/login/recovery/code" class="text-center">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <button type="submit" class="text-xs text-neutral-500 underline hover:text-neutral-800">{{if $ja}}コードを作り直す{{else}}Create a new code{{end}}</button>
+      </form>
+      {{else}}
+      <p class="text-sm text-neutral-700">{{if $ja}}この PC に、パスワードを変えるための「再設定コード」を書いたファイルを作ります。ファイルのあるフォルダが開くので、中に書かれた8桁の数字を次の画面で入力してください。{{else}}A file containing a "reset code" for changing your password will be created on this PC. Its folder will open; enter the 8-digit number written in it on the next screen.{{end}}</p>
+      <p class="text-xs text-neutral-500">{{if $ja}}コードは15分間、1回だけ使えます。{{else}}The code can be used once, within 15 minutes.{{end}}</p>
+      <form id="recovery-code-form" method="post" action="/admin/login/recovery/code">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <button type="submit" class="btn btn-primary btn-md w-full">{{if $ja}}再設定コードを作る{{else}}Create reset code{{end}}</button>
+      </form>
+      {{end}}
+    </div>
+    <p class="mt-4 text-center text-xs"><a href="/admin/login" class="text-neutral-500 underline hover:text-neutral-800">{{if $ja}}ログイン画面に戻る{{else}}Back to login{{end}}</a></p>
+    {{else}}
+    <form method="post" action="/admin/login" class="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      {{/* ログアウト・パスワードの再設定などの後の通知は、トーストではなくフォームの中に出し続ける（見落とさないように）。 */}}
+      {{if and .Flash (not .FlashError)}}<p id="login-flash" class="notice notice-success" role="status">{{if and (eq .FlashKey "password_reset") (not $ja)}}Your password has been changed. Log in with your new password. AI apps need a new token.{{else}}{{.Flash}}{{end}}</p>{{end}}
+      <div>
+        <label for="username" class="block text-sm font-medium">{{.T "username"}}</label>
+        <input id="username" name="username" type="text" required autocomplete="username"{{if not $d.Username}} autofocus{{end}}
+               value="{{$d.Username}}"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+      </div>
+      <div>
+        <label for="password" class="block text-sm font-medium">{{.T "password"}}</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password"{{if $d.Username}} autofocus{{end}}
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+      </div>
+      {{if .FlashError}}<p class="text-sm text-neutral-600" role="alert">{{.Flash}}</p>{{end}}
+      <button type="submit" class="btn btn-primary btn-md w-full">{{.T "login"}}</button>
+    </form>
+    {{if $d.Desktop}}
+    <p class="mt-4 text-center text-sm"><a href="/admin/login/recovery" id="forgot-password" class="text-neutral-600 underline hover:text-neutral-900">{{if $ja}}パスワードを忘れたとき{{else}}Forgot your password?{{end}}</a></p>
+    {{else}}
+    <p class="mt-4 text-center text-xs text-neutral-400">{{.T "forgot_password"}}</p>
+    {{end}}
+    {{end}}
+    <p class="mt-3 text-center text-xs text-neutral-500"><a href="/admin/set-lang?lang=ja&amp;return=/admin/login">JA</a> | <a href="/admin/set-lang?lang=en&amp;return=/admin/login">EN</a></p>
+  </div>
+</div>
+{{end}}

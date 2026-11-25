@@ -1,0 +1,6 @@
+{
+  "name": { "ja": "ポータル", "en": "Portal" },
+  "description": { "ja": "濃紺のナビと白いカードで構成した、情報量の多いサイト向けのデザイン", "en": "Navy navigation and white cards for content-rich sites" },
+  "color_scheme": "light dark",
+  "order": 40
+}

@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1 class="page-title">{{if eq .Lang "en"}}Search{{else}}サイト内検索{{end}}</h1>
+{{if .Data.Static}}
+{{/* 静的エクスポートの検索ページ。static-search.js が /search-index.json を読み、ブラウザの中で結果を表示する。 */}}
+<form class="search-form search-form-large" action="{{if eq .Lang "en"}}/en/search{{else}}/search{{end}}" method="get" role="search" data-static-search="#static-search-results">
+  <label class="visually-hidden" for="search-page-q">{{if eq .Lang "en"}}Keywords{{else}}キーワード{{end}}</label>
+  <input id="search-page-q" type="search" name="q" value="" placeholder="{{if eq .Lang "en"}}Enter keywords{{else}}キーワードを入力{{end}}" autocomplete="off" autofocus>
+  <button type="submit">{{if eq .Lang "en"}}Search{{else}}検索{{end}}</button>
+</form>
+<div id="static-search-results" aria-live="polite" data-index="/search-index.json">
+  <p class="empty">{{if eq .Lang "en"}}Enter keywords to search articles.{{else}}キーワードを入力して記事を検索できます。{{end}}</p>
+  <noscript><p class="empty">{{if eq .Lang "en"}}JavaScript is required to search this page. Please enable JavaScript in your browser settings.{{else}}このページの検索には JavaScript を使います。ブラウザの設定で JavaScript を有効にしてください。{{end}}</p></noscript>
+</div>
+<script src="{{asset "js/static-search.js"}}" defer></script>
+{{else}}
+<form class="search-form search-form-large" action="{{if eq .Lang "en"}}/en/search{{else}}/search{{end}}" method="get" role="search">
+  <label class="visually-hidden" for="search-page-q">{{if eq .Lang "en"}}Keywords{{else}}キーワード{{end}}</label>
+  <input id="search-page-q" type="search" name="q" value="{{.Query}}" placeholder="{{if eq .Lang "en"}}Enter keywords{{else}}キーワードを入力{{end}}" autocomplete="off"
+         data-live-search="#search-results" autofocus>
+  <button type="submit">{{if eq .Lang "en"}}Search{{else}}検索{{end}}</button>
+</form>
+<div id="search-results" aria-live="polite">{{template "search_results" .Data}}</div>
+{{end}}
+{{end}}

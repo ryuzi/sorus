@@ -1,0 +1,9 @@
+/* Broken for a "light" theme: the CSS color-scheme overrides <meta name="color-scheme">. */
+:root {
+  --bg: #ffffff; --surface: #f5f5f5; --fg: #111111; --muted: #555555; --border: #dddddd;
+  --accent: #0b57d0; --accent-fg: #ffffff; --accent-soft: #e8f0fe; --mark: #fff59d;
+  --code-bg: #111111; --code-fg: #eeeeee;
+  --font-body: system-ui, sans-serif; --font-heading: Georgia, serif; --font-mono: ui-monospace, monospace;
+  --radius: 6px; --radius-lg: 10px; --content-width: 1000px; --prose-width: 720px; --shadow: none;
+}
+html { color-scheme: light dark; }

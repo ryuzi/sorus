@@ -1,0 +1,30 @@
+{{define "content"}}{{$d := .Data}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0">
+      <div class="mb-5">
+        <a href="/admin/settings/categories" class="text-sm text-neutral-500 hover:text-neutral-800">&larr; {{.T "categories"}}</a>
+        <h1 class="text-xl font-bold text-neutral-900">{{.T "category_edit"}}</h1>
+      </div>
+      {{range $d.Errors}}<p role="alert" class="notice notice-error mb-3">{{.}}</p>{{end}}
+      <form method="post" action="/admin/settings/categories/{{$d.Category.ID}}/edit" class="grid gap-4 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <label class="grid gap-1 text-sm">{{.T "category_name"}}
+          <input name="name" value="{{$d.Form.Name}}" required maxlength="100" class="rounded-lg border border-neutral-300 px-3 py-2">
+        </label>
+        <label class="grid gap-1 text-sm">{{.T "category_slug"}}
+          <input name="slug" value="{{$d.Form.Slug}}" required maxlength="200" class="rounded-lg border border-neutral-300 px-3 py-2">
+        </label>
+        <label class="grid gap-1 text-sm">{{.T "category_description"}}
+          <textarea name="description" rows="4" maxlength="1000" class="rounded-lg border border-neutral-300 px-3 py-2">{{$d.Form.Description}}</textarea>
+        </label>
+        <div class="flex gap-2">
+          <button class="btn btn-primary btn-md">{{.T "category_save_action"}}</button>
+          <a href="/admin/settings/categories" class="btn btn-secondary btn-md">{{.T "category_cancel_action"}}</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}

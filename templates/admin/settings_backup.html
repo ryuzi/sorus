@@ -1,0 +1,270 @@
+{{define "content"}}{{$d := .Data}}{{$ja := eq .Lang "ja"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  <div class="mb-5">
+    <h1 class="text-xl font-bold text-neutral-900">{{$.T "settings_nav_backup"}}</h1>
+    <p class="mt-1 flex items-center text-sm text-neutral-600">
+      {{if $ja}}記事・設定・画像をまとめて保存し、必要なときにその時点へ戻せます。{{else}}Save articles, settings and images together, and return to that point when needed.{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}データベースとアップロード画像・添付資料をまとめたバックアップを作成し、必要なときにその時点の状態へ戻します。別のパソコンやサーバーへの引っ越しにも使えます。{{else}}Create a backup of the database, uploaded images and attachments, and return the site to that state when needed. You can also use it to move the site to another computer or server.{{end}}</span><span>
+      {{if $ja}}独自テーマのファイルはバックアップに含まれません。取り込み元の URL または Zip は、バックアップといっしょに保管してください。復元しても、いま登録されている独自テーマはそのまま残ります。別のパソコンやサーバーへ移したときなど、復元先にテーマがない場合は、保管した URL または Zip から再登録してください。{{else}}Custom theme files are not included in backups. Keep the source URL or Zip file together with your backup. Restoring keeps the custom themes already on this site. If the theme is missing where you restore, such as after moving to another computer or server, add it again from the saved URL or Zip file.{{end}}</span></span></span>
+    </p>
+  </div>
+
+  {{with $d.Auto}}
+  {{/* デスクトップモードの自動バックアップ（handlers_backup_auto.go）。保存先のフォルダを1回選ぶと、起動時と1日1回そこへ置く。 */}}
+  <section id="auto-backup" class="mb-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="auto-backup-title">
+    <h2 id="auto-backup-title" class="flex items-center text-base font-semibold text-neutral-900">{{if $ja}}自動バックアップ{{else}}Automatic backup{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}保存先のフォルダを1回選ぶと、sorus を起動したときと、動いている間は1日1回、そのフォルダにバックアップを置きます。新しいものから {{.Keep}} 個を残し、それより古いものは消します。{{else}}Choose a folder once. sorus saves a backup there when it starts and once a day while it runs, keeping the newest {{.Keep}}.{{end}}</span><span>{{if $ja}}OneDrive・Google ドライブ・Dropbox のフォルダを選ぶと、バックアップがインターネット上にも自動で保存されるので、PC が壊れても安心です。{{else}}Choosing a OneDrive, Google Drive or Dropbox folder keeps a copy online as well, so your data survives even if this computer breaks.{{end}}</span><span>{{if $ja}}サイトを渡すときは「今のサイトを Zip ファイルでダウンロード」を使ってください。{{else}}To share the site, use “Download the site as a Zip file.”{{end}}</span></span></span></h2>
+    <p class="mt-1 text-sm text-amber-800">{{if $ja}}自動バックアップにもパスワードや API キーなどの秘密情報が含まれます。人に渡さないでください。{{else}}Automatic backups also contain passwords and API keys. Do not share them.{{end}}</p>
+
+    {{if .Folder}}
+    <div id="auto-backup-current" class="mt-4 notice {{if and .Last (not .Last.OK)}}notice-error{{else}}notice-neutral{{end}}">
+      <p class="text-neutral-700">{{if $ja}}保存先{{else}}Folder{{end}}: <span class="break-all font-mono text-neutral-900">{{.Folder}}</span></p>
+      {{if not .Last}}
+      <p class="mt-1 text-neutral-700">{{if $ja}}まだバックアップはありません。{{else}}No backup yet.{{end}}</p>
+      {{else if .Last.OK}}
+      <p class="mt-1 text-neutral-700">{{if $ja}}最後のバックアップ{{else}}Last backup{{end}}: <span class="font-medium tabular-nums">{{.LastAtFor $.Lang}}</span></p>
+      {{with .Last.WarningFor $.Lang}}<p class="mt-1 text-xs text-neutral-600">{{.}}</p>{{end}}
+      {{else}}
+      <p class="mt-1 font-medium text-rose-900">{{$.T "backup_status_failed_at" (.LastAtFor $.Lang)}}</p>
+      <p class="mt-1 text-rose-900">{{.Last.MessageFor $.Lang}}</p>
+      {{end}}
+      <div class="mt-3 flex flex-wrap gap-2">
+        <form method="post" action="/admin/settings/backup/auto/run" onsubmit="this.querySelector('button').disabled = true">
+          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+          <button type="submit" id="auto-backup-run" class="btn btn-primary btn-md">{{if $ja}}今すぐバックアップする{{else}}Back up now{{end}}</button>
+        </form>
+        <form method="post" action="/admin/settings/backup/auto/off" data-confirm="{{if $ja}}自動バックアップをやめますか？（作ったバックアップは消えません）{{else}}Stop automatic backups? (Existing backups are kept.){{end}}">
+          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+          <button type="submit" class="btn btn-secondary btn-md">{{if $ja}}自動バックアップをやめる{{else}}Stop automatic backups{{end}}</button>
+        </form>
+      </div>
+    </div>
+    {{end}}
+
+    <h3 class="mt-5 flex items-center text-sm font-semibold text-neutral-800">{{if .Folder}}{{if $ja}}保存先を変える{{else}}Change the folder{{end}}{{else}}{{if $ja}}保存先のフォルダを選ぶ{{else}}Choose a folder{{end}}{{end}}{{if .Candidates}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}この PC で見つかった同期フォルダです。選ぶと、その中に「sorus バックアップ」フォルダを作って保存します。{{else}}Sync folders found on this computer. sorus creates an "sorus バックアップ" folder inside the one you choose.{{end}}</span></span>{{end}}</h3>
+    {{if .Candidates}}
+    <div class="mt-2 flex flex-col gap-2">
+      {{range .Candidates}}
+      <form method="post" action="/admin/settings/backup/auto">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <input type="hidden" name="folder" value="{{.Suggested}}">
+        <button type="submit" class="flex w-full flex-col items-start rounded-lg border border-neutral-300 px-4 py-2.5 text-left hover:bg-neutral-50">
+          <span class="text-sm font-semibold text-neutral-900">{{if $ja}}{{.Service}} に保存する{{else}}Save to {{.Service}}{{end}}</span>
+          <span class="break-all font-mono text-xs text-neutral-500">{{.Suggested}}</span>
+        </button>
+      </form>
+      {{end}}
+    </div>
+    {{else}}
+    <p class="mt-1 text-xs text-neutral-500">{{if $ja}}OneDrive・Google ドライブ・Dropbox のフォルダは見つかりませんでした。使っている場合は、そのフォルダの場所を入力してください。{{else}}No OneDrive, Google Drive or Dropbox folder was found. If you use one, enter its location.{{end}}</p>
+    {{end}}
+    <form id="auto-backup-form" method="post" action="/admin/settings/backup/auto" class="mt-3">
+      <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+      <div class="flex items-center"><label for="auto-backup-folder" class="text-sm font-medium text-neutral-800">{{if $ja}}フォルダの場所を入力する{{else}}Enter a folder location{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}フォルダが無ければ作ります。{{else}}The folder is created if it does not exist.{{end}}</span></span></div>
+      <div class="mt-1 flex flex-wrap gap-2">
+        <input id="auto-backup-folder" name="folder" type="text" value="{{if .Input}}{{.Input}}{{else}}{{.Folder}}{{end}}" spellcheck="false"
+               placeholder="{{if $ja}}例: C:\Users\hanako\OneDrive\sorus バックアップ{{else}}e.g. C:\Users\hanako\OneDrive\sorus backup{{end}}"
+               class="min-w-0 flex-1 rounded-lg border {{if .Error}}border-rose-400{{else}}border-neutral-300{{end}} px-3 py-2 font-mono text-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+               {{if .Error}}aria-invalid="true" aria-describedby="auto-backup-error"{{end}}>
+        <button type="submit" class="btn btn-secondary btn-md">{{if $ja}}ここに保存する{{else}}Save here{{end}}</button>
+      </div>
+      {{with .Error}}<p id="auto-backup-error" class="mt-1 text-sm text-rose-800" role="alert">{{.}}</p>{{end}}
+    </form>
+  </section>
+  {{end}}
+
+  <section class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="backup-create-title">
+    <h2 id="backup-create-title" class="flex items-center text-base font-semibold text-neutral-900">{{if $ja}}手動でバックアップをダウンロード{{else}}Download backup manually{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}記事・ユーザー・サイト設定などのデータベースと、アップロードした画像（Favicon を含む）、記事に添付した資料（PDF など）を 1 つの Zip ファイルにまとめてダウンロードします。サイトを止めずに実行できます。{{else}}Download the database (articles, users, site settings and more), all uploaded images including the favicon, and files attached to articles as a single Zip file. The site keeps running while the backup is created.{{end}}</span><span>{{if $ja}}ファイル名は <code>sorus_backup_日時.zip</code> です。安全な場所に保管してください。ログイン中の情報（セッション）は含まれません。{{else}}The file is named <code>sorus_backup_DATE_TIME.zip</code>. Keep it in a safe place. Active login sessions are not included.{{end}}</span><span>{{if $ja}}サイトを渡すときは「今のサイトを Zip ファイルでダウンロード」を使ってください。{{else}}To share the site, use “Download the site as a Zip file.”{{end}}</span></span></span></h2>
+    {{/* 自動バックアップ（デスクトップモード）と中身は同じ（handlers_backup_auto.go も同じ完全バックアップを作る）。違うのは保存先と作るタイミングだけ。 */}}
+    <p id="backup-manual-note" class="mt-1 text-sm text-neutral-600">{{if $d.Auto}}{{if $ja}}自動バックアップと同じ内容を、いますぐこのブラウザでダウンロードします。違いは保存先と作るタイミングだけです。{{else}}Downloads the same data as the automatic backup to this browser right now. Only where it is saved and when it is made differ.{{end}}{{else}}{{if $ja}}データベース・アップロード画像・添付資料（ログイン中の情報と独自テーマは含みません）を、いますぐこのブラウザでダウンロードします。{{else}}Downloads the database, uploaded images and attachments (active login sessions and custom themes are not included) to this browser right now.{{end}}{{end}}</p>
+    <p class="mt-2 text-sm text-amber-800">{{if $ja}}このバックアップには、パスワードや API キーなどの秘密情報が含まれます。人に渡さないでください。{{else}}This backup contains passwords and API keys. Do not share it.{{end}}</p>
+    <form method="post" action="/admin/settings/backup/download" id="backup-download-form" class="mt-4 flex flex-wrap items-center gap-3">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <button type="submit" id="backup-download" class="btn btn-primary btn-md">{{if $ja}}バックアップを作成してダウンロード{{else}}Create and download backup{{end}}</button>
+      <span id="backup-download-status" class="text-sm text-neutral-500" aria-live="polite"></span>
+    </form>
+  </section>
+
+  <section class="mt-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="backup-restore-title">
+    <h2 id="backup-restore-title" class="flex items-center text-base font-semibold text-neutral-900">{{if $ja}}バックアップから復元{{else}}Restore from a backup{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}この画面でダウンロードしたバックアップ、または <code>sorus backup</code> コマンドで作成したバックアップ（.zip）から、データベースと画像を復元します。{{else}}Restore the database and images from a backup (.zip) downloaded on this page or created with the <code>sorus backup</code> command.{{end}}</span><span>{{if $ja}}記事・ユーザー・設定・画像が、バックアップを作成した時点の内容に戻ります。{{else}}Articles, users, settings and images return to the state at the time the backup was created.{{end}}</span><span>{{if $ja}}置き換える前のデータは、サーバー上の元の場所に「.pre-restore-日時」を付けた名前で残します。{{else}}The data before the restore is kept on the server next to the original, with ".pre-restore-DATE_TIME" added to its name.{{end}}</span><span>{{if $ja}}復元が終わると、全員がログアウトされます。復元したデータのアカウントでもう一度ログインしてください。{{else}}After the restore, everyone is signed out. Sign in again with an account from the restored data.{{end}}</span></span></span></h2>
+    <p class="mt-1 text-sm text-amber-800" role="note">{{if $ja}}復元すると現在のデータが置き換わります。{{else}}Restoring replaces the current data.{{end}}</p>
+
+    <form id="restore-form" method="post" action="/admin/settings/backup/restore" enctype="multipart/form-data" class="mt-4" data-max-bytes="{{$d.MaxRestoreBytes}}">
+      <label for="restore-file" id="restore-drop"
+             class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center transition hover:bg-neutral-100">
+        <span class="text-sm font-semibold text-neutral-800">{{if $ja}}バックアップファイル（.zip）をここにドラッグ＆ドロップ{{else}}Drag and drop a backup file (.zip) here{{end}}</span>
+        <span class="text-xs text-neutral-500">{{if $ja}}またはクリックしてファイルを選択（{{$d.MaxRestoreSize}} まで）{{else}}or click to choose a file (up to {{$d.MaxRestoreSize}}){{end}}</span>
+        <span id="restore-file-name" class="mt-2 break-all font-mono text-sm text-neutral-800"></span>
+      </label>
+      <input id="restore-file" name="backup" type="file" accept=".zip,application/zip" class="sr-only">
+      <div id="restore-progress-wrap" class="mt-4 hidden">
+        <progress id="restore-progress" max="100" value="0" class="h-2 w-full"></progress>
+        <p id="restore-status" class="mt-1 text-sm text-neutral-600" aria-live="polite"></p>
+      </div>
+      <button type="submit" id="restore-submit" disabled
+              class="btn btn-danger btn-md mt-4">{{if $ja}}このバックアップから復元する{{else}}Restore from this backup{{end}}</button>
+    </form>
+  </section>
+    </div>
+  </div>
+</div>
+
+<dialog id="restore-confirm" class="ai-modal w-[min(32rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="restore-confirm-title">
+  <form method="dialog" class="p-5">
+    <h2 id="restore-confirm-title" class="text-base font-semibold text-neutral-900">{{if $ja}}本当に復元しますか？{{else}}Restore this backup?{{end}}</h2>
+    <p class="mt-3 text-sm text-neutral-700">{{if $ja}}選択したファイル:{{else}}Selected file:{{end}} <strong id="restore-confirm-name" class="break-all font-mono"></strong></p>
+    <p class="mt-2 text-sm text-neutral-700">{{if $ja}}現在の記事・ユーザー・設定・画像は、このバックアップの内容に置き換わります。この操作は画面から取り消せません。{{else}}The current articles, users, settings and images will be replaced by the contents of this backup. This cannot be undone from the admin screen.{{end}}</p>
+    <label class="mt-4 flex items-start gap-2 text-sm text-neutral-800">
+      <input type="checkbox" id="restore-confirm-check" class="mt-0.5">
+      <span>{{if $ja}}内容を理解したうえで復元します{{else}}I understand and want to restore{{end}}</span>
+    </label>
+    <div class="mt-5 flex justify-end gap-2">
+      <button value="cancel" class="btn btn-secondary btn-md">{{if $ja}}キャンセル{{else}}Cancel{{end}}</button>
+      <button value="restore" id="restore-confirm-ok" disabled
+              class="btn btn-danger btn-md">{{if $ja}}復元する{{else}}Restore{{end}}</button>
+    </div>
+  </form>
+</dialog>
+{{end}}
+
+{{define "scripts"}}{{$ja := ne .Lang "en"}}
+<script>
+(function () {
+  'use strict';
+
+  // バックアップのダウンロードは作成に時間がかかるため、二重送信を防ぎ、待つように知らせる。
+  var downloadForm = document.getElementById('backup-download-form');
+  if (downloadForm) {
+    downloadForm.addEventListener('submit', function () {
+      var btn = document.getElementById('backup-download');
+      var status = document.getElementById('backup-download-status');
+      status.textContent = '{{if $ja}}バックアップを作成しています。ダウンロードが始まるまでお待ちください。{{else}}Creating the backup. The download starts when it is ready.{{end}}';
+      setTimeout(function () { btn.disabled = true; }, 0);
+      setTimeout(function () { btn.disabled = false; status.textContent = ''; }, 8000);
+    });
+  }
+
+  var form = document.getElementById('restore-form');
+  if (!form) return;
+  var input = document.getElementById('restore-file');
+  var drop = document.getElementById('restore-drop');
+  var nameEl = document.getElementById('restore-file-name');
+  var submit = document.getElementById('restore-submit');
+  var dialog = document.getElementById('restore-confirm');
+  var check = document.getElementById('restore-confirm-check');
+  var ok = document.getElementById('restore-confirm-ok');
+  var wrap = document.getElementById('restore-progress-wrap');
+  var progress = document.getElementById('restore-progress');
+  var status = document.getElementById('restore-status');
+  var maxBytes = Number(form.getAttribute('data-max-bytes')) || 0;
+  var file = null;
+
+  function formatSize(n) {
+    if (n >= 1073741824) return (n / 1073741824).toFixed(1) + ' GB';
+    if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+    if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+    return n + ' B';
+  }
+
+  function choose(f) {
+    file = null;
+    submit.disabled = true;
+    nameEl.textContent = '';
+    if (!f) return;
+    if (!/\.zip$/i.test(f.name)) {
+      window.cmsToast('{{if $ja}}Zip 形式（.zip）のバックアップファイルを選択してください{{else}}Choose a backup file in Zip format (.zip){{end}}', 'error');
+      return;
+    }
+    if (maxBytes && f.size > maxBytes) {
+      window.cmsToast('{{if $ja}}ファイルが大きすぎます（上限 {{else}}The file is too large (limit {{end}}' + formatSize(maxBytes) + '{{if $ja}}）{{else}}){{end}}', 'error');
+      return;
+    }
+    file = f;
+    nameEl.textContent = f.name + ' (' + formatSize(f.size) + ')';
+    submit.disabled = false;
+  }
+
+  input.addEventListener('change', function () { choose(input.files && input.files[0]); });
+  ['dragenter', 'dragover'].forEach(function (type) {
+    drop.addEventListener(type, function (e) {
+      e.preventDefault();
+      drop.classList.add('border-zinc-500', 'bg-neutral-100');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (type) {
+    drop.addEventListener(type, function (e) {
+      e.preventDefault();
+      drop.classList.remove('border-zinc-500', 'bg-neutral-100');
+    });
+  });
+  drop.addEventListener('drop', function (e) {
+    choose(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!file) return;
+    document.getElementById('restore-confirm-name').textContent = file.name;
+    check.checked = false;
+    ok.disabled = true;
+    dialog.returnValue = '';
+    dialog.showModal();
+  });
+  check.addEventListener('change', function () { ok.disabled = !check.checked; });
+  dialog.addEventListener('close', function () {
+    if (dialog.returnValue === 'restore' && check.checked) upload();
+  });
+
+  function fail(message) {
+    wrap.classList.add('hidden');
+    status.textContent = '';
+    input.disabled = false;
+    submit.disabled = !file;
+    window.cmsToast(message, 'error');
+  }
+
+  // 本文をログイン確認の前に読ませないよう、CSRF トークンは必ずヘッダーで送る（XMLHttpRequest は送信の進み具合も分かる）。
+  function upload() {
+    var data = new FormData();
+    data.append('backup', file, file.name);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', form.action);
+    xhr.setRequestHeader('X-CSRF-Token', window.cmsCSRFToken());
+    xhr.setRequestHeader('Accept', 'application/json');
+    input.disabled = true;
+    submit.disabled = true;
+    wrap.classList.remove('hidden');
+    progress.value = 0;
+    status.textContent = '{{if $ja}}バックアップをアップロードしています...{{else}}Uploading the backup...{{end}}';
+    xhr.upload.onprogress = function (e) {
+      if (!e.lengthComputable) return;
+      var pct = Math.round(e.loaded / e.total * 100);
+      progress.value = pct;
+      status.textContent = '{{if $ja}}バックアップをアップロードしています... {{else}}Uploading the backup... {{end}}' + pct + '%';
+    };
+    xhr.upload.onload = function () {
+      progress.removeAttribute('value');
+      status.textContent = '{{if $ja}}バックアップを検査して復元しています。画面を閉じずにお待ちください...{{else}}Checking and restoring the backup. Keep this page open...{{end}}';
+    };
+    xhr.onload = function () {
+      var res = {};
+      try { res = JSON.parse(xhr.responseText); } catch (err) { res = {}; }
+      if (xhr.status === 200) {
+        progress.value = 100;
+        status.textContent = res.message || '';
+        window.cmsToast(res.message || '{{if $ja}}復元しました{{else}}Restored{{end}}', 'success');
+        var next = typeof res.redirect === 'string' && res.redirect.indexOf('/admin') === 0 ? res.redirect : '/admin/settings/backup';
+        setTimeout(function () { window.location.href = next; }, 1200);
+        return;
+      }
+      fail((res.message || '{{if $ja}}復元に失敗しました{{else}}Restore failed{{end}}') + ' (' + xhr.status + ')');
+    };
+    xhr.onerror = function () {
+      fail('{{if $ja}}通信に失敗しました。ネットワークを確認してからやり直してください{{else}}The upload failed. Check the network connection and try again{{end}}');
+    };
+    xhr.send(data);
+  }
+})();
+</script>
+{{end}}

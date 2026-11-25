@@ -1,0 +1,229 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}{{$csrf := .CSRFToken}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  <div class="mb-5">
+    <h1 class="text-xl font-bold text-neutral-900">{{$.T "settings_nav_publish"}}</h1>
+    <p class="mt-1 text-sm text-neutral-600">{{$.T "publish_remote_intro"}}</p>
+  </div>
+
+  {{/* 公開方法は「公開サーバー」か「静的サイト」のどちらか1つ。先頭に方式のタブを置く（publish.html と同じ部品）。
+       最初に目に入る位置には主な操作（いまの接続・一括同期・招待）だけを置き、参加し直す・URL とトークンの直接入力・接続の解除は
+       最下部の「接続・設定の管理」（#remote-manage）に収める。未接続のときは、参加（招待コードの貼り付け）が主な操作になる。 */}}
+  {{template "publish_method_banner" $}}
+
+  {{if and $d.HasToken $d.ServerHost}}
+  <section id="remote-connection" class="mb-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="remote-connection-title">
+    <h2 id="remote-connection-title" class="text-sm font-semibold text-neutral-800">{{if $ja}}いまの接続{{else}}Current connection{{end}}</h2>
+    <dl class="mt-3 grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-sm">
+      <dt class="text-neutral-500">{{if $ja}}接続先{{else}}Server{{end}}</dt><dd class="break-all font-medium text-neutral-900" id="remote-connection-host">{{$d.ServerHost}}</dd>
+      {{with $d.Token}}
+      <dt class="text-neutral-500">{{if $ja}}名前{{else}}Name{{end}}</dt><dd class="text-neutral-800">{{.Subject}}</dd>
+      <dt class="text-neutral-500">{{if $ja}}立場{{else}}Role{{end}}</dt>
+      <dd class="text-neutral-800" data-remote-role="{{.Role}}"><span class="font-medium">{{$d.Role.Label}}</span><span class="text-neutral-500">{{if $ja}}（{{$d.Role.Description}}）{{else}} ({{$d.Role.Description}}){{end}}</span></dd>
+      <dt class="text-neutral-500">{{if $ja}}有効期限{{else}}Expires{{end}}</dt>
+      <dd class="{{if .Expired}}font-semibold text-rose-700{{else}}text-neutral-800{{end}}" id="remote-connection-expiry">{{$d.ExpiryText}}</dd>
+      {{end}}
+    </dl>
+    {{if and $d.Token $d.Token.Expired}}
+    <p class="notice notice-error mt-3" role="alert">{{if $ja}}招待の有効期限が切れています。サイト管理者に新しい招待コードを発行してもらい、下の「接続・設定の管理」で参加し直してください。{{else}}The invite has expired. Ask the site administrator for a new invite code and join again under "Connection and settings" below.{{end}}</p>
+    {{else if $d.TokenError}}
+    <p id="remote-connection-error" class="notice notice-error mt-3" role="alert">{{if $ja}}保存済みのトークンを読み取れません。下の「接続・設定の管理」で、新しい招待コードで参加し直してください。{{else}}The saved token cannot be read. Join again with a new invite code under "Connection and settings" below.{{end}}</p>
+    {{end}}
+  </section>
+  {{end}}
+
+  {{if $d.CanBulkSync}}{{$b := $d.BulkStatus}}
+  {{/* 公開中の記事・添付ファイル・フォトギャラリーの写真を、ボタン1つで公開サーバーへまとめて送る（handlers_remote_bulk.go）。
+       送信はサーバーの中で続き、画面は進み具合を読むだけ（static/js/remote_sync.js）。 */}}
+  <section id="remote-bulk-sync" class="mb-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="remote-bulk-title"
+           data-remote-bulk data-bulk-running="{{$b.Running}}" data-bulk-active="{{$d.BulkActive}}">
+    <h2 id="remote-bulk-title" class="flex items-center text-base font-semibold text-neutral-900">{{$.T "remote_bulk_title"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{$.T "remote_bulk_note_overwrite"}}</span><span>{{$.T "remote_bulk_note_background"}}</span></span></span></h2>
+    <p class="mt-1 text-sm text-neutral-600">{{$.T "remote_bulk_desc" $d.BulkPlan.Articles $d.BulkPlan.Attachments}}</p>
+    {{if not $d.BulkActive}}<p id="remote-bulk-standby" class="notice notice-warn mt-3">{{$.T "remote_bulk_standby"}}</p>{{end}}
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      <button type="button" id="remote-bulk-start" class="btn btn-primary btn-md"{{if or $b.Running (not $d.BulkActive)}} disabled{{end}}
+              data-confirm-message="{{$.T "remote_bulk_confirm" $d.BulkPlan.Articles $d.BulkPlan.Attachments}}" data-confirm-title="{{$.T "remote_bulk_title"}}"
+              data-confirm-ok="{{$.T "remote_bulk_start"}}">{{$.T "remote_bulk_start"}}</button>
+    </div>
+    <div id="remote-bulk-progress" class="mt-4"{{if not $b.Running}} hidden{{end}} aria-live="polite">
+      <div class="h-2 w-full overflow-hidden rounded-full bg-neutral-200" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{$b.Percent}}" aria-labelledby="remote-bulk-title">
+        <div id="remote-bulk-bar" class="h-2 rounded-full bg-zinc-800 transition-all" style="width: {{$b.Percent}}%"></div>
+      </div>
+      <p id="remote-bulk-text" class="mt-2 text-sm text-neutral-700">{{if $b.Running}}{{$.T "js_bulk_running" (print $b.Done) (print $b.Total)}}{{if $b.Waiting}} {{$.T "js_bulk_waiting" (print $b.Waiting)}}{{end}}{{end}}</p>
+    </div>
+    <div id="remote-bulk-result" class="mt-4"{{if or $b.Running (not $b.Started)}} hidden{{end}}>
+      {{if and $b.Started (not $b.Running)}}
+      <div class="notice {{if eq $b.Outcome "ok"}}notice-success{{else}}notice-warn{{end}}" data-bulk-result="{{if eq $b.Outcome "ok"}}ok{{else}}partial{{end}}">
+        <p class="font-semibold">{{if eq $b.Outcome "ok"}}{{$.T "js_bulk_result_ok" (print $b.Articles) (print $b.Attachments) (print $b.Images) (print $b.Media)}}{{else if eq $b.Outcome "partial"}}{{$.T "js_bulk_result_partial" (print $b.Articles) (print (len $b.Failures))}}{{else}}{{$.T "js_bulk_result_stopped" (print $b.Done) (print $b.Total)}}{{if eq $b.Outcome "timeout"}} {{$.T "js_bulk_stopped_timeout"}}{{else if $b.StopReason}} {{$b.StopReason}}{{end}}{{end}}</p>
+        {{with $b.Notes}}<ul class="mt-2 list-disc space-y-1 pl-5">{{range .}}<li>{{$.T .}}</li>{{end}}</ul>{{end}}
+        {{with $b.Failures}}<ul class="mt-2 list-disc space-y-1 pl-5">{{range .}}<li><span class="font-medium">{{if eq .Kind "gallery"}}{{$.T "js_bulk_gallery"}}{{else}}{{.Title}}{{end}}</span>: {{if eq .Kind "attachments"}}{{$.T "js_bulk_attachments_failed"}} {{end}}{{.Message}}</li>{{end}}</ul>{{end}}
+        <p class="mt-2 text-xs opacity-75">{{$.T "js_bulk_finished_at" $b.FinishedText}}</p>
+      </div>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+
+  {{if not $d.HasToken}}{{template "remote_join_card" $}}{{end}}
+
+  {{if $d.CanInvite}}
+  <section class="mb-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" data-remote-invites aria-labelledby="remote-invite-title">
+    <h2 id="remote-invite-title" class="flex items-center text-sm font-semibold text-neutral-800">{{if $ja}}招待する{{else}}Invite{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}公開サーバーに記事を送ってもらう人を招待します。招待コードを作り、その人にメールやチャットで送ってください。{{else}}Invite people who will send articles to the publish server. Create an invite code and send it to them by email or chat.{{end}}</span><span>{{if $ja}}受け取った人は、自分の sorus の「設定」→「公開先」で「公開サーバーに接続する」を開き、招待コードを貼り付けるだけで参加できます。{{else}}They can join by opening "Settings" → "Publishing" → "Connect to a publish server" in their own sorus and pasting the code.{{end}}</span></span></span></h2>
+    <form id="remote-invite-form" class="mt-4 grid gap-3 sm:grid-cols-[1fr_11rem_9rem_auto] sm:items-end" autocomplete="off">
+      <div>
+        <label for="invite_name" class="block text-xs font-semibold text-neutral-700">{{if $ja}}名前{{else}}Name{{end}}</label>
+        <input id="invite_name" name="name" type="text" required maxlength="100" placeholder="{{if $ja}}例: 山田 花子{{else}}e.g. Jane Smith{{end}}"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+      </div>
+      <div>
+        <label for="invite_role" class="block text-xs font-semibold text-neutral-700">{{if $ja}}立場{{else}}Role{{end}}</label>
+        <select id="invite_role" name="role" class="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+          <option value="writer" selected>{{if $ja}}ライター（記事を提出）{{else}}Writer (submits articles){{end}}</option>
+          <option value="editor">{{if $ja}}編集者（校閲して公開）{{else}}Editor (reviews and publishes){{end}}</option>
+          <option value="admin">{{if $ja}}サイト管理者（すべて）{{else}}Site administrator (everything){{end}}</option>
+        </select>
+      </div>
+      <div>
+        <label for="invite_ttl" class="block text-xs font-semibold text-neutral-700">{{if $ja}}使える期間{{else}}Valid for{{end}}</label>
+        <select id="invite_ttl" name="ttl_days" class="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+          <option value="7">{{if $ja}}1週間{{else}}1 week{{end}}</option>
+          <option value="30">{{if $ja}}1か月{{else}}1 month{{end}}</option>
+          <option value="90" selected>{{if $ja}}3か月{{else}}3 months{{end}}</option>
+          <option value="365">{{if $ja}}1年{{else}}1 year{{end}}</option>
+          <option value="1095">{{if $ja}}3年{{else}}3 years{{end}}</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-md">{{if $ja}}招待コードを作る{{else}}Create invite code{{end}}</button>
+    </form>
+
+    <div id="remote-invite-result" class="notice notice-success mt-4" role="status" aria-live="polite" hidden>
+      <p id="remote-invite-result-title" class="text-sm font-semibold text-emerald-900"></p>
+      <p class="mt-1 text-xs text-emerald-900">{{if $ja}}この招待コードは今だけ表示されます。「コピー」を押して、招待する人に送ってください。{{else}}This invite code is shown only now. Press "Copy" and send it to the person you are inviting.{{end}}</p>
+      <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start">
+        <textarea id="remote-invite-code" rows="3" readonly spellcheck="false"
+                  class="w-full break-all rounded-lg border border-emerald-200 bg-white p-2 font-mono text-xs text-neutral-800"></textarea>
+        <button type="button" id="remote-invite-copy" class="btn btn-primary btn-md shrink-0">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+      </div>
+    </div>
+
+    <h3 class="mt-6 flex items-center text-sm font-semibold text-neutral-800">{{if $ja}}発行した招待{{else}}Issued invites{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}なくした・やめた人の招待は「取り消す」を押すと、すぐに使えなくなります。{{else}}Press "Revoke" to disable an invite immediately, for example if it was lost or the person left.{{end}}</span></span></h3>
+    <div class="mt-2 overflow-x-auto">
+      <table class="w-full min-w-[40rem] text-left text-sm" id="remote-invite-table">
+        <thead class="text-xs text-neutral-500">
+          <tr><th class="py-2 pr-3 font-medium">{{if $ja}}名前{{else}}Name{{end}}</th><th class="py-2 pr-3 font-medium">{{if $ja}}立場{{else}}Role{{end}}</th><th class="py-2 pr-3 font-medium">{{if $ja}}発行日{{else}}Issued{{end}}</th><th class="py-2 pr-3 font-medium">{{if $ja}}有効期限{{else}}Expires{{end}}</th><th class="py-2 pr-3 font-medium">{{if $ja}}状態{{else}}Status{{end}}</th><th class="py-2 pr-3 font-medium">{{if $ja}}発行した人{{else}}Issued by{{end}}</th><th class="py-2"><span class="sr-only">{{if $ja}}操作{{else}}Actions{{end}}</span></th></tr>
+        </thead>
+        <tbody id="remote-invite-rows" class="text-neutral-800"></tbody>
+      </table>
+    </div>
+    <p id="remote-invite-status" class="mt-2 text-sm text-neutral-500" hidden></p>
+  </section>
+  {{end}}
+
+  {{if or $d.CanManageSiteAccess $d.CanManageMaintenance}}
+  <p id="remote-operations-link" class="text-sm text-neutral-600">
+    {{if eq $.Lang "en"}}Access restriction and maintenance mode are on the <a href="/admin/settings/operations" class="font-medium text-zinc-800 underline">Site operations</a> page.{{else}}閲覧制限とメンテナンス表示は<a href="/admin/settings/operations" class="font-medium text-zinc-800 underline">「サイト運用」</a>で切り替えます。{{end}}
+  </p>
+  {{end}}
+
+  {{if $d.HasToken}}
+  {{/* 接続の管理（参加し直す・URL とトークンの直接入力・接続の解除）。ふだんは閉じておき、参加し直しや詳細設定の保存に失敗した
+       とき・招待の期限が切れた／トークンが読めないときは開いて見せる。 */}}
+  <details id="remote-manage" class="publish-manage"{{if or $d.AdvancedOpen $d.JoinCode $d.TokenError (and $d.Token $d.Token.Expired)}} open{{end}}>
+    <summary>{{$.T "publish_manage_title"}}</summary>
+    <div class="publish-manage-body">
+      {{template "remote_join_card" $}}
+      {{template "remote_advanced" $}}
+      {{template "publish_method_danger" $}}
+    </div>
+  </details>
+  {{else}}
+  <div class="mt-6">{{template "remote_advanced" $}}</div>
+  {{end}}
+
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{/* remote_join_card は招待コードを貼り付けて公開サーバーに参加する（参加し直す）フォーム。. はページ。 */}}
+{{define "remote_join_card"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}
+  <section id="remote-join" class="{{if not $d.HasToken}}mb-6 {{end}}rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="remote-join-heading">
+    <h2 class="text-sm font-semibold text-neutral-800" id="remote-join-heading">{{if $ja}}{{if $d.HasToken}}別の招待コードで参加し直す{{else}}公開サーバーに参加する{{end}}{{else}}{{if $d.HasToken}}Rejoin with another invite code{{else}}Join a publish server{{end}}{{end}}</h2>
+    <form id="remote-join-form" method="post" action="/admin/settings/remote/join" class="mt-3 flex flex-col gap-4" autocomplete="off">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <div>
+        <div class="flex items-center"><label for="invite_code" class="text-xs font-semibold text-neutral-700">{{if $ja}}招待コード{{else}}Invite code{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}サイト管理者から受け取った、sorus-invite: で始まる長い文字列です。メールやチャットで受け取ったものを、全部そのまま貼り付けてください。{{else}}The long string starting with sorus-invite: that you received from the site administrator. Paste the whole code you received by email or chat.{{end}}</span><span>{{if $ja}}公開サーバーにつながることを確かめてから保存します。つながらないときは何も変わりません。{{else}}It is saved only after the connection to the publish server is confirmed. Nothing changes if it cannot connect.{{end}}</span>{{if $d.HasToken}}<span>{{if $ja}}参加し直すと、いまの接続は新しい招待コードの接続に切り替わります。{{else}}Rejoining switches the current connection to the new invite code.{{end}}</span>{{end}}</span></span></div>
+        <textarea id="invite_code" name="invite_code" rows="3" spellcheck="false" required placeholder="sorus-invite:..."
+                  class="mt-1.5 w-full break-all rounded-lg border border-neutral-300 bg-neutral-50 p-3 font-mono text-xs text-neutral-800 focus:border-zinc-500 focus:outline-none">{{$d.JoinCode}}</textarea>
+      </div>
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <button type="submit" id="remote-join-button" class="btn btn-primary btn-md">{{if $ja}}接続を確かめて参加する{{else}}Check connection and join{{end}}</button>
+      </div>
+    </form>
+  </section>
+{{end}}
+
+{{/* remote_advanced は公開サーバーの URL とトークンを直接入力する詳細設定（招待コードを使わないとき）。. はページ。 */}}
+{{define "remote_advanced"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}
+  <details id="remote-advanced" class="rounded-xl border border-neutral-200 bg-white shadow-sm"{{if $d.AdvancedOpen}} open{{end}}>
+    <summary class="cursor-pointer px-6 py-4 text-sm font-semibold text-neutral-700">{{if $ja}}詳細設定（公開サーバーの URL とトークンを直接入力する）{{else}}Advanced (enter the publish server URL and token directly){{end}}</summary>
+    <div class="border-t border-neutral-200 px-6 pb-6 pt-4">
+    <form id="remote-settings-form" method="post" action="/admin/settings/remote" class="flex flex-col gap-5" autocomplete="off">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+      <div>
+        <div class="flex items-center"><label for="remote_url" class="text-sm font-semibold text-neutral-800">{{if $ja}}公開サーバーの URL{{else}}Publish server URL{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}ふだんは招待コードを使ってください。ここは、同期 API の URL とトークンを別々に受け取った場合に使います。{{else}}Normally, use an invite code. Use this only if you received the sync API URL and token separately.{{end}}</span><span>{{if $ja}}公開サーバーの管理者から受け取った、同期 API のパスまで含めた URL をそのまま貼り付けてください。{{else}}Paste the URL, including the sync API path, exactly as you received it from the publish server administrator.{{end}} {{if $ja}}例: <code>{{else}}e.g. <code>{{end}}https://media.example.jp/api/sync-0123456789abcdef0123456789abcdef{{if $ja}}</code>。{{else}}</code>.{{end}}</span><span>{{if $ja}}パスだけ（<code>/api/sync-...</code>）を受け取った場合は、公開サーバーの URL のすぐ後ろにつなげて入力します。パスを省略すると <code>/api/sync</code> に接続します。{{else}}If you received only the path (<code>/api/sync-...</code>), append it directly after the publish server URL. If the path is omitted, it connects to <code>/api/sync</code>.{{end}}</span><span>{{if $ja}}安全のため <code>https://</code> で始まる URL を使います（このPC内での試験用に限り <code>http://localhost</code> も使えます。その場合、公開サーバーの閲覧制限は確認だけができ、変更はできません）。{{else}}For safety, use a URL starting with <code>https://</code> (<code>http://localhost</code> is allowed only for testing on this PC; in that case the publish server's access restriction can be checked but not changed).{{end}}</span></span></span></div>
+        <input id="remote_url" name="remote_url" type="url" value="{{$d.URL}}" placeholder="https://media.example.jp/api/sync-..." spellcheck="false"
+               class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+      </div>
+
+      <div>
+        <div class="flex items-center"><label for="remote_token" class="text-sm font-semibold text-neutral-800">{{if $ja}}トークン{{else}}Token{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $d.HasToken}}{{if $ja}}変更するときだけ新しいトークンを貼り付けてください。空欄のまま保存すると今のトークンを使い続けます。{{else}}Paste a new token only to change it. If left blank, the current token is kept.{{end}}{{else}}{{if $ja}}公開サーバーの管理者が発行したトークン（英数字と記号の長い文字列）を貼り付けてください。{{else}}Paste the token issued by the publish server administrator (a long string of letters, digits, and symbols).{{end}}{{end}}</span></span></div>
+        {{if $d.HasToken}}<p class="text-xs text-neutral-500">{{if $ja}}保存済みのトークン: {{else}}Saved token: {{end}}<code id="remote-token-preview">{{$d.TokenPreview}}</code></p>{{end}}
+        <textarea id="remote_token" name="remote_token" rows="3" spellcheck="false" placeholder="{{if $d.HasToken}}{{if $ja}}新しいトークン（変更しない場合は空欄）{{else}}New token (leave blank to keep the current one){{end}}{{else}}eyJ...{{end}}"
+                  class="mt-1.5 w-full rounded-lg border border-neutral-300 bg-neutral-50 p-3 font-mono text-xs text-neutral-800 focus:border-zinc-500 focus:outline-none"></textarea>
+        {{if $d.HasToken}}
+        <label class="mt-2 inline-flex items-center gap-2 text-xs text-neutral-600">
+          <input type="checkbox" name="clear_token" value="1" class="rounded border-neutral-300">
+          {{if $ja}}保存済みのトークンを削除する{{else}}Delete the saved token{{end}}
+        </label>
+        {{end}}
+      </div>
+
+      {{if $d.TokenError}}
+      <p id="remote-token-error" class="notice notice-error" role="alert">{{if $ja}}保存済みのトークン: {{$d.TokenError}}{{else}}Saved token: {{$d.TokenError}}{{end}}</p>
+      {{else if $d.Token}}
+      <div id="remote-token-info" class="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm">
+        <h2 class="mb-2 flex items-center text-xs font-semibold text-neutral-700">{{if $ja}}保存済みトークンの内容{{else}}Saved token details{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}トークンに書かれている内容です。本物かどうかは「接続テスト」で公開サーバーが確認します。{{else}}This is what the token says. The publish server verifies whether it is genuine when you run "Test connection".{{end}}</span></span></h2>
+        <dl class="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1 text-xs">
+          <dt class="text-neutral-500">{{if $ja}}名前{{else}}Name{{end}}</dt><dd class="text-neutral-800">{{$d.Token.Subject}}</dd>
+          <dt class="text-neutral-500">{{if $ja}}権限{{else}}Role{{end}}</dt><dd class="text-neutral-800">{{$d.Token.Role}}</dd>
+          <dt class="text-neutral-500">{{if $ja}}有効期限{{else}}Expires{{end}}</dt>
+          <dd class="{{if $d.Token.Expired}}font-semibold text-rose-700{{else}}text-neutral-800{{end}}">{{formatTime $d.Token.ExpiresAt}}{{if $d.Token.Expired}}{{if $ja}}（期限切れ）{{else}} (expired){{end}}{{end}}</dd>
+          <dt class="text-neutral-500">{{if $ja}}できること{{else}}Allowed actions{{end}}</dt>
+          <dd class="text-neutral-800">
+            <ul class="flex flex-wrap gap-1.5">
+              <li class="rounded-full px-2 py-0.5 {{if $d.Permissions.SubmitDraft}}bg-zinc-800 text-white{{else}}bg-neutral-200 text-neutral-500 line-through{{end}}">{{if $ja}}記事の提出{{else}}Submit articles{{end}}</li>
+              <li class="rounded-full px-2 py-0.5 {{if $d.Permissions.FetchPending}}bg-zinc-800 text-white{{else}}bg-neutral-200 text-neutral-500 line-through{{end}}">{{if $ja}}校閲待ちの取得{{else}}Fetch pending reviews{{end}}</li>
+              <li class="rounded-full px-2 py-0.5 {{if $d.Permissions.PublishArticle}}bg-zinc-800 text-white{{else}}bg-neutral-200 text-neutral-500 line-through{{end}}">{{if $ja}}承認して公開{{else}}Approve and publish{{end}}</li>
+              <li class="rounded-full px-2 py-0.5 {{if $d.Permissions.SyncSettings}}bg-zinc-800 text-white{{else}}bg-neutral-200 text-neutral-500 line-through{{end}}">{{if $ja}}サイト設定の反映{{else}}Push site settings{{end}}</li>
+            </ul>
+          </dd>
+        </dl>
+      </div>
+      {{end}}
+
+      <div id="remote-test-result" class="hidden rounded-lg border px-4 py-3 text-sm" role="status" aria-live="polite"></div>
+
+      <div class="flex flex-wrap items-center justify-end gap-3 border-t border-neutral-200 pt-4">
+        <button type="button" id="remote-test-button" class="btn btn-secondary btn-md">{{if $ja}}接続テスト{{else}}Test connection{{end}}</button>
+        <button type="submit" class="btn btn-primary btn-md">{{if $ja}}設定を保存する{{else}}Save settings{{end}}</button>
+      </div>
+    </form>
+    </div>
+  </details>
+{{end}}
+
+{{define "scripts"}}{{template "remote_sync_assets"}}<script src="{{asset "js/remote_invite.js"}}"></script>{{end}}

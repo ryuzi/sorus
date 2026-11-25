@@ -1,0 +1,141 @@
+{{define "content"}}{{$ja := ne .Lang "en"}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <!-- 最上位ナビゲーション: 記事 / 固定ページの切り替え（左）と新規作成ボタン（右端）。検索は下の絞り込み行に置き、
+       検索欄のすぐ隣に「新しい記事」が並んで押し間違えないように分ける。 -->
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 pb-4">
+    <nav id="kind-switch" class="inline-flex rounded-xl bg-neutral-100 p-1 text-sm font-medium" aria-label="{{.T "kind_switch"}}">
+      {{range .Data.KindTabs}}
+      <a href="/admin/articles?kind={{.Kind}}{{if eq .Kind "page"}}&status=published{{end}}{{if $.Data.Lang}}&lang={{$.Data.Lang}}{{end}}{{if $.Data.Query}}&q={{$.Data.Query}}{{end}}{{if $.Data.Sort}}&sort={{$.Data.Sort}}{{end}}"{{if .Active}} aria-current="page"{{end}}
+         class="inline-flex items-center gap-2 rounded-lg px-4 py-2 transition-all {{if .Active}}bg-white font-bold text-neutral-900 shadow-sm{{else}}text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60{{end}}">
+        <span>{{$.T (printf "kind_%s" .Kind)}}</span>
+        <span class="rounded-full px-2 py-0.5 text-xs {{if .Active}}bg-neutral-900 text-white{{else}}bg-neutral-200 text-neutral-600{{end}}"{{if $ja}}>{{.Count}}件</span>{{else}}>{{.Count}}</span>{{end}}
+      </a>
+      {{end}}
+    </nav>
+
+    {{if .User.HasRole "editor" "writer"}}
+      {{if eq .Data.Kind "page"}}
+      <a href="/admin/articles/new?kind=page" id="new-page-button" class="btn btn-primary btn-md gap-1.5">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span>{{.T "new_page"}}</span>
+      </a>
+      {{else}}
+      <a href="/admin/articles/new" id="new-article-button" class="btn btn-primary btn-md gap-1.5">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span>{{.T "new_article"}}</span>
+      </a>
+      {{end}}
+    {{end}}
+  </div>
+
+  <!-- 絞り込み行: 検索（入力欄＋「検索」ボタン、検索中は欄の中に×）・ステータスタブ・言語フィルター -->
+  <div id="article-filter-bar" class="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-neutral-200 pb-2">
+    <form id="article-search" method="get" action="/admin/articles" role="search" class="flex w-full items-center gap-2 sm:w-auto">
+      <input type="hidden" name="kind" value="{{.Data.Kind}}">
+      <input type="hidden" name="status" value="{{.Data.Status}}">
+      <input type="hidden" name="lang" value="{{.Data.Lang}}">
+      {{with .Data.Sort}}<input type="hidden" name="sort" value="{{.}}">{{end}}
+      <div class="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
+        <svg class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input type="search" name="q" id="article-search-input" value="{{.Data.Query}}" placeholder="{{if $ja}}記事を検索（タイトル・スラッグ）{{else}}Search articles (title, slug){{end}}" aria-label="{{if $ja}}記事を検索{{else}}Search articles{{end}}"
+               class="h-[2.375rem] w-full rounded border border-neutral-300 bg-white pl-8 {{if .Data.Query}}pr-8{{else}}pr-3{{end}} text-sm text-neutral-900 placeholder-neutral-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 [&::-webkit-search-cancel-button]:appearance-none">
+        {{if .Data.Query}}
+        <a href="/admin/articles?kind={{.Data.Kind}}&status={{.Data.Status}}&lang={{.Data.Lang}}{{if $.Data.Sort}}&sort={{$.Data.Sort}}{{end}}" id="article-search-clear" aria-label="{{if $ja}}検索をクリア{{else}}Clear search{{end}}" title="{{if $ja}}クリア{{else}}Clear{{end}}"
+           class="absolute right-1.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800">
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+        </a>
+        {{end}}
+      </div>
+      <button type="submit" id="article-search-submit" class="btn btn-secondary btn-md">{{if $ja}}検索{{else}}Search{{end}}</button>
+    </form>
+
+    <div class="flex min-w-0 flex-1 flex-wrap items-end justify-between gap-3">
+      <div class="flex gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" role="tablist" style="scrollbar-width: none; -ms-overflow-style: none;">
+        {{range .Data.Tabs}}
+        <a href="/admin/articles?status={{.Status}}{{if eq $.Data.Kind "page"}}&kind=page{{end}}{{if $.Data.Lang}}&lang={{$.Data.Lang}}{{end}}{{if $.Data.Query}}&q={{$.Data.Query}}{{end}}{{if $.Data.Sort}}&sort={{$.Data.Sort}}{{end}}" role="tab" aria-selected="{{.Active}}"
+           class="-mb-2.5 shrink-0 border-b-2 px-3 py-2 text-sm transition-colors {{if .Active}}border-neutral-900 font-bold text-neutral-900{{else}}border-transparent text-neutral-500 hover:text-neutral-800{{end}}">
+          {{$.T (statusKey .Status)}}
+          <span class="ml-1.5 rounded-full px-2 py-0.5 text-xs font-semibold {{if .Active}}bg-neutral-900 text-white{{else if and (eq .Status "review") .Count}}bg-amber-100 text-amber-900{{else}}bg-neutral-100 text-neutral-600{{end}}">{{.Count}}</span>
+        </a>
+        {{end}}
+      </div>
+
+      <div class="mb-0.5 flex flex-wrap items-center gap-2">
+      {{if $.MultilingualEnabled}}
+      <div id="lang-filter" class="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white p-1 text-xs font-medium" aria-label="{{if $ja}}言語フィルター{{else}}Language filter{{end}}">
+        <span class="px-2 text-neutral-400">{{if $ja}}言語:{{else}}Language:{{end}}</span>
+        <a href="/admin/articles?status={{$.Data.Status}}{{if eq $.Data.Kind "page"}}&kind=page{{end}}{{if $.Data.Query}}&q={{$.Data.Query}}{{end}}{{if $.Data.Sort}}&sort={{$.Data.Sort}}{{end}}" class="rounded-md px-2.5 py-1 transition {{if eq $.Data.Lang ""}}bg-neutral-900 font-semibold text-white{{else}}text-neutral-600 hover:bg-neutral-100{{end}}">{{if $ja}}すべて{{else}}All{{end}}</a>
+        <a href="/admin/articles?status={{$.Data.Status}}{{if eq $.Data.Kind "page"}}&kind=page{{end}}&lang=ja{{if $.Data.Query}}&q={{$.Data.Query}}{{end}}{{if $.Data.Sort}}&sort={{$.Data.Sort}}{{end}}" class="rounded-md px-2.5 py-1 transition {{if eq $.Data.Lang "ja"}}bg-neutral-900 font-semibold text-white{{else}}text-neutral-600 hover:bg-neutral-100{{end}}">日本語 (JA)</a>
+        <a href="/admin/articles?status={{$.Data.Status}}{{if eq $.Data.Kind "page"}}&kind=page{{end}}&lang=en{{if $.Data.Query}}&q={{$.Data.Query}}{{end}}{{if $.Data.Sort}}&sort={{$.Data.Sort}}{{end}}" class="rounded-md px-2.5 py-1 transition {{if eq $.Data.Lang "en"}}bg-neutral-900 font-semibold text-white{{else}}text-neutral-600 hover:bg-neutral-100{{end}}">English (EN)</a>
+      </div>
+      {{end}}
+      <!-- 並び順: 選ぶとすぐに一覧を開き直す（タブ・言語・検索語はそのまま）。 -->
+      <form id="article-sort" method="get" action="/admin/articles" class="inline-flex items-center gap-1 text-xs">
+        <input type="hidden" name="kind" value="{{$.Data.Kind}}">
+        <input type="hidden" name="status" value="{{$.Data.Status}}">
+        {{with $.Data.Lang}}<input type="hidden" name="lang" value="{{.}}">{{end}}
+        {{with $.Data.Query}}<input type="hidden" name="q" value="{{.}}">{{end}}
+        <label for="article-sort-select" class="text-neutral-400">{{$.T "sort_label"}}</label>
+        <select name="sort" id="article-sort-select" onchange="this.form.submit()"
+                class="rounded-lg border border-neutral-200 bg-white py-1.5 pl-2 pr-7 text-xs font-medium text-neutral-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500">
+          {{range $.Data.Sorts}}<option value="{{.Value}}"{{if .Active}} selected{{end}}>{{.Label}}</option>{{end}}
+        </select>
+        <noscript><button type="submit" class="btn btn-secondary btn-sm">{{$.T "sort_label"}}</button></noscript>
+      </form>
+      </div>
+    </div>
+  </div>
+
+  {{with .Data.DeletedTitle}}
+  <!-- 「ゴミ箱へ」で移した記事のお知らせ（元の一覧に戻したうえで、ゴミ箱への導線を出す） -->
+  <div id="trash-notice" role="status" class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800">
+    <span class="[overflow-wrap:anywhere]">{{$.T "trash_moved_notice" .}}</span>
+    {{if ne $.Data.Status "deleted"}}<a href="/admin/articles?status=deleted{{if eq $.Data.Kind "page"}}&kind=page{{end}}" id="trash-notice-link" class="font-medium text-zinc-700 underline hover:text-zinc-900">{{$.T "trash_view_link"}}</a>{{end}}
+  </div>
+  {{end}}
+
+  {{if .Data.IsTrash}}
+  <!-- ゴミ箱: 操作の結果・30日後の自動削除の案内・「ゴミ箱を空にする」（編集者・管理者） -->
+  {{with .Data.TrashNotice}}<p id="trash-result-notice" role="status" class="notice notice-success mb-3">{{.}}</p>{{end}}
+  <div id="trash-toolbar" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3">
+    <p id="trash-auto-purge-note" class="text-sm text-neutral-600">{{.T "trash_auto_purge_note"}}</p>
+    {{if and .Data.CanPublish .Data.TrashTotal}}
+    <form method="post" action="/admin/articles/trash/empty" id="trash-empty-form"
+          data-confirm="{{.T "trash_empty_confirm" .Data.TrashTotal}}" data-confirm-title="{{.T "trash_empty_title"}}" data-confirm-ok="{{.T "trash_empty"}}" data-confirm-danger>
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <input type="hidden" name="kind" value="{{.Data.Kind}}">
+      <button type="submit" id="trash-empty-button" class="btn btn-danger btn-sm">{{.T "trash_empty"}}</button>
+    </form>
+    {{end}}
+  </div>
+  {{end}}
+
+  <!-- 一覧テーブル -->
+  <div class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-neutral-50 text-xs uppercase text-neutral-500 border-b border-neutral-200">
+        <tr>
+          <th class="w-full px-4 py-3">{{$.T "col_title"}}</th>
+          <th class="whitespace-nowrap px-4 py-3">{{$.T "col_author"}}</th>
+          <th class="whitespace-nowrap px-4 py-3">{{$.T "col_status"}}</th>
+          <th class="whitespace-nowrap px-4 py-3">{{$.T "col_date"}}</th>
+          <th class="whitespace-nowrap px-4 py-3 text-right">{{$.T "col_views"}}</th>
+          <th class="whitespace-nowrap px-4 py-3"><span class="sr-only">{{$.T "col_actions"}}</span></th>
+        </tr>
+      </thead>
+      <tbody id="article-rows" class="divide-y divide-neutral-100">
+        {{template "article_rows" .}}
+      </tbody>
+    </table>
+  </div>
+  {{if or .Data.PrevPage .Data.NextPage}}
+  <div class="mt-4 flex justify-between text-sm">
+    {{if .Data.PrevPage}}<a class="text-neutral-700 font-medium hover:underline" href="/admin/articles?status={{.Data.Status}}{{if eq $.Data.Kind "page"}}&kind=page{{end}}{{if $.Data.Lang}}&lang={{$.Data.Lang}}{{end}}{{if $.Data.Query}}&q={{$.Data.Query}}{{end}}{{if $.Data.Sort}}&sort={{$.Data.Sort}}{{end}}&page={{.Data.PrevPage}}">{{if $ja}}← 前へ{{else}}← Previous{{end}}</a>{{else}}<span></span>{{end}}
+    {{if .Data.NextPage}}<a class="text-neutral-700 font-medium hover:underline" href="/admin/articles?status={{.Data.Status}}{{if eq $.Data.Kind "page"}}&kind=page{{end}}{{if $.Data.Lang}}&lang={{$.Data.Lang}}{{end}}{{if $.Data.Query}}&q={{$.Data.Query}}{{end}}{{if $.Data.Sort}}&sort={{$.Data.Sort}}{{end}}&page={{.Data.NextPage}}">{{if $ja}}次へ →{{else}}Next →{{end}}</a>{{end}}
+  </div>
+  {{end}}
+</div>
+{{if .AIEnabled}}{{template "social_modal" .}}{{end}}
+{{end}}
+
+{{define "scripts"}}<script src="{{asset "js/social.js"}}"></script>{{end}}

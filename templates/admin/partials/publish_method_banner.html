@@ -1,0 +1,44 @@
+{{define "publish_method_banner"}}{{with .PublishMethod}}
+{{/* 「公開先」の2つの画面（静的サイト /admin/publish・公開サーバー /admin/settings/remote）の先頭に置く、方式の切り替えのタブ
+     （publish_method.go）。いま使う方式は1つだけで、記事を公開したときはその方式にだけ送る（動作中）。もう一方は設定を残したまま
+     自動では送らない（待機中）。画面には選んでいるタブの方式の内容だけを出し、両方を設定済みのときだけ、どちらが有効かを1行で示す。
+     待機中の方式のタブを開いているときは、その行からその方式へ切り替えられる。接続の解除・設定の削除は画面の最下部の
+     「接続・設定の管理」（publish_method_danger）に置き、最初に目に入る位置には出さない。 */}}
+<div id="publish-method" class="mb-6" data-publish-active="{{if .Active}}{{.Active}}{{else}}none{{end}}">
+  <nav id="publish-method-tabs" class="publish-tabs" aria-label="{{$.T "publish_method_tabs"}}">
+    <a href="/admin/settings/remote" id="publish-tab-remote" class="publish-tab{{if eq .Tab "remote"}} is-current{{end}}"{{if eq .Tab "remote"}} aria-current="page"{{end}}>{{$.T "publish_method_remote"}}{{if eq .Active "remote"}}<span class="badge badge-remote">{{$.T "publish_method_active"}}</span>{{else if .RemoteConfigured}}<span class="badge badge-standby">{{$.T "publish_method_standby_short"}}</span>{{end}}</a>
+    <a href="/admin/publish?view=static" id="publish-tab-static" class="publish-tab{{if eq .Tab "static"}} is-current{{end}}"{{if eq .Tab "static"}} aria-current="page"{{end}}>{{$.T "publish_method_static"}}{{if eq .Active "static"}}<span class="badge badge-static">{{$.T "publish_method_active"}}</span>{{else if .StaticConfigured}}<span class="badge badge-standby">{{$.T "publish_method_standby_short"}}</span>{{end}}</a>
+  </nav>
+  {{if .Both}}
+  <div id="publish-method-status" data-publish-method="{{.Active}}" class="publish-method-status" role="status" aria-label="{{$.T "publish_current_method"}}">
+    <p class="flex min-w-0 items-center"><span class="publish-method-dot is-{{.Active}}" aria-hidden="true"></span><span>{{$.T (printf "publish_method_status_%s" .Active)}}</span><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$.T "help_show"}}">?</button><span class="help-tip-pop" hidden><span>{{$.T "publish_method_both_note"}}</span><span>{{$.T (printf "publish_method_%s_standby_desc" .Standby)}}</span></span></span></p>
+    {{if not .TabActive}}
+    <form method="post" action="/admin/publish/method" class="shrink-0" data-confirm="{{$.T (printf "publish_method_switch_to_%s_confirm" .Tab)}}" data-confirm-title="{{$.T "publish_method_switch_title"}}" data-confirm-ok="{{$.T (printf "publish_method_switch_to_%s" .Tab)}}">
+      <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+      <input type="hidden" name="method" value="{{.Tab}}">
+      <input type="hidden" name="return" value="{{.Tab}}">
+      <button type="submit" id="publish-method-switch-{{.Tab}}" class="btn btn-secondary btn-sm">{{$.T (printf "publish_method_switch_to_%s" .Tab)}}</button>
+    </form>
+    {{end}}
+  </div>
+  {{else if and (not .Active) (eq .Tab "remote")}}
+  <p id="publish-method-none" data-publish-method="none" class="mt-4 text-sm text-neutral-600">{{$.T "publish_method_none_note"}}</p>
+  {{end}}
+</div>
+{{end}}{{end}}
+
+{{/* publish_method_danger は、表示中のタブの方式の接続の解除・設定の削除（「接続・設定の管理」の折りたたみの最後に置く）。
+     その方式を設定していなければ何も出さない。. はページ。 */}}
+{{define "publish_method_danger"}}{{with .PublishMethod}}{{if .TabConfigured}}
+<div id="publish-method-danger" class="publish-danger" data-method="{{.Tab}}">
+  <div class="min-w-0">
+    <p class="text-sm font-semibold text-neutral-900">{{$.T (printf "publish_method_clear_%s" .Tab)}}</p>
+    <p class="mt-0.5 text-xs text-neutral-600">{{$.T (printf "publish_method_clear_%s_desc" .Tab)}}</p>
+  </div>
+  <form method="post" action="/admin/publish/method/clear" class="shrink-0" data-confirm="{{$.T (printf "publish_method_clear_%s_confirm" .Tab)}}" data-confirm-title="{{$.T (printf "publish_method_clear_%s" .Tab)}}" data-confirm-ok="{{$.T (printf "publish_method_clear_%s" .Tab)}}" data-confirm-danger>
+    <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+    <input type="hidden" name="method" value="{{.Tab}}">
+    <button type="submit" id="publish-method-clear-{{.Tab}}" class="btn btn-danger btn-sm">{{$.T (printf "publish_method_clear_%s" .Tab)}}</button>
+  </form>
+</div>
+{{end}}{{end}}{{end}}

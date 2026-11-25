@@ -1,0 +1,12 @@
+# deploy/Dockerfile 用のビルドコンテキスト除外設定（BuildKit が自動で読む）。
+.git
+.env
+.env.*
+.navigator
+database.db*
+*.db
+uploads
+search_index
+attachments
+backups
+certs

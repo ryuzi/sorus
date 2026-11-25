@@ -1,0 +1,72 @@
+{{define "social_modal"}}{{$ja := ne .Lang "en"}}
+<dialog id="social-modal" class="ai-modal w-[min(48rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="social-modal-title">
+  <div class="flex items-center justify-between border-b border-neutral-200 px-5 py-3">
+    <h2 id="social-modal-title" class="font-semibold text-neutral-800">{{if $ja}} SNS告知文{{else}} Social posts{{end}}</h2>
+    <button type="button" data-social-close class="btn btn-ghost btn-sm" aria-label="{{.T "close"}}">{{.T "close"}}</button>
+  </div>
+  <div class="max-h-[70vh] overflow-y-auto px-5 py-4">
+    <div data-social-pane="loading" class="flex flex-col items-center gap-3 py-10 text-neutral-500" role="status">
+      <span class="ai-spinner" aria-hidden="true"></span>
+      <p>{{if $ja}}告知文を作成中...{{else}}Creating posts...{{end}}</p>
+    </div>
+
+    <div data-social-pane="error" class="py-6 text-center" hidden>
+      <p id="social-error-text" class="font-medium text-neutral-600" role="alert"></p>
+    </div>
+
+    <div data-social-pane="result" hidden>
+      <p id="social-template-notice" class="mb-3 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-900" hidden>
+        {{if $ja}}AIアシスタントが未設定のため、タイトルと抜粋からテンプレートで作成しました。AIを設定すると記事の内容に合わせた告知文を作れます。{{else}}The AI assistant is not set up, so these were created from the title and excerpt using a template. Set up AI to create posts tailored to the article content.{{end}}
+      </p>
+      <p id="social-unpublished-notice" class="mb-3 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600" hidden>
+        {{if $ja}}未公開の記事のため、記事のURLは含めていません。公開後にもう一度作成すると、URL付きの告知文になります。{{else}}The article is not published, so its URL is not included. Create them again after publishing to include the URL.{{end}}
+      </p>
+      <figure id="social-og-figure" class="mb-4" hidden>
+        <img id="social-og-image" alt="{{if $ja}}SNSで表示される画像（OGP）{{else}}Image shown on social media (OGP){{end}}" width="1200" height="630" class="w-full rounded-lg border border-neutral-200" loading="lazy">
+        <figcaption class="mt-1 text-xs text-neutral-500">{{if $ja}}SNSでシェアされたときに表示される画像{{else}}Image shown when shared on social media{{end}}</figcaption>
+      </figure>
+
+      <section class="mb-5" aria-labelledby="social-x-title">
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <h3 id="social-x-title" class="text-sm font-semibold text-neutral-800">{{if $ja}}X (旧Twitter) 告知スレッド{{else}}X (formerly Twitter) thread{{end}}</h3>
+          <button type="button" id="social-copy-thread" class="btn btn-secondary btn-sm">{{if $ja}}スレッドをまとめてコピー{{else}}Copy whole thread{{end}}</button>
+        </div>
+        <ol id="social-x-thread" class="flex flex-col gap-3"></ol>
+      </section>
+
+      <section class="mb-5" aria-labelledby="social-ig-title">
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <h3 id="social-ig-title" class="text-sm font-semibold text-neutral-800"> {{if $ja}}Instagram リード文{{else}}Instagram caption{{end}}</h3>
+          <button type="button" data-social-copy="#social-instagram" class="btn btn-secondary btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+        </div>
+        <label for="social-instagram" class="sr-only">{{if $ja}}Instagram のキャプション{{else}}Instagram caption{{end}}</label>
+        <textarea id="social-instagram" rows="7" class="social-text w-full rounded-lg border border-neutral-300 p-3 text-sm leading-relaxed focus:border-zinc-500 focus:outline-none"></textarea>
+      </section>
+
+      <section class="mb-5" aria-labelledby="social-line-title">
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <h3 id="social-line-title" class="text-sm font-semibold text-neutral-800"> {{if $ja}}LINE公式アカウント 配信文{{else}}LINE Official Account message{{end}}</h3>
+          <button type="button" data-social-copy="#social-line" class="btn btn-secondary btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+        </div>
+        <label for="social-line" class="sr-only">{{if $ja}}LINE の配信文{{else}}LINE message{{end}}</label>
+        <textarea id="social-line" rows="5" class="social-text w-full rounded-lg border border-neutral-300 p-3 text-sm leading-relaxed focus:border-zinc-500 focus:outline-none"></textarea>
+      </section>
+
+      <section aria-labelledby="social-tags-title">
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <h3 id="social-tags-title" class="text-sm font-semibold text-neutral-800">{{if $ja}}# ハッシュタグ{{else}}# Hashtags{{end}}</h3>
+          <button type="button" id="social-copy-tags" class="btn btn-secondary btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+        </div>
+        <p id="social-hashtags" class="flex flex-wrap gap-1.5"></p>
+      </section>
+    </div>
+  </div>
+  <div class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-5 py-3">
+    <span id="social-provider" class="text-xs text-neutral-400"></span>
+    <div class="flex gap-2">
+      <button type="button" data-social-close class="btn btn-secondary btn-md">{{.T "close"}}</button>
+      <button type="button" id="social-regenerate" class="btn btn-primary btn-md">{{if $ja}}作り直す{{else}}Regenerate{{end}}</button>
+    </div>
+  </div>
+</dialog>
+{{end}}

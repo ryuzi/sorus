@@ -1,0 +1,35 @@
+{{define "head"}}{{template "content_head" .}}{{end}}
+{{define "content"}}
+{{with .Data}}
+<section class="front-hero" aria-labelledby="front-hero-title">
+  {{with .Article.ImageHTML}}<figure class="hero">{{.}}</figure>{{end}}
+  <h1 id="front-hero-title" class="article-title">{{.Article.Title}}</h1>
+  <div class="prose" data-math-root>{{.HTML}}</div>
+</section>
+{{if .Cards}}
+<ul class="front-cards">
+  {{range $card := .Cards}}
+  <li class="front-card{{if not $.ShowFrontCardImages}} front-card--no-media{{end}}">
+    {{if $.ShowFrontCardImages}}{{with .ImageHTML}}<a href="{{$card.URL}}" class="front-card-media" tabindex="-1" aria-hidden="true">{{.}}</a>{{else}}<a href="{{$card.URL}}" class="front-card-media is-placeholder" tabindex="-1" aria-hidden="true"></a>{{end}}{{end}}
+    <div class="front-card-body">
+      <h2 class="front-card-title"><a href="{{.URL}}">{{.Title}}</a></h2>
+      {{with .Excerpt}}<p class="front-card-excerpt">{{.}}</p>{{end}}
+    </div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{template "front_gallery" $}}
+<section class="front-news" aria-labelledby="front-news-title">
+  <h2 id="front-news-title" class="page-title">{{if eq $.Lang "en"}}Latest News{{else}}新着記事{{end}}</h2>
+  {{if .News}}
+  <div class="card-grid">
+    {{range .News}}{{template "article_card" .}}{{end}}
+  </div>
+  {{else}}
+  <p class="empty">{{if eq $.Lang "en"}}No articles published yet.{{else}}まだ公開された記事はありません。{{end}}</p>
+  {{end}}
+  <p class="front-news-more"><a href="{{if eq $.Lang "en"}}/en/articles{{else}}/articles{{end}}">{{$.ArticlesAllLabel}}</a></p>
+</section>
+{{end}}
+{{end}}

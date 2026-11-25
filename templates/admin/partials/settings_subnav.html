@@ -1,0 +1,49 @@
+{{define "settings_subnav"}}
+{{/* 設定の左メニュー。項目名は各画面の見出し（<h1>）・設定の入口と同じにする（admin_ux_redesign_spec.md §2-5）。 */}}
+{{if .User}}{{$ja := ne .Lang "en"}}
+<nav class="admin-settings-sidebar md:sticky md:top-20 self-start rounded-xl border border-neutral-200 bg-white p-2 shadow-sm" aria-label="{{.T "settings"}}">
+  <div class="flex flex-col gap-3">
+    <div>
+      <div class="px-3 py-1 text-xs font-semibold text-neutral-400">{{if $ja}}基本設定{{else}}General{{end}}</div>
+      <ul class="flex flex-col gap-1">
+        {{if .User.HasRole "admin"}}
+        <li><a class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/settings/general"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/settings/general"{{if .AtPath "/admin/settings/general"}} aria-current="page"{{end}}>{{.T "settings_nav_general"}}</a></li>
+        <li><a class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/settings/theme" "/admin/settings/structure"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/settings/theme"{{if .AtPath "/admin/settings/theme" "/admin/settings/structure"}} aria-current="page"{{end}}>{{.T "settings_nav_appearance"}}</a></li>
+        {{/* 公開方法は「公開サーバー」か「静的サイト」のどちらか1つなので、左メニューは「公開先」1項目にまとめ、両方の画面で選択中にする。 */}}
+        <li><a class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/publish" "/admin/settings/remote"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/publish"{{if .AtPath "/admin/publish" "/admin/settings/remote"}} aria-current="page"{{end}}>{{.T "settings_nav_publish"}}</a></li>
+        <li><a class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/settings/operations"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/settings/operations"{{if .AtPath "/admin/settings/operations"}} aria-current="page"{{end}}>{{.T "settings_nav_operations"}}</a></li>
+        {{/* AI の3画面（AI 機能の ON/OFF・使う AI・外部の AI アプリとつなぐ）は「AI」1項目にまとめ、どの画面でも選択中にする。
+             画面の中はタブで切り替える（partials/ai_tabs.html）。管理者には AI 機能が OFF でも出す（ON に戻す入口）。 */}}
+        <li><a id="subnav-ai" class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/settings/ai-integrations" "/admin/settings/ai" "/admin/settings/mcp"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/settings/ai-integrations"{{if .AtPath "/admin/settings/ai-integrations" "/admin/settings/ai" "/admin/settings/mcp"}} aria-current="page"{{end}}>{{.T "settings_nav_ai_section"}}</a></li>
+        {{else if .AIEnabled}}
+        {{/* 管理者以外は、AI 機能が ON のときだけ「AI」（文章スタイル・外部の AI アプリとつなぐ）を出す。 */}}
+        <li><a id="subnav-ai" class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/settings/ai" "/admin/settings/mcp"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/settings/ai"{{if .AtPath "/admin/settings/ai" "/admin/settings/mcp"}} aria-current="page"{{end}}>{{.T "settings_nav_ai_section"}}</a></li>
+        {{end}}
+      </ul>
+    </div>
+    {{if .User.HasRole "admin" "editor"}}
+    <div>
+      <div class="px-3 py-1 text-xs font-semibold text-neutral-400">{{if $ja}}コンテンツ{{else}}Content{{end}}</div>
+      <ul class="flex flex-col gap-1">
+        <li><a class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/settings/categories"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/settings/categories"{{if .AtPath "/admin/settings/categories"}} aria-current="page"{{end}}>{{.T "categories"}}</a></li>
+      </ul>
+    </div>
+    {{end}}
+    {{if .User.HasRole "admin"}}
+    <div>
+      <div class="px-3 py-1 text-xs font-semibold text-neutral-400">{{if $ja}}管理{{else}}Administration{{end}}</div>
+      <ul class="flex flex-col gap-1">
+        <li><a class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/settings/backup"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/settings/backup"{{if .AtPath "/admin/settings/backup"}} aria-current="page"{{end}}>{{.T "settings_nav_backup"}}</a></li>
+        <li><a class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/settings/migration" "/admin/import" "/admin/import/preview" "/admin/import/run"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/settings/migration"{{if .AtPath "/admin/settings/migration" "/admin/import" "/admin/import/preview" "/admin/import/run"}} aria-current="page"{{end}}>{{.T "settings_nav_migration"}}</a></li>
+        <li><a class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/users"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/users"{{if .AtPath "/admin/users"}} aria-current="page"{{end}}>{{.T "users"}}</a></li>
+        {{/* サイトの追加・切り替えはデスクトップモード（複数サイトを扱えるとき）だけ。 */}}
+        {{if .Desktop}}
+        <li><a class="block whitespace-nowrap rounded-lg px-3 py-2 text-sm transition hover:bg-neutral-100 {{if .AtPath "/admin/settings/sites" "/admin/settings/sites/delete"}}bg-neutral-100 font-semibold text-neutral-900{{else}}text-neutral-600{{end}}" href="/admin/settings/sites"{{if .AtPath "/admin/settings/sites" "/admin/settings/sites/delete"}} aria-current="page"{{end}}>{{.T "sites_title"}}</a></li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
+  </div>
+</nav>
+{{end}}
+{{end}}

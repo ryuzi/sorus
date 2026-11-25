@@ -1,0 +1,424 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  <div class="mb-5">
+    <h1 class="text-xl font-bold text-neutral-900">{{$.T "settings_nav_publish"}}</h1>
+    <p class="mt-1 text-sm text-neutral-600">{{if or $d.Configured $d.RemoteConnected}}{{$.T "publish_static_intro"}}{{else}}{{$.T "publish_choose_method_desc"}}{{end}}</p>
+  </div>
+
+  {{/* 公開方法は「公開サーバー」か「静的サイト」のどちらか1つ。先頭に方式のタブを置く（動作中・待機中はタブのバッジで示す）。
+       最初に目に入る位置には主な操作（サイトに反映）だけを置き、設定の削除は最下部の「接続・設定の管理」（#publish-manage）に収める。 */}}
+  {{template "publish_method_banner" $}}
+  {{if not (or $d.Configured $d.RemoteConnected)}}
+  <section id="publish-method-choice" class="mb-6" aria-labelledby="publish-method-choice-title">
+    <h2 id="publish-method-choice-title" class="text-base font-semibold text-neutral-900">{{$.T "publish_choose_method"}}</h2>
+    <div class="mt-3 grid gap-4 sm:grid-cols-2">
+      <a href="/admin/settings/remote" id="publish-choice-remote" data-publish-choice="remote" class="group flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-sky-400 hover:shadow focus-visible:border-sky-500">
+        <span class="text-base font-semibold text-neutral-900">{{$.T "publish_choice_remote_title"}}</span>
+        <span class="text-sm text-neutral-600">{{$.T "publish_choice_remote_desc"}}</span>
+        <span class="mt-auto pt-2 text-sm font-medium text-sky-800 group-hover:underline">{{$.T "publish_choice_remote_action"}}</span>
+      </a>
+      <a href="#publish-form" id="publish-choice-static" data-publish-choice="static" class="group flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm transition hover:border-emerald-400 hover:shadow focus-visible:border-emerald-500">
+        <span class="text-base font-semibold text-neutral-900">{{$.T "publish_choice_static_title"}}</span>
+        <span class="text-sm text-neutral-600">{{$.T "publish_choice_static_desc"}}</span>
+        <span class="mt-auto pt-2 text-sm font-medium text-emerald-800 group-hover:underline">{{$.T "publish_choice_static_action"}}</span>
+      </a>
+    </div>
+  </section>
+  {{end}}
+
+  {{with $d.Errors}}
+  <div id="publish-errors" class="notice notice-error mb-6" role="alert">
+    <p class="font-semibold">{{if $ja}}入力を確かめてください{{else}}Please check your input{{end}}</p>
+    <ul class="mt-1 list-disc space-y-0.5 pl-5">{{range .}}<li>{{.}}</li>{{end}}</ul>
+  </div>
+  {{end}}
+
+  {{with $d.HostKey}}
+  <section id="publish-host-key" class="notice notice-error mb-6 p-6" role="alert" aria-labelledby="publish-host-key-title">
+    <h2 id="publish-host-key-title" class="text-base font-semibold">{{if $ja}}接続先のサーバーの鍵が、前に接続したときと違います{{else}}The server's key is different from the last time you connected{{end}}</h2>
+    <p class="mt-2">{{if $ja}}サーバーは、本物であることを示す「鍵」を持っています。{{.Addr}} の鍵が、前に接続したときと変わりました。サーバー会社によるサーバーの引っ越しなどで変わることもありますが、別のサーバーになりすまされているおそれもあります。そのため、確かめるまでは何も送りません。{{else}}A server has a "key" that proves it is genuine. The key of {{.Addr}} has changed since the last connection. This can happen when the hosting company moves the server, but another server may also be impersonating it. Nothing will be sent until you confirm.{{end}}</p>
+    <dl class="mt-3 grid gap-1 font-mono text-xs sm:grid-cols-[8rem_1fr]">
+      <dt class="font-sans font-medium">{{if $ja}}前の鍵の指紋{{else}}Previous key fingerprint{{end}}</dt><dd class="break-all">{{.Known}}</dd>
+      <dt class="font-sans font-medium">{{if $ja}}今回の鍵の指紋{{else}}New key fingerprint{{end}}</dt><dd class="break-all">{{.Got}}</dd>
+    </dl>
+    <p class="mt-3">{{if $ja}}サーバー会社のお知らせや管理画面で、鍵が変わったことを確かめてから押してください。分からないときは、サーバー会社に問い合わせてください。{{else}}Confirm the key change in your hosting company's announcements or control panel before pressing this. If unsure, contact your hosting company.{{end}}</p>
+    <form method="post" action="/admin/publish/trust-host-key" class="mt-4">
+      <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+      <input type="hidden" name="fingerprint" value="{{.Got}}">
+      <button type="submit" id="publish-trust-host-key" class="btn btn-danger btn-md">{{if $ja}}確かめたので、この接続先を信頼する{{else}}I have confirmed it; trust this server{{end}}</button>
+    </form>
+  </section>
+  {{end}}
+
+  {{if $d.Configured}}
+  <section id="publish-reflect-section" class="mb-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="publish-reflect-title">
+    <h2 id="publish-reflect-title" class="flex items-center text-base font-semibold text-neutral-900">{{if $ja}}サイトに反映{{else}}Update site{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}記事の公開や変更を公開先に送ります。変わったところだけを送ります。{{else}}Sends published and changed articles to the destination. Only the changes are sent.{{end}}</span>{{if $d.AutoReflect}}<span>{{if $ja}}記事を公開したときは、自動で反映します。{{else}}Publishing an article updates the site automatically.{{end}}</span>{{end}}<span>{{if $ja}}予約投稿は、sorus を起動している間に予約時刻になると、自動で公開して反映します。{{else}}Scheduled posts are published and sent automatically when their time comes while sorus is running.{{end}}</span></span></span></h2>
+    <p class="mt-1 break-all text-sm text-neutral-600">{{if $ja}}公開先: {{$d.Label}}{{else}}Destination: {{$d.Label}}{{end}}</p>
+    {{if $d.PlainFTP}}<p id="publish-plain-ftp-warning" class="notice notice-warn mt-3" role="alert">{{if $ja}}この公開先には、暗号化しないで送る設定になっています。パスワードが読み取られるおそれがあります。サーバー会社が SFTP に対応していれば、下の「接続のしかた」で SFTP に切り替えてください。{{else}}This destination is set to send without encryption, so your password could be intercepted. If your hosting company supports SFTP, switch to SFTP under "Connection type" below.{{end}}</p>{{end}}
+    {{if $d.StaticActive}}
+    <form method="post" action="/admin/publish/reflect" data-publish-reflect-form class="mt-4">
+      <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+      <button type="submit" id="publish-reflect-button" data-publish-reflect{{if $d.Status.Running}} disabled{{end}}
+              class="btn btn-primary btn-md">{{if $ja}}サイトに反映{{else}}Update site{{end}}</button>
+    </form>
+    {{else}}
+    {{/* 公開サーバーを使っているあいだ（静的サイトは待機中）は、静的サイトへ送らない。切り替えは上の1行の状態から。 */}}
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      <button type="button" id="publish-reflect-button" disabled class="btn btn-primary btn-md">{{if $ja}}サイトに反映{{else}}Update site{{end}}</button>
+      <p id="publish-reflect-standby" class="text-sm text-neutral-600">{{$.T "publish_static_standby_note"}}</p>
+    </div>
+    {{end}}
+    <div id="publish-status" class="mt-4" data-publish-status data-publish-running="{{$d.Status.Running}}" aria-live="polite">
+      {{if $d.Status.Running}}<p class="text-sm font-medium text-neutral-800">{{$d.Status.Message}}</p>
+      {{else}}{{with $d.Status.Last}}
+      <div class="notice {{if .OK}}notice-success{{else if .ReplaceSite}}notice-warn{{else}}notice-error{{end}}" data-publish-result="{{if .OK}}ok{{else if .ReplaceSite}}confirm{{else}}error{{end}}">
+        <p class="font-semibold">{{.Message}}</p>
+        {{with .Details}}<ul class="mt-2 list-disc space-y-1 pl-5">{{range .}}<li>{{.}}</li>{{end}}</ul>{{end}}
+        {{with .FixSiteURL}}<p class="mt-3"><a href="{{.}}" data-publish-fix-site-url class="btn btn-danger btn-sm">{{if $ja}}「公開サイトのURL」を入力する{{else}}Enter the "Public site URL"{{end}}</a></p>{{end}}
+        {{if .ReplaceSite}}
+        <form method="post" action="/admin/publish/replace-site" data-publish-reflect-form class="mt-3">
+          <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+          <button type="submit" id="publish-replace-site" class="btn btn-primary btn-md">{{if $ja}}置き換える{{else}}Replace{{end}}</button>
+        </form>
+        {{end}}
+        {{if and .OK .SiteURL}}<p class="mt-3"><a href="{{.SiteURL}}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">{{if $ja}}公開サイトを開く{{else}}Open public site{{end}}</a> <span class="ml-2 break-all text-xs">{{.SiteURL}}</span></p>{{end}}
+        {{with .Error}}<details class="mt-2"><summary class="cursor-pointer text-xs">{{if $ja}}詳しい情報{{else}}Details{{end}}</summary><pre class="mt-1 whitespace-pre-wrap break-all text-xs">{{.}}</pre></details>{{end}}
+        <p class="mt-2 text-xs opacity-75">{{if $ja}}{{.FinishedText}} に終わった反映の結果です。{{else}}Result of the update finished at {{.FinishedText}}.{{end}}</p>
+      </div>
+      {{with .Warnings}}<div class="notice notice-warn mt-3 p-4" data-publish-warnings><p class="font-semibold">{{if $ja}}お知らせ{{else}}Notices{{end}}</p><ul class="mt-1 list-disc space-y-1 pl-5">{{range .}}<li>{{.}}</li>{{end}}</ul></div>{{end}}
+      {{end}}{{end}}
+    </div>
+  </section>
+  {{end}}
+
+  {{if and $d.Configured $d.SiteURL}}
+  <section id="publish-health" class="mb-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="publish-health-title">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 id="publish-health-title" class="text-base font-semibold text-neutral-900">{{$.T "publish_health_title"}}</h2>
+        {{with $d.Health}}
+        <div class="mt-2 text-sm {{if eq .State "ok"}}text-emerald-800{{else if eq .State "warning"}}text-amber-800{{else}}text-rose-800{{end}}" data-publish-health-state="{{.State}}"><p>{{$.T .MessageKey}}</p>{{range .AdditionalMessageKeys}}<p>{{$.T .}}</p>{{end}}</div>
+        <p class="mt-1 text-xs text-neutral-500">{{$.T "publish_health_checked" .CheckedText}}{{if .HTTPStatus}} ・ {{$.T "publish_health_http" .HTTPStatus}}{{end}}{{if .LatencyMS}} ・ {{$.T "publish_health_latency" .LatencyMS}}{{end}}</p>
+        {{if .TLSExpiresText}}<p class="mt-1 text-xs text-neutral-500">{{$.T "publish_health_tls_expiry" .TLSExpiresText}}</p>{{end}}
+        {{else}}
+        <p class="mt-2 text-sm text-neutral-600">{{$.T "publish_health_not_checked"}}</p>
+        {{end}}
+      </div>
+      <form method="post" action="/admin/api/publish/health-check">
+        <input type="hidden" name="_csrf" value="{{$d.CSRFToken}}">
+        <button type="submit" class="btn btn-secondary btn-md">{{$.T "publish_health_check"}}</button>
+      </form>
+    </div>
+  </section>
+  {{end}}
+
+  <form id="publish-form" method="post" action="/admin/publish" autocomplete="off"
+        class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="publish-form-title">
+    <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+    <h2 id="publish-form-title" class="flex items-center text-base font-semibold text-neutral-900"><span>{{if $d.Configured}}{{if $ja}}公開先を選ぶ{{else}}Choose a destination{{end}}{{else}}{{$.T "publish_choice_static_title"}}{{if $ja}}: 公開先を選ぶ{{else}}: choose a destination{{end}}{{end}}</span><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" id="publish-rules" hidden><strong class="block font-semibold">{{if $ja}}反映仕様{{else}}How updates work{{end}}</strong><span>{{if $ja}}不要になった、sorus が送信済みのファイルを削除します。{{else}}Files that sorus sent before and are no longer needed are deleted.{{end}}</span><span>{{if $ja}}初回反映では、公開先に既存のファイルがあっても削除しません。{{else}}The first update never deletes files already at the destination.{{end}}</span><span>{{if $ja}}フォルダに初めて書き出すとき、トップページ（index.html）がすでにあれば、上書きする前に置き換えるかを確認します。{{else}}When exporting to a folder for the first time, if a top page (index.html) already exists, you are asked before it is replaced.{{end}}</span><span>{{if $ja}}レンタルサーバーでは、指定したフォルダ内だけを更新します。{{else}}On a rental server, only the specified folder is updated.{{end}}</span><span>{{if $ja}}Cloudflare Pages と Netlify は、反映時にサイト全体を新しい版へ置き換えます。{{else}}Cloudflare Pages and Netlify replace the whole site with the new version on each update.{{end}}</span></span></span></h2>
+    {{if $d.Configured}}<section class="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4" aria-live="polite">
+      <p class="text-xs font-medium text-neutral-500">{{if $ja}}現在の公開先{{else}}Current destination{{end}}</p>
+      {{if $d.Configured}}
+      <p class="mt-1 font-semibold text-neutral-900">{{if $ja}}{{if eq $d.Kind "server"}}レンタルサーバー{{else if eq $d.Kind "s3"}}S3互換ストレージ{{else if eq $d.Kind "cloudflare"}}Cloudflare Pages{{else if eq $d.Kind "github"}}GitHub Pages{{else if eq $d.Kind "netlify"}}Netlify{{else if eq $d.Kind "folder"}}フォルダに書き出す{{else}}未設定{{end}}{{else}}{{if eq $d.Kind "server"}}Rental server{{else if eq $d.Kind "s3"}}S3-compatible storage{{else if eq $d.Kind "cloudflare"}}Cloudflare Pages{{else if eq $d.Kind "github"}}GitHub Pages{{else if eq $d.Kind "netlify"}}Netlify{{else if eq $d.Kind "folder"}}Export to a folder{{else}}Not set{{end}}{{end}}</p>
+      {{if and (eq $d.Kind "server") $d.Server.Host}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.Server.Host}}{{$d.Server.Root}}</p>{{end}}
+      {{if and (eq $d.Kind "s3") $d.S3.Bucket}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.S3.Bucket}}</p>{{end}}
+      {{if and (eq $d.Kind "cloudflare") $d.Cloudflare.Project}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.Cloudflare.Project}}.pages.dev</p>{{end}}
+      {{if and (eq $d.Kind "github") $d.GitHub.Owner}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.GitHub.Owner}}/{{$d.GitHub.Repository}}</p>{{end}}
+      {{if and (eq $d.Kind "netlify") $d.Netlify.SiteID}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.Netlify.SiteID}}</p>{{end}}
+      {{if and (eq $d.Kind "folder") $d.FolderPath}}<p class="mt-1 break-all text-sm text-neutral-700">{{$d.FolderPath}}</p>{{end}}
+      {{else}}<p class="mt-1 font-semibold text-neutral-900">{{if $ja}}未設定{{else}}Not set{{end}}</p>{{end}}
+    </section>{{end}}
+
+    {{if not $d.Configured}}
+    <fieldset class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="{{if $ja}}公開先の種類{{else}}Destination type{{end}}">
+      <legend class="mb-2 text-sm font-semibold text-neutral-800">{{if $ja}}公開先の種類を選んでください{{else}}Choose a destination type{{end}}</legend>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="server"{{if eq $d.Kind "server"}} checked{{end}}>{{if $ja}}レンタルサーバー{{else}}Rental server{{end}}</span>
+        <span class="text-xs text-neutral-600">{{if $ja}}さくらのレンタルサーバー、エックスサーバーなどへ SFTP または FTP で送ります。{{else}}Sends files to hosting services such as Sakura Internet or Xserver over SFTP or FTP.{{end}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="s3"{{if eq $d.Kind "s3"}} checked{{end}}>{{$.T "publish_s3_kind"}}</span>
+        <span class="text-xs text-neutral-600">{{$.T "publish_s3_kind_desc"}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="cloudflare"{{if eq $d.Kind "cloudflare"}} checked{{end}}>Cloudflare Pages</span>
+        <span class="text-xs text-neutral-600">{{if $ja}}無料で使える公開サービスです。Cloudflare のアカウントで「API トークン」を1つ作って貼り付けます。{{else}}A free publishing service. Create one "API token" in your Cloudflare account and paste it in.{{end}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="github"{{if eq $d.Kind "github"}} checked{{end}}>{{$.T "publish_github_kind"}}</span>
+        <span class="text-xs text-neutral-600">{{$.T "publish_github_kind_desc"}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="netlify"{{if eq $d.Kind "netlify"}} checked{{end}}>Netlify</span>
+        <span class="text-xs text-neutral-600">{{$.T "publish_netlify_kind_desc"}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="folder"{{if eq $d.Kind "folder"}} checked{{end}}>{{if $ja}}フォルダに書き出すだけ{{else}}Export to a folder only{{end}}</span>
+        <span class="text-xs text-neutral-600">{{if $ja}}このパソコンのフォルダにサイトを作ります。できたファイルを自分でアップロードするときに使います。{{else}}Builds the site in a folder on this computer. Use this when you upload the files yourself.{{end}}</span>
+      </label>
+    </fieldset>
+    {{end}}
+
+    {{$sv := $d.Server}}
+    <div data-kind-panel="server" class="mt-6 space-y-4"{{if ne $d.Kind "server"}} hidden{{end}}>
+      <details id="publish-hints-server" class="publish-hints rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
+        <summary class="cursor-pointer select-none font-medium text-neutral-800">{{if $ja}}入力のヒント{{else}}Tips for these fields{{end}}</summary>
+        <dl class="mt-2 space-y-2">
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}接続のしかた{{else}}Connection type{{end}}</dt><dd class="text-neutral-600">{{if $ja}}サーバー会社の案内に「SFTP」「SSH」とあれば SFTP、「FTP」だけなら FTP を選びます。{{else}}Choose SFTP if your hosting company's guide mentions "SFTP" or "SSH"; choose FTP if it only mentions "FTP".{{end}}</dd></div>
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}ポート番号{{else}}Port{{end}}</dt><dd class="text-neutral-600">{{if $ja}}指定がある場合のみ入力（既定: 22）{{else}}Enter only if specified (default: 22){{end}}</dd></div>
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}SSH の秘密鍵（パスワードの代わりに鍵を使うときだけ）{{else}}SSH private key (only when using a key instead of a password){{end}}</dt><dd class="text-neutral-600">{{if $ja}}鍵にパスフレーズを付けているときは、パスワードの欄にそのパスフレーズを入力します。{{else}}If your key has a passphrase, enter it in the password field.{{end}}</dd></div>
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}暗号化なし（FTP）{{else}}Unencrypted FTP{{end}}</dt><dd class="text-neutral-600">{{if $ja}}サーバーが暗号化に対応していない場合に限り選択してください。{{else}}Choose this only if the server does not support encryption.{{end}}</dd></div>
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}アップロード先のフォルダ{{else}}Upload folder{{end}}</dt><dd class="text-neutral-600">{{if $ja}}サーバー会社の案内にある、ホームページを置くフォルダです。ほかのファイルを消さないよう、空欄や「/」だけは指定できません。{{else}}The folder for your website given in your hosting company's guide. To avoid deleting other files, it cannot be blank or just "/".{{end}}</dd></div>
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}公開サイトのURL{{else}}Public site URL{{end}}</dt><dd class="text-neutral-600">{{if $ja}}読者がサイトを開くときのアドレスです。SNS で共有したときのリンクなどに使います（「サイト基本設定」の公開サイトURLと同じものです）。{{else}}The address readers use to open your site. It is used for links shared on social media (same as the public site URL in General settings).{{end}}</dd></div>
+        </dl>
+      </details>
+      <div>
+        <label for="publish-protocol" class="block text-sm font-medium">{{if $ja}}接続のしかた{{else}}Connection type{{end}}</label>
+        <select id="publish-protocol" name="protocol" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 sm:w-auto">
+          <option value="sftp"{{if eq $sv.Protocol "sftp"}} selected{{end}}>{{if $ja}}SFTP（通信を暗号化）{{else}}SFTP (encrypted){{end}}</option>
+          <option value="ftp"{{if eq $sv.Protocol "ftp"}} selected{{end}}>{{if $ja}}FTP（暗号化なし）{{else}}FTP (not encrypted){{end}}</option>
+        </select>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-[1fr_8rem]">
+        <div>
+          <label for="publish-host" class="block text-sm font-medium">{{if $ja}}ホスト名（サーバー名）{{else}}Host name (server name){{end}}</label>
+          <input id="publish-host" name="host" type="text" value="{{$sv.Host}}" placeholder="{{if $ja}}例: sv1234.example.jp{{else}}e.g. sv1234.example.jp{{end}}" autocapitalize="off" spellcheck="false"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">
+        </div>
+        <div>
+          <label for="publish-port" class="block text-sm font-medium">{{if $ja}}ポート番号{{else}}Port{{end}}</label>
+          <input id="publish-port" name="port" type="text" inputmode="numeric" value="{{$sv.Port}}" placeholder="22"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="publish-user" class="block text-sm font-medium">{{if $ja}}ユーザー名{{else}}User name{{end}}</label>
+          <input id="publish-user" name="user" type="text" value="{{$sv.User}}" autocapitalize="off" spellcheck="false"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">
+        </div>
+        <div>
+          <label for="publish-password" class="block text-sm font-medium">{{if $ja}}パスワード{{else}}Password{{end}}</label>
+          <input id="publish-password" name="password" type="password" autocomplete="new-password"
+                 placeholder="{{if $sv.HasPassword}}{{if $ja}}保存済み（変えるときだけ入力）{{else}}Saved (enter only to change){{end}}{{end}}"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">
+        </div>
+      </div>
+      <div data-sftp-only>
+        <label for="publish-key" class="block text-sm font-medium">{{if $ja}}SSH の秘密鍵（パスワードの代わりに鍵を使うときだけ）{{else}}SSH private key (only when using a key instead of a password){{end}}</label>
+        <textarea id="publish-key" name="private_key" rows="3" spellcheck="false"
+                  placeholder="{{if $sv.HasKey}}{{if $ja}}保存済み（変えるときだけ貼り付け）{{else}}Saved (paste only to change){{end}}{{else}}{{if $ja}}-----BEGIN OPENSSH PRIVATE KEY----- で始まる内容を貼り付け{{else}}Paste the content starting with -----BEGIN OPENSSH PRIVATE KEY-----{{end}}{{end}}"
+                  class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-xs"></textarea>
+        {{if $sv.HasKey}}<label class="mt-1 flex items-center gap-2 text-xs text-neutral-600"><input type="checkbox" name="clear_private_key" value="1">{{if $ja}}保存済みの鍵を消す{{else}}Delete the saved key{{end}}</label>{{end}}
+      </div>
+      <div data-ftp-only>
+        <div class="flex items-start"><label class="flex items-start gap-2 text-sm text-neutral-800"><input type="checkbox" id="publish-allow-plain-ftp" name="allow_plain_ftp" value="1" class="mt-1"{{if $sv.AllowPlainFTP}} checked{{end}}>{{if $ja}}暗号化なし（非推奨）{{else}}No encryption (not recommended){{end}}</label></div>
+      </div>
+      <div>
+        <label for="publish-root" class="block text-sm font-medium">{{if $ja}}アップロード先のフォルダ{{else}}Upload folder{{end}}</label>
+        <input id="publish-root" name="root" type="text" value="{{$sv.Root}}" placeholder="{{if $ja}}例: /public_html{{else}}e.g. /public_html{{end}}" autocapitalize="off" spellcheck="false"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+      <div>
+        <label for="publish-server-site-url" class="block text-sm font-medium">{{if $ja}}公開サイトのURL{{else}}Public site URL{{end}}</label>
+        <input id="publish-server-site-url" name="server_site_url" type="url" value="{{$d.SiteURL}}" placeholder="{{if $ja}}例: https://media.example.jp{{else}}e.g. https://media.example.jp{{end}}"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">
+      </div>
+    </div>
+
+    {{$gh := $d.GitHub}}
+    <div data-kind-panel="github" class="mt-6 space-y-4"{{if ne $d.Kind "github"}} hidden{{end}}>
+      <details id="publish-hints-github" class="publish-hints rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
+        <summary class="cursor-pointer select-none font-medium text-neutral-800">{{if $ja}}入力のヒント{{else}}Tips for these fields{{end}}</summary>
+        <dl class="mt-2 space-y-2">
+          <div><dt class="font-medium text-neutral-800">{{$.T "publish_github_directory"}}</dt><dd class="text-neutral-600">{{$.T "publish_github_directory_help"}}</dd></div>
+          <div><dt class="font-medium text-neutral-800">{{$.T "publish_github_token"}}</dt><dd class="text-neutral-600">{{$.T "publish_github_token_help"}}</dd></div>
+        </dl>
+      </details>
+      <p class="text-sm text-neutral-600">{{$.T "publish_github_intro"}}</p>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div><label for="publish-github-owner" class="block text-sm font-medium">{{$.T "publish_github_owner"}}</label><input id="publish-github-owner" name="github_owner" type="text" value="{{$gh.Owner}}" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></div>
+        <div><label for="publish-github-repository" class="block text-sm font-medium">{{$.T "publish_github_repository"}}</label><input id="publish-github-repository" name="github_repository" type="text" value="{{$gh.Repository}}" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></div>
+        <div><label for="publish-github-branch" class="block text-sm font-medium">{{$.T "publish_github_branch"}}</label><input id="publish-github-branch" name="github_branch" type="text" value="{{if $gh.Branch}}{{$gh.Branch}}{{else}}main{{end}}" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></div>
+        <div><label for="publish-github-directory" class="block text-sm font-medium">{{$.T "publish_github_directory"}}</label><input id="publish-github-directory" name="github_directory" type="text" value="{{$gh.Directory}}" placeholder="/" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></div>
+      </div>
+      <div><label for="publish-github-token" class="block text-sm font-medium">{{$.T "publish_github_token"}}</label><input id="publish-github-token" name="github_token" type="password" autocomplete="new-password" placeholder="{{if $gh.HasToken}}{{$.T "publish_github_token_saved"}}{{end}}" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm"></div>
+    </div>
+
+    {{$nl := $d.Netlify}}
+    <div data-kind-panel="netlify" class="mt-6 space-y-4"{{if ne $d.Kind "netlify"}} hidden{{end}}>
+      <details id="publish-hints-netlify" class="publish-hints rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
+        <summary class="cursor-pointer select-none font-medium text-neutral-800">{{$.T "publish_netlify_guide"}}</summary>
+        <ol class="mt-2 list-decimal space-y-1 pl-5">
+          <li>{{$.T "publish_netlify_step1"}}</li>
+          <li>{{$.T "publish_netlify_step2"}}</li>
+          <li>{{$.T "publish_netlify_step3"}}</li>
+        </ol>
+        <dl class="mt-2 space-y-2">
+          <div><dt class="font-medium text-neutral-800">Site ID</dt><dd class="text-neutral-600">{{$.T "publish_netlify_site_help"}}</dd></div>
+          <div><dt class="font-medium text-neutral-800">Personal Access Token</dt><dd class="text-neutral-600">{{$.T "publish_netlify_token_help"}}</dd></div>
+        </dl>
+      </details>
+      <div>
+        <label for="publish-netlify-site-id" class="block text-sm font-medium">Site ID</label>
+        <input id="publish-netlify-site-id" name="netlify_site_id" type="text" value="{{$nl.SiteID}}" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+      <div>
+        <label for="publish-netlify-token" class="block text-sm font-medium">Personal Access Token</label>
+        <input id="publish-netlify-token" name="netlify_token" type="password" autocomplete="new-password" placeholder="{{if $nl.HasToken}}{{$.T "publish_github_token_saved"}}{{end}}" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+    </div>
+
+    {{$cf := $d.Cloudflare}}
+    <div data-kind-panel="cloudflare" class="mt-6 space-y-4"{{if ne $d.Kind "cloudflare"}} hidden{{end}}>
+      <details id="publish-hints-cloudflare" class="publish-hints rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
+        <summary class="cursor-pointer select-none font-medium text-neutral-800">{{if $ja}}はじめに Cloudflare で用意するもの{{else}}What to prepare in Cloudflare first{{end}}</summary>
+        <ol class="mt-2 list-decimal space-y-1 pl-5">
+          <li>{{if $ja}}Cloudflare にログインし、画面の右上のアカウントのメニューから「アカウントのホーム」を開きます。アドレス欄の dash.cloudflare.com/ のあとに続く32文字の英数字が「アカウント ID」です。{{else}}Log in to Cloudflare and open "Account home" from the account menu at the top right. The 32 letters and digits after dash.cloudflare.com/ in the address bar are your "Account ID".{{end}}</li>
+          <li>{{if $ja}}右上の人のマークから「プロファイル」→「API トークン」→「トークンを作成する」を選び、「カスタム トークン」で、権限に「アカウント」「Cloudflare Pages」「編集」を付けて作ります。{{else}}From the person icon at the top right, choose "Profile" → "API Tokens" → "Create Token", and create a "Custom token" with the permission "Account" / "Cloudflare Pages" / "Edit".{{end}}</li>
+          <li>{{if $ja}}表示されたトークンをコピーして、下の欄に貼り付けます（トークンはそのとき1回しか表示されません）。{{else}}Copy the token shown and paste it below (the token is shown only once).{{end}}</li>
+        </ol>
+        <p class="mt-2">{{if $ja}}プロジェクトがまだ無ければ、最初に「サイトに反映」したときに作ります。{{else}}If the project does not exist yet, it is created the first time you press "Update site".{{end}}</p>
+        <dl class="mt-2 space-y-2">
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}プロジェクト名{{else}}Project name{{end}}</dt><dd class="text-neutral-600">{{if $ja}}半角の英小文字・数字・ハイフンで入力します。公開サイトのURLは https://（プロジェクト名）.pages.dev になり、未設定なら自動で入れます。{{else}}Use lowercase letters, digits, and hyphens. The public site URL becomes https://(project name).pages.dev and is filled in automatically if not set.{{end}}</dd></div>
+        </dl>
+      </details>
+      <div>
+        <label for="publish-cf-account" class="block text-sm font-medium">{{if $ja}}アカウント ID{{else}}Account ID{{end}}</label>
+        <input id="publish-cf-account" name="cf_account_id" type="text" value="{{$cf.AccountID}}" autocapitalize="off" spellcheck="false"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+      <div>
+        <label for="publish-cf-token" class="block text-sm font-medium">{{if $ja}}API トークン{{else}}API token{{end}}</label>
+        <input id="publish-cf-token" name="cf_api_token" type="password" autocomplete="new-password"
+               placeholder="{{if $cf.HasToken}}{{if $ja}}保存済み: {{$cf.TokenPreview}}（変えるときだけ貼り付け）{{else}}Saved: {{$cf.TokenPreview}} (paste only to change){{end}}{{end}}"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+      <div>
+        <label for="publish-cf-project" class="block text-sm font-medium">{{if $ja}}プロジェクト名{{else}}Project name{{end}}</label>
+        <input id="publish-cf-project" name="cf_project" type="text" value="{{$cf.Project}}" placeholder="{{if $ja}}例: my-media{{else}}e.g. my-media{{end}}" autocapitalize="off" spellcheck="false"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+      <section class="mt-6 border-t border-neutral-100 pt-5" aria-labelledby="cdn-purge-title">
+      <h2 id="cdn-purge-title" class="flex items-center text-base font-semibold text-neutral-900">{{$.T "cdn_purge_title"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{$.T "cdn_purge_desc"}}</span><span>{{$.T "cdn_purge_token_help"}}</span></span></span></h2>
+      <input type="hidden" name="cdn_purge_enabled" value="auto">
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        <div><label for="cdn-zone-id" class="block text-sm font-medium">{{$.T "cdn_purge_zone_id"}}</label>
+          <input id="cdn-zone-id" name="cdn_cf_zone_id" type="text" value="{{$d.CDNZoneID}}" maxlength="256" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm"></div>
+        <div><label for="cdn-api-token" class="block text-sm font-medium">{{$.T "cdn_purge_api_token"}}</label>
+          <input id="cdn-api-token" name="cdn_cf_api_token" type="password" autocomplete="new-password" placeholder="{{if $d.CDNHasToken}}{{$.T "cdn_purge_token_saved"}}{{end}}" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm"></div>
+      </div>
+      <button type="button" data-cdn-purge-test class="btn btn-secondary btn-md mt-3">{{$.T "cdn_purge_test"}}</button>
+      <div data-cdn-purge-result class="mt-2 text-sm" aria-live="polite"></div>
+    </section>
+    </div>
+
+    {{$s3 := $d.S3}}
+    <div data-kind-panel="s3" class="mt-6 space-y-4"{{if ne $d.Kind "s3"}} hidden{{end}}>
+      <details id="publish-hints-s3" class="publish-hints rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
+        <summary class="cursor-pointer select-none font-medium text-neutral-800">{{if $ja}}入力のヒント{{else}}Tips for these fields{{end}}</summary>
+        <dl class="mt-2 space-y-2">
+          <div><dt class="font-medium text-neutral-800">{{$.T "publish_s3_region"}}</dt><dd class="text-neutral-600">{{$.T "publish_s3_region_help"}}</dd></div>
+          <div><dt class="font-medium text-neutral-800">{{$.T "publish_s3_site_url"}}</dt><dd class="text-neutral-600">{{$.T "publish_s3_site_url_help"}}</dd></div>
+        </dl>
+      </details>
+      <p class="text-sm text-neutral-600">{{$.T "publish_s3_intro"}}</p>
+      <div>
+        <label for="publish-s3-endpoint" class="block text-sm font-medium">{{$.T "publish_s3_endpoint"}}</label>
+        <input id="publish-s3-endpoint" name="s3_endpoint" type="url" value="{{$s3.Endpoint}}" placeholder="{{if $ja}}例: https://account.r2.cloudflarestorage.com{{else}}e.g. https://account.r2.cloudflarestorage.com{{end}}" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div><label for="publish-s3-bucket" class="block text-sm font-medium">{{$.T "publish_s3_bucket"}}</label><input id="publish-s3-bucket" name="s3_bucket" type="text" value="{{$s3.Bucket}}" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></div>
+        <div><label for="publish-s3-region" class="block text-sm font-medium">{{$.T "publish_s3_region"}}</label><input id="publish-s3-region" name="s3_region" type="text" value="{{if $s3.Region}}{{$s3.Region}}{{else}}auto{{end}}" placeholder="auto" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></div>
+        <div><label for="publish-s3-access-key" class="block text-sm font-medium">{{$.T "publish_s3_access_key"}}</label><input id="publish-s3-access-key" name="s3_access_key_id" type="text" value="{{$s3.AccessKeyID}}" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></div>
+        <div><label for="publish-s3-secret-key" class="block text-sm font-medium">{{$.T "publish_s3_secret_key"}}</label><input id="publish-s3-secret-key" name="s3_secret_access_key" type="password" autocomplete="new-password" placeholder="{{if $s3.HasSecret}}{{$.T "publish_s3_secret_saved"}}{{end}}" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></div>
+      </div>
+      <div><label for="publish-s3-site-url" class="block text-sm font-medium">{{$.T "publish_s3_site_url"}}</label><input id="publish-s3-site-url" name="s3_site_url" type="url" value="{{$d.SiteURL}}" placeholder="{{if $ja}}例: https://media.example.jp{{else}}e.g. https://media.example.jp{{end}}" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></div>
+    </div>
+
+    <div data-kind-panel="folder" class="mt-6 space-y-4"{{if ne $d.Kind "folder"}} hidden{{end}}>
+      <details id="publish-hints-folder" class="publish-hints rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-700">
+        <summary class="cursor-pointer select-none font-medium text-neutral-800">{{if $ja}}入力のヒント{{else}}Tips for these fields{{end}}</summary>
+        <dl class="mt-2 space-y-2">
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}書き出すフォルダ{{else}}Export folder{{end}}</dt><dd class="text-neutral-600">{{if $ja}}ここにサイトのファイル一式を作ります。中身をそのままサーバーにアップロードすれば公開できます。{{else}}The full set of site files is created here. Upload its contents to a server as-is to publish.{{end}}</dd></div>
+          <div><dt class="font-medium text-neutral-800">{{if $ja}}公開サイトのURL{{else}}Public site URL{{end}}</dt><dd class="text-neutral-600">{{if $ja}}読者がサイトを開くときのアドレスです。入れるまでは「サイトに反映」で書き出しません（SNS で共有したときのリンクなどが正しく作られないため）。{{else}}The address readers use to open your site. "Update site" will not export until it is entered (otherwise links shared on social media would be wrong).{{end}}</dd></div>
+        </dl>
+      </details>
+      <div>
+        <label for="publish-folder" class="block text-sm font-medium">{{if $ja}}書き出すフォルダ{{else}}Export folder{{end}}</label>
+        <input id="publish-folder" name="folder_path" type="text" value="{{$d.FolderPath}}" spellcheck="false"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm">
+      </div>
+      <div>
+        <label for="publish-folder-site-url" class="block text-sm font-medium">{{if $ja}}公開サイトのURL{{else}}Public site URL{{end}}</label>
+        <input id="publish-folder-site-url" name="folder_site_url" type="url" value="{{$d.SiteURL}}" placeholder="{{if $ja}}例: https://media.example.jp{{else}}e.g. https://media.example.jp{{end}}"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">
+      </div>
+      <p class="text-sm"><a href="/admin/publish/zip" id="publish-zip" class="font-medium text-zinc-700 underline hover:text-zinc-900">{{if $ja}}今のサイトを Zip ファイルでダウンロード{{else}}Download the current site as a Zip file{{end}}</a>
+        <span class="text-xs text-neutral-500">{{if $ja}}（フォルダの代わりに、1つのファイルで受け取ります）{{else}}(get it as a single file instead of a folder){{end}}</span></p>
+    </div>
+
+
+
+    <div class="mt-6 border-t border-neutral-100 pt-5">
+      <input type="hidden" name="auto_reflect_on_publish" value="0">
+      <div class="flex items-start"><label class="flex items-start gap-2 text-sm font-medium text-neutral-900"><input type="checkbox" id="publish-auto-reflect" name="auto_reflect_on_publish" value="1" class="mt-1"{{if $d.AutoReflect}} checked{{end}}>{{if $ja}}記事公開時に自動でサイトに反映する{{else}}Update the site automatically when an article is published{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}記事を「公開する」「承認して公開」で公開すると、少し待ってから自動で公開先に送ります。チェックを外すと、「サイトに反映」を押すまで公開先には送りません。{{else}}When an article is published with "Publish" or "Approve and publish", it is sent to the destination automatically after a short wait. When unchecked, nothing is sent until you press "Update site".{{end}}</span></span></div>
+    </div>
+
+    <div class="mt-5 flex flex-wrap items-center gap-3">
+      <button type="button" data-publish-test id="publish-test"
+              class="btn btn-secondary btn-md">{{if $ja}}接続テスト{{else}}Test connection{{end}}</button>
+      <button type="submit" id="publish-save" class="btn btn-primary btn-md">{{if $ja}}保存{{else}}Save{{end}}</button>
+      <span class="flex items-center text-xs text-neutral-500">{{if $ja}}パスワードの扱い{{else}}About passwords{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}パスワードと API トークンはこのパソコンの sorus に保存し、画面には表示しません。{{else}}Passwords and API tokens are stored in sorus on this computer and are never shown on screen.{{end}}</span></span></span>
+    </div>
+    <div data-publish-test-result aria-live="polite"></div>
+
+    {{if $d.Configured}}<details id="publish-target-switch" class="mt-6 border-t border-neutral-100 pt-5">
+      <summary class="cursor-pointer text-sm font-semibold text-neutral-700">{{if $ja}}別の公開先に切り替える{{else}}Switch to another destination{{end}}</summary>
+      <p class="mt-2 text-sm text-neutral-600">{{if $ja}}切り替え先を選び、必要な情報を入力して保存してください。{{else}}Choose the new destination, enter the required information, and save.{{end}}</p>
+    <fieldset class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <legend class="sr-only">{{if $ja}}公開先の種類{{else}}Destination type{{end}}</legend>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="server"{{if eq $d.Kind "server"}} checked{{end}}>{{if $ja}}レンタルサーバー{{else}}Rental server{{end}}</span>
+        <span class="text-xs text-neutral-600">{{if $ja}}さくらのレンタルサーバー、エックスサーバーなどへ SFTP または FTP で送ります。{{else}}Sends files to hosting services such as Sakura Internet or Xserver over SFTP or FTP.{{end}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="s3"{{if eq $d.Kind "s3"}} checked{{end}}>{{$.T "publish_s3_kind"}}</span>
+        <span class="text-xs text-neutral-600">{{$.T "publish_s3_kind_desc"}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="cloudflare"{{if eq $d.Kind "cloudflare"}} checked{{end}}>Cloudflare Pages</span>
+        <span class="text-xs text-neutral-600">{{if $ja}}無料で使える公開サービスです。Cloudflare のアカウントで「API トークン」を1つ作って貼り付けます。{{else}}A free publishing service. Create one "API token" in your Cloudflare account and paste it in.{{end}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="github"{{if eq $d.Kind "github"}} checked{{end}}>{{$.T "publish_github_kind"}}</span>
+        <span class="text-xs text-neutral-600">{{$.T "publish_github_kind_desc"}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="netlify"{{if eq $d.Kind "netlify"}} checked{{end}}>Netlify</span>
+        <span class="text-xs text-neutral-600">{{$.T "publish_netlify_kind_desc"}}</span>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-neutral-200 p-4 hover:bg-neutral-50 has-[:checked]:border-zinc-900 has-[:checked]:ring-1 has-[:checked]:ring-zinc-900">
+        <span class="flex items-center gap-2 text-sm font-semibold text-neutral-900"><input type="radio" name="kind" value="folder"{{if eq $d.Kind "folder"}} checked{{end}}>{{if $ja}}フォルダに書き出すだけ{{else}}Export to a folder only{{end}}</span>
+        <span class="text-xs text-neutral-600">{{if $ja}}このパソコンのフォルダにサイトを作ります。できたファイルを自分でアップロードするときに使います。{{else}}Builds the site in a folder on this computer. Use this when you upload the files yourself.{{end}}</span>
+      </label>
+    </fieldset>
+    </details>{{end}}
+  </form>
+
+  {{if $d.Configured}}
+  <details id="publish-manage" class="publish-manage">
+    <summary>{{$.T "publish_manage_title"}}</summary>
+    <div class="publish-manage-body">{{template "publish_method_danger" $}}</div>
+  </details>
+  {{end}}
+
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "scripts"}}<script src="{{asset "js/reflect.js"}}"></script>{{end}}

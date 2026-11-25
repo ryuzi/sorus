@@ -1,0 +1,33 @@
+/* Broken: page-wide elements selected without a public-class ancestor, written so they do not start with the element. */
+:root {
+  --bg: #ffffff; --surface: #f5f5f5; --fg: #111111; --muted: #555555; --border: #dddddd;
+  --accent: #0b57d0; --accent-fg: #ffffff; --accent-soft: #e8f0fe; --mark: #fff59d;
+  --code-bg: #111111; --code-fg: #eeeeee;
+  --font-body: system-ui, sans-serif; --font-heading: Georgia, serif; --font-mono: ui-monospace, monospace;
+  --radius: 6px; --radius-lg: 10px; --content-width: 1000px; --prose-width: 720px; --shadow: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111111; --surface: #1c1c1c; --fg: #eeeeee; --muted: #aaaaaa; --border: #333333;
+    --accent: #8ab4f8; --accent-fg: #111111; --accent-soft: #1f2a3d; --mark: #5c4f12;
+    --code-bg: #000000; --code-fg: #eeeeee;
+  }
+}
+html h1 { color: red; }
+:root h2 { color: red; }
+:is(h1) { color: red; }
+:where(code) { color: red; }
+.card:not(pre) { color: red; }
+:not(.prose) blockquote { color: red; }
+.card ~ h3 { color: red; }
+.card:has(+ pre) { color: red; }
+.card + :nth-child(1 of a) { color: red; }
+.card, :is(.prose, body) { color: red; }
+:root {
+  --unused: 0;
+  h3 { color: red; }
+  @media (min-width: 600px) { pre { color: red; } }
+}
+@scope (:root) { blockquote { color: red; } }
+@scope { a { color: red; } }
+@scope (.prose) { :scope + code { color: red; } }

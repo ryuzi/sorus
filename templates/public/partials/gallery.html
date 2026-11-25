@@ -1,0 +1,29 @@
+{{/* フォトギャラリー1つ。受け取る値（galleryTemplateData）: Tag（メディアのタグ。空なら data-gallery-tag を出さない）・
+     Layout（justified・masonry・cards。空・知らない値は justified）・Images（markdown.GalleryImage の一覧）・Lang（"en" なら英語）。
+     一覧の src は軽いサムネイル（ThumbURL）、拡大の data-full は高解像度（FullURL）で、無ければ URL を使う。
+     Width・Height（元画像の寸法）があれば width・height 属性に出し、読み込み中に場所を確保して表示のずれ（CLS）を防ぐ。
+     並べ方は figure の class（gallery-layout-<Layout>。段組みは今までの masonry-grid も付ける）と data-gallery-layout で表す。 */}}
+{{define "gallery"}}
+{{if .Images}}{{$layout := galleryLayout .Layout}}
+<figure class="photo-gallery gallery-layout-{{$layout}}{{if eq $layout "masonry"}} masonry-grid{{end}}" data-gallery-layout="{{$layout}}"{{with .Tag}} data-gallery-tag="{{.}}"{{end}}>
+  {{range .Images}}
+  <div class="gallery-item" tabindex="0" role="button" aria-label="{{if eq $.Lang "en"}}Enlarge image{{else}}画像を拡大表示{{end}}{{if .Alt}}: {{.Alt}}{{else if .Caption}}: {{.Caption}}{{end}}">
+    <img src="{{or .ThumbURL .URL}}" data-full="{{or .FullURL .URL}}"{{if and (gt .Width 0) (gt .Height 0)}} width="{{.Width}}" height="{{.Height}}"{{end}} alt="{{.Alt}}" loading="lazy" decoding="async">
+    {{with .Caption}}<figcaption>{{.}}</figcaption>{{end}}
+  </div>
+  {{end}}
+</figure>
+{{end}}
+{{end}}
+
+{{/* トップページ（front.html・index.html）のフォトギャラリーの節。受け取る値は publicPage で、サイト構成の top_gallery_*
+     （タグ・枚数・見出し・並べ方・「すべて見る」リンク）に従う。タグが空・写真が無ければ何も出さない。
+     リンクの行き先は保存・読み込みで "/" 始まりか http(s):// に限っている（validGalleryLinkURL）。 */}}
+{{define "front_gallery"}}{{$p := .}}{{with .SiteStructure}}{{if .TopGalleryTag}}{{$st := .}}
+{{with galleryImages $p .TopGalleryTag .TopGalleryLimit "latest" .TopGalleryLayout}}{{if .Images}}
+<section class="front-gallery" aria-labelledby="front-gallery-title">
+  <h2 id="front-gallery-title" class="page-title">{{if $st.TopGalleryTitle}}{{$st.TopGalleryTitle}}{{else if eq $p.Lang "en"}}Photo Gallery{{else}}フォトギャラリー{{end}}</h2>
+  {{template "gallery" .}}
+  {{with $st.TopGalleryLinkURL}}<p class="front-gallery-more"><a href="{{.}}">{{if $st.TopGalleryLinkLabel}}{{$st.TopGalleryLinkLabel}}{{else if eq $p.Lang "en"}}View all{{else}}すべて見る{{end}}</a></p>{{end}}
+</section>
+{{end}}{{end}}{{end}}{{end}}{{end}}

@@ -1,0 +1,293 @@
+/* Neutral admin palette and compact, flat controls. */
+:root { --admin-ink:#18181b; --admin-muted:#71717a; --admin-line:#e4e4e7; --admin-surface:#fafafa; }
+:root { --admin-header-h: 3.25rem; }
+html { scroll-padding-top: calc(var(--admin-header-h) + 0.5rem); }
+/* 縦スクロールバーの有無で内容が横にずれないよう、スクロールバーの領域を常に確保する（画面を切り替えても左端が動かない）。 */
+html { scrollbar-gutter: stable; }
+body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Noto Sans JP", sans-serif; letter-spacing: -.01em; }
+input, select, textarea, button { border-radius: 4px !important; }
+button { transition: background-color .12s ease, border-color .12s ease, color .12s ease; }
+/* 管理画面ナビ: 項目名を途中で折り返さない。現在の画面（aria-current）は背景で示す。 */
+.admin-nav > *, .admin-nav button { white-space: nowrap; }
+.admin-nav a[aria-current="page"] { background: #f4f4f5; color: var(--admin-ink); font-weight: 600; }
+/* 外観（テーマ・サイト構成）のタブ。 */
+.admin-tabs a[aria-current="page"] { border-color: var(--admin-ink); color: var(--admin-ink); font-weight: 600; }
+.language-switch { white-space: nowrap; color: var(--admin-muted); font-size: .75rem; }
+.language-switch a { color: inherit; text-decoration: none; }
+.language-switch a:hover { color: var(--admin-ink); text-decoration: underline; }
+.prose-preview { line-height: 1.85; word-break: break-word; }
+.prose-preview h1, .prose-preview h2, .prose-preview h3, .prose-preview h4 { font-weight: 700; margin: 1.4em 0 .6em; line-height: 1.4; }
+.prose-preview h1 { font-size: 1.6rem; }
+.prose-preview h2 { font-size: 1.35rem; border-bottom: 1px solid #e2e8f0; padding-bottom: .25em; }
+.prose-preview h3 { font-size: 1.15rem; }
+.prose-preview p, .prose-preview ul, .prose-preview ol, .prose-preview blockquote, .prose-preview pre, .prose-preview table { margin: 0 0 1em; }
+.prose-preview ul { list-style: disc; padding-left: 1.5em; }
+.prose-preview ol { list-style: decimal; padding-left: 1.5em; }
+.prose-preview a { color: #27272a; text-decoration: underline; }
+.prose-preview blockquote { border-left: 4px solid #cbd5e1; padding-left: 1em; color: #475569; }
+.prose-preview code { background: #f1f5f9; border-radius: .25rem; padding: .1em .35em; font-size: .9em; }
+.prose-preview pre { background: #0f172a; color: #e2e8f0; border-radius: .5rem; padding: 1em; overflow-x: auto; }
+.prose-preview pre code { background: none; padding: 0; }
+.prose-preview img { max-width: 100%; height: auto; border-radius: .5rem; }
+.prose-preview table { border-collapse: collapse; }
+.prose-preview th, .prose-preview td { border: 1px solid #e2e8f0; padding: .4em .8em; }
+.preview-toc ul { list-style: none; padding: 0; margin: 0; }
+.preview-toc .toc-level-3 { padding-left: 1em; }
+.preview-toc .toc-level-4, .preview-toc .toc-level-5, .preview-toc .toc-level-6 { padding-left: 2em; }
+.preview-toc a { color: #475569; }
+.dropzone.is-dragover { border-color: #52525b; background: #f4f4f5; color: #27272a; }
+.editor-input.is-dragover { border-color: #52525b; box-shadow: 0 0 0 3px #e4e4e7; }
+.toast { transition: opacity .3s, transform .3s; }
+.toast.is-hidden { opacity: 0; transform: translateY(.5rem); }
+/* 差分（推敲・版の比較・AI 翻訳と変更案の確認）とモーダル。追加は緑の下線、削除は赤の取り消し線。
+   色は管理画面の成功（emerald）・エラー（rose）の配色に合わせ、色が見分けにくくても線の形で分かるようにする。 */
+.diff-view { white-space: pre-wrap; word-break: break-word; }
+ins.diff-add { background: #d1fae5; color: #065f46; text-decoration: underline; text-decoration-color: #059669; text-underline-offset: .15em; border-radius: .2rem; padding: 0 .05em; }
+del.diff-del { background: #ffe4e6; color: #9f1239; text-decoration: line-through; text-decoration-color: #e11d48; border-radius: .2rem; padding: 0 .05em; }
+/* Tailwind の flex 等が hidden 属性の display: none を上書きしないようにする。 */
+.ai-modal [hidden] { display: none !important; }
+.ai-modal::backdrop { background: rgb(15 23 42 / .45); }
+/* 確認・入力のモーダル（layout.html の #confirm-modal）の候補のボタン。押すと入力欄に入り、入っているものは塗りで示す。 */
+.confirm-modal-chip { border: 1px solid #d4d4d8; background: #fff; color: #3f3f46; padding: .2rem .6rem; font-size: .75rem; line-height: 1.25rem; }
+.confirm-modal-chip:hover { background: #f4f4f5; }
+.confirm-modal-chip[aria-pressed="true"] { background: #27272a; border-color: #27272a; color: #fff; }
+/* タグの候補のボタン（サイト構成のフォトギャラリーのタグ・メディアの詳細ダイアログのタグ）。確認・入力のモーダルの候補と
+   同じ見た目にし、選んでいる（タグ欄に入っている）ものは塗りで示す。 */
+.tag-chip { display: inline-flex; align-items: center; border: 1px solid #d4d4d8; border-radius: 4px; background: #fff; color: #3f3f46; padding: .2rem .6rem; font-size: .75rem; line-height: 1.25rem; text-decoration: none; }
+.tag-chip:hover { background: #f4f4f5; }
+.tag-chip[aria-pressed="true"] { background: #27272a; border-color: #27272a; color: #fff; }
+/* メディアの詳細のタグ（media.js）。押しやすいよう高さ 2rem にそろえ、付いているタグは × 付き、候補は枚数を小さく添える。 */
+#media-tag-editor .tag-chip { min-height: 2rem; gap: .35rem; }
+.tag-chip-count { color: #a1a1aa; font-size: .6875rem; font-variant-numeric: tabular-nums; }
+.tag-chip[aria-pressed="true"] .tag-chip-count { color: #d4d4d8; }
+.tag-chip.is-selected { background: #f4f4f5; border-color: #a1a1aa; color: #18181b; padding-right: .25rem; }
+.tag-chip-remove { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 9999px; color: #71717a; font-size: .875rem; line-height: 1; }
+.tag-chip-remove:hover { background: #e4e4e7; color: #18181b; }
+.tag-chip-remove:focus-visible { outline: 2px solid #52525b; outline-offset: 1px; }
+/* メディアライブラリのタグの絞り込み（タグクラウド）。写真の多いタグほど大きく濃く（level-1〜3）、選んでいるもの
+   （aria-current）は塗りで示す。「タグ未設定」は点線の枠で、ほかのタグと区別する。 */
+.media-cloud-chip { display: inline-flex; align-items: baseline; gap: .2rem; border: 1px solid #d4d4d8; border-radius: 9999px; background: #fff; color: #3f3f46; padding: .15rem .7rem; font-size: .8125rem; line-height: 1.4rem; text-decoration: none; white-space: nowrap; }
+.media-cloud-chip:hover { background: #f4f4f5; border-color: #a1a1aa; }
+.media-cloud-chip:focus-visible { outline: 2px solid #52525b; outline-offset: 2px; }
+.media-cloud-count { color: #71717a; font-size: .6875rem; font-variant-numeric: tabular-nums; }
+.media-cloud-level-1 { font-size: .75rem; color: #52525b; }
+.media-cloud-level-2 { font-size: .8125rem; font-weight: 500; }
+.media-cloud-level-3 { font-size: .9375rem; font-weight: 700; color: #18181b; border-color: #a1a1aa; }
+.media-cloud-chip.is-untagged { border-style: dashed; border-color: #a1a1aa; }
+.media-cloud-chip[aria-current="page"] { background: #27272a; border-color: #27272a; border-style: solid; color: #fff; }
+.media-cloud-chip[aria-current="page"] .media-cloud-count { color: #d4d4d8; }
+/* カードの「タグなし」。タグの無い写真がひと目で分かるよう、点線の枠で示す。 */
+.media-tags-preview.is-empty { width: fit-content; max-width: 100%; border: 1px dashed #d4d4d8; border-radius: 9999px; padding: 0 .4rem; color: #71717a; }
+#top-gallery-thumbs[hidden], #top-gallery-chips[hidden], #media-tag-chips[hidden] { display: none !important; }
+.ai-spinner { width: 2.25rem; height: 2.25rem; border: 3px solid #e4e4e7; border-top-color: #52525b; border-radius: 9999px; animation: ai-spin .8s linear infinite; }
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ai-spinner { animation-duration: 2.4s; } }
+.ai-button:disabled { cursor: progress; opacity: .6; }
+.fact-claim { list-style: none; }
+.fact-verdict { display: inline-block; border-radius: 9999px; padding: 2px 10px; font-size: .75rem; font-weight: 700; }
+.fact-verdict-verified, .fact-verdict-unverified, .fact-verdict-inaccurate { background: #f4f4f5; color: #3f3f46; }
+.fact-source { display: block; margin-top: 6px; color: #3f3f46; font-size: .8rem; overflow-wrap: anywhere; }
+/* 共同編集ワークフロー: 校閲待ち・予約投稿のステータスバッジ。 */
+.status-review, .status-scheduled { background: #f4f4f5; color: #3f3f46; }
+/* 校閲・申し送りメモ。ワークフローが自動で残したコメントは左線で色分けする。 */
+.comment { border-left: 3px solid #e2e8f0; padding: .25rem 0 .25rem .75rem; }
+.comment.is-mine, .comment.comment-request { border-left-color: #a1a1aa; }
+.comment.comment-reject, .comment.comment-approve { border-left-color: #71717a; background: #fafafa; border-radius: 0 .5rem .5rem 0; }
+/* リビジョン履歴: 選択中の版と、長い本文の差分。 */
+.revision-item.is-active { background: #f4f4f5; box-shadow: inset 3px 0 0 #52525b; }
+.revision-diff-body { max-height: 50vh; overflow-y: auto; }
+/* 添付資料の形式バッジ。 */
+.attachment-badge { flex-shrink: 0; border-radius: .25rem; background: #f1f5f9; color: #334155; font-size: .7rem; font-weight: 700; padding: .1rem .4rem; }
+/* プレビュー内の数式。KaTeX の読み込み前・失敗時も TeX のソースが読めるようにする。 */
+.prose-preview .math-display { display: block; overflow-x: auto; margin: 1em 0; text-align: center; }
+.prose-preview .katex-display { overflow-x: auto; overflow-y: hidden; }
+/* プレビュー内のフォトギャラリー（:::gallery）。公開サイト（public.css のギャラリー節）と同じ3つの並べ方を、figure の
+   class（gallery-layout-justified・-masonry・-cards）で切り替えて、スクリプトなしの簡易表示で見せる。
+   列の数と行の高さはプレビュー欄の幅で決める。 */
+.prose-preview { container: prose-preview / inline-size; }
+.prose-preview .photo-gallery { --gallery-gap: 12px; margin: 0 0 1em; padding: 0; }
+.prose-preview .gallery-item { position: relative; overflow: hidden; background: var(--admin-surface); }
+.prose-preview .gallery-item img { display: block; width: 100%; height: auto; border-radius: 0; }
+.prose-preview .gallery-item figcaption { color: var(--admin-muted); font-size: .8rem; line-height: 1.6; }
+/* 行揃え（justified・既定）: 同じ高さの行に写真を元の縦横比の幅で詰め、行の余りを等分して右端をそろえる（公開サイトで
+   justified_gallery.js が動く前と同じ並べ方。広げた分だけ上下をわずかに切り抜く）。最後の行は ::after の詰め物が余りを受け、
+   写真を引き伸ばさない。キャプションは写真の下端に重ね、指したときだけ出す。 */
+.prose-preview .photo-gallery.gallery-layout-justified { --gallery-gap: 6px; --gallery-row-height: 120px; display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--gallery-gap); }
+@container prose-preview (min-width: 520px) { .prose-preview .photo-gallery.gallery-layout-justified { --gallery-row-height: 160px; } }
+.prose-preview .photo-gallery.gallery-layout-justified::after { content: ""; flex: 1000 1 0; margin-left: calc(-1 * var(--gallery-gap)); }
+.prose-preview .gallery-layout-justified .gallery-item { flex: 1 1 auto; max-width: 100%; height: var(--gallery-row-height); margin: 0; border-radius: .25rem; }
+.prose-preview .gallery-layout-justified .gallery-item img { width: auto; min-width: 100%; max-width: 100%; height: 100%; object-fit: cover; }
+.prose-preview .gallery-layout-justified .gallery-item figcaption { position: absolute; right: 0; bottom: 0; left: 0; padding: 18px 8px 5px; overflow: hidden; background: linear-gradient(to top, rgb(15 23 42 / .72), rgb(15 23 42 / 0)); color: #f8fafc; font-size: .72rem; line-height: 1.5; white-space: nowrap; text-overflow: ellipsis; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
+.prose-preview .gallery-layout-justified .gallery-item:hover figcaption, .prose-preview .gallery-layout-justified .gallery-item:focus-visible figcaption { opacity: 1; }
+/* 段組み（masonry。masonry-grid は並べ方を導入する前のクラスで、新しい形にも付く）: CSS Columns で写真を段に詰める。
+   ふだんは2列、幅が足りれば3列にする。 */
+.prose-preview .photo-gallery.masonry-grid { column-count: 2; column-gap: 12px; }
+@container prose-preview (min-width: 520px) { .prose-preview .photo-gallery.masonry-grid { column-count: 3; } }
+.prose-preview .masonry-grid .gallery-item { break-inside: avoid; margin-bottom: 12px; border: 1px solid var(--admin-line); border-radius: .5rem; }
+.prose-preview .masonry-grid .gallery-item figcaption { padding: 6px 10px 8px; }
+/* カード（cards）: 写真を額縁のような余白で囲み、元の縦横比のまま中央に置いて、下にキャプションを添える。 */
+.prose-preview .photo-gallery.gallery-layout-cards { --gallery-gap: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)); align-items: stretch; gap: var(--gallery-gap); }
+.prose-preview .gallery-layout-cards .gallery-item { container-type: inline-size; display: flex; flex-direction: column; margin: 0; padding: clamp(8px, 7%, 14px); border: 1px solid var(--admin-line); border-radius: 3px; background: #fff; box-shadow: 0 1px 2px rgb(15 23 42 / .04), 0 10px 24px -18px rgb(15 23 42 / .28); }
+.prose-preview .gallery-layout-cards .gallery-item img { max-height: 20rem; max-height: min(125cqw, 20rem); margin: auto 0; object-fit: contain; }
+.prose-preview .gallery-layout-cards .gallery-item figcaption { padding: 10px 2px 0; font-size: .75rem; letter-spacing: .02em; text-align: center; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .prose-preview .gallery-layout-justified .gallery-item figcaption { transition: none; } }
+/* ダッシュボード: PV 推移の棒グラフ（単一系列・インディゴの単色）。目盛り線と軸は控えめにし、棒は上端だけ角丸。 */
+.pv-chart { overflow: visible; }
+.pv-chart .chart-grid { stroke: #e2e8f0; stroke-width: 1; }
+.pv-chart .chart-axis { stroke: #cbd5e1; stroke-width: 1; }
+.pv-chart .chart-tick { fill: #64748b; font-size: 11px; font-variant-numeric: tabular-nums; }
+.pv-chart .chart-value { fill: #334155; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pv-chart .chart-mark { fill: #71717a; }
+.pv-chart .chart-bar.is-today .chart-mark { fill: #27272a; }
+.pv-chart .chart-hit { fill: transparent; }
+.pv-chart .chart-bar { cursor: default; outline: none; }
+.pv-chart .chart-bar.is-active .chart-hit, .pv-chart .chart-bar:focus-visible .chart-hit { fill: #f4f4f5; }
+.pv-chart .chart-bar.is-active .chart-mark { fill: #27272a; }
+.chart-tooltip { position: absolute; z-index: 10; pointer-events: none; transform: translateX(-50%); display: flex; flex-direction: column;
+  gap: 1px; white-space: nowrap; border-radius: .5rem; background: #0f172a; color: #f8fafc; padding: .4rem .6rem; font-size: .75rem;
+  box-shadow: 0 4px 12px rgb(15 23 42 / .2); font-variant-numeric: tabular-nums; }
+.chart-tooltip[hidden] { display: none; }
+/* 人気記事ランキングの順位。上位3位を色分けする。 */
+.rank-badge { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem;
+  border-radius: 9999px; background: #f1f5f9; color: #475569; font-size: .8rem; font-weight: 700; }
+.rank-badge.rank-1 { background: #e4e4e7; color: #27272a; }
+.rank-badge.rank-2 { background: #e2e8f0; color: #334155; }
+.rank-badge.rank-3 { background: #f4f4f5; color: #3f3f46; }
+/* MCP 連携: AI ツールの設定例。長いトークン・URL は折り返し、横スクロールさせない。 */
+.snippet { white-space: pre-wrap; overflow-wrap: anywhere; border-radius: .5rem; background: #0f172a; color: #e2e8f0; padding: .75rem; font-size: .75rem; line-height: 1.6; }
+/* SNS 告知文: X の文字数が上限を超えたら赤くする。 */
+.social-count.is-over { color: #27272a; font-weight: 700; }
+/* メディアライブラリ・メディアピッカー: 選択中の画像。 */
+.media-picker-item[aria-pressed="true"] { border-color: #27272a; box-shadow: 0 0 0 2px #27272a; }
+#media-dropzone.is-dragover { border-color: #52525b; background: #f4f4f5; color: #27272a; }
+/* フォトギャラリーの作成・挿入モーダル: 選んだ順の番号と、写真を落とせる枠。 */
+.gallery-pick-badge { position: absolute; top: 6px; left: 6px; display: inline-flex; align-items: center; justify-content: center; min-width: 1.5rem; height: 1.5rem;
+  padding: 0 .35rem; border-radius: 9999px; background: #27272a; color: #fff; font-size: .75rem; font-weight: 700; box-shadow: 0 0 0 2px #fff; }
+.gallery-pick-badge[hidden] { display: none; }
+.gallery-dropzone.is-dragover { border-color: #52525b; background: #f4f4f5; color: #27272a; }
+.gallery-dropzone:focus-within { border-color: #52525b; outline: 2px solid #a1a1aa; outline-offset: 2px; }
+/* テーマ設定: カードに公開ページの縮小した実物を出す。iframe を枠の4倍の大きさで描画し、1/4 に縮める。 */
+.theme-thumb { position: relative; display: block; aspect-ratio: 16 / 10; overflow: hidden; background: #f4f4f5; border-bottom: 1px solid var(--admin-line); }
+.theme-thumb iframe { position: absolute; top: 0; left: 0; width: 400%; height: 400%; border: 0; transform: scale(.25); transform-origin: 0 0; pointer-events: none; }
+.theme-card:has(input:checked) { border-color: var(--admin-ink); box-shadow: 0 0 0 1px var(--admin-ink); }
+.theme-card:focus-within { outline: 2px solid #a1a1aa; outline-offset: 2px; }
+/* 共通ボタン（admin_ux_redesign_spec.md §2-2）。バリアント（.btn-primary / -secondary / -danger / -ghost）とサイズ（.btn-sm / .btn-md）を組み合わせる。
+   .btn-sm はテーブル・リストの行やカード内の操作、.btn-md はフォームの送信・モーダルのフッター・主要な操作に使う。
+   高さを固定するので、<button>・<a>・<summary> のどれで作っても隣のボタンと高さがそろう。 */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .375rem; box-sizing: border-box; border: 1px solid transparent;
+  border-radius: 4px !important; font-weight: 600; line-height: 1.25; white-space: nowrap; text-decoration: none; cursor: pointer; user-select: none;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease; }
+.btn:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 2px; }
+.btn:disabled, .btn[aria-disabled="true"] { cursor: not-allowed; opacity: .5; }
+.btn[hidden] { display: none !important; }
+summary.btn { list-style: none; }
+summary.btn::-webkit-details-marker { display: none; }
+.btn, .btn-md { height: 2.375rem; padding: 0 1rem; font-size: .875rem; }
+.btn-sm { height: 2rem; padding: 0 .75rem; font-size: .8125rem; }
+.btn-primary { background: #27272a; border-color: #27272a; color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #18181b; border-color: #18181b; }
+.btn-secondary { background: #fff; border-color: #d4d4d8; color: #27272a; font-weight: 500; }
+.btn-secondary:hover:not(:disabled) { background: #f4f4f5; }
+.btn-danger { background: #fff; border-color: #fecdd3; color: #be123c; }
+.btn-danger:hover:not(:disabled) { background: #fff1f2; border-color: #fda4af; }
+.btn-ghost { background: transparent; border-color: transparent; color: #52525b; font-weight: 500; }
+.btn-ghost:hover:not(:disabled) { background: #f4f4f5; color: #18181b; }
+/* 予約の入力欄（remote_schedule_picker）は行の中でもモーダルのフッターでも同じ部品を使う。モーダルでは隣のボタン（.btn-md）に高さをそろえる。 */
+.btn-group-md summary.btn-sm, .btn-group-md .btn-sm { height: 2.375rem; padding: 0 1rem; font-size: .875rem; }
+/* 公開サーバーへの未反映バナー（layout.html）。 */
+.remote-dirty-banner[hidden] { display: none; }
+/* 統一ヘルプポップオーバー（admin_ux_polish_and_mcp_spec.md §2-1）。項目ラベルの横に「?」ボタンを置き、長い説明はクリックで開く吹き出しに入れる。
+   <span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="…">?</button><span class="help-tip-pop" hidden>…</span></span>
+   吹き出しは <p> や <label> の中にも置けるよう <span> で作り、表示位置は admin.js が画面内に収まるよう fixed で決める（親の overflow で切れない）。 */
+.help-tip { position: relative; display: inline-flex; align-items: center; vertical-align: middle; margin-left: .25rem; font-weight: 400; letter-spacing: normal; }
+.help-tip-btn { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 1.125rem; height: 1.125rem; padding: 0;
+  border: 1px solid #d4d4d8; border-radius: 9999px !important; background: #fff; color: #71717a; font-size: .6875rem; font-weight: 700; line-height: 1; cursor: pointer; }
+.help-tip-btn:hover, .help-tip-btn[aria-expanded="true"] { border-color: #27272a; background: #27272a; color: #fff; }
+.help-tip-btn:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 2px; }
+.help-tip-pop { position: fixed; z-index: 60; top: 0; left: 0; display: block; box-sizing: border-box; width: max-content; max-width: min(22rem, calc(100vw - 1rem));
+  padding: .625rem .75rem; border: 1px solid var(--admin-line); border-radius: .5rem; background: #fff; color: #3f3f46; box-shadow: 0 8px 24px rgb(15 23 42 / .14);
+  font-size: .75rem; font-weight: 400; line-height: 1.65; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.help-tip-pop[hidden] { display: none; }
+.help-tip-pop > span { display: block; }
+.help-tip-pop > span + span { margin-top: .375rem; }
+.help-tip-pop code { border-radius: .25rem; background: #f4f4f5; padding: 0 .25rem; font-size: .9em; }
+.help-tip-pop a { color: #18181b; text-decoration: underline; }
+/* 記事編集: 本文のシンタックスハイライト（desktop_quit_and_editor_ux_spec.md §1.3-3）。文字を透明にした textarea の背面に、
+   同じ文字を色付きで描いたミラー（pre.editor-highlight）を重ねる。カーソル・折り返しがずれないよう、文字の大きさ・行の高さ・
+   余白・枠線・折り返しの規則は下の1つの規則で両方に同じ値を当てる（色以外の装飾、太さ・斜体・余白は付けない）。
+   スクロールバーの幅だけは editor.js がミラーの右の余白に足して合わせる。 */
+.editor-wrap { position: relative; }
+.editor-wrap .editor-input, .editor-wrap .editor-highlight {
+  box-sizing: border-box; margin: 0; padding: 1rem; border-width: 1px; border-style: solid; border-radius: 4px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 1rem; font-weight: 400; font-style: normal; line-height: 1.625; letter-spacing: normal; word-spacing: normal;
+  font-variant-ligatures: none; font-kerning: none; text-transform: none; text-indent: 0; text-align: left; tab-size: 4;
+  white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; line-break: auto; }
+/* lg 以上は 14px。狭い画面は iOS Safari が入力時に画面を拡大しないよう 16px のまま。 */
+@media (min-width: 1024px) { .editor-wrap .editor-input, .editor-wrap .editor-highlight { font-size: .875rem; } }
+.editor-wrap .editor-input { display: block; position: relative; z-index: 1; }
+.editor-wrap .editor-highlight { position: absolute; inset: 0; z-index: 0; overflow: hidden; border-color: transparent; background: #fff; color: #27272a; pointer-events: none; }
+.editor-wrap .editor-highlight code { font: inherit; letter-spacing: inherit; white-space: inherit; background: none; padding: 0; border: 0; }
+.editor-wrap:not(.has-highlight) .editor-highlight { display: none; }
+.editor-wrap.has-highlight .editor-input { background: transparent; color: transparent; caret-color: #18181b; -webkit-text-fill-color: transparent; }
+.editor-wrap.has-highlight .editor-input::placeholder { color: #a1a1aa; -webkit-text-fill-color: #a1a1aa; }
+.editor-wrap.has-highlight .editor-input::selection { background: rgb(59 130 246 / .28); color: transparent; -webkit-text-fill-color: transparent; }
+/* 配色は控えめに。記法の記号（# ** > - ` $ など）は薄いグレーにし、中身の種類ごとに色を変える。 */
+.editor-highlight .md-mark { color: #a1a1aa; }
+.editor-highlight .md-heading { color: #1e3a8a; }
+.editor-highlight .md-strong { color: #9a3412; }
+.editor-highlight .md-em { color: #6d28d9; }
+.editor-highlight .md-code { color: #0f766e; background: #f4f4f5; border-radius: 2px; }
+.editor-highlight .md-codeblock { color: #0f766e; }
+.editor-highlight .md-quote { color: #57534e; }
+.editor-highlight .md-list { color: #b45309; }
+.editor-highlight .md-link { color: #1d4ed8; }
+.editor-highlight .md-url { color: #71717a; }
+.editor-highlight .md-math { color: #be185d; }
+/* 装飾ツールバーの「? 書き方ガイド」: 統一ヘルプポップオーバー（.help-tip）の丸いボタンを、文字の入る小さなボタンにする。 */
+.help-tip-btn.editor-guide-btn { width: auto; height: 1.75rem; padding: 0 .625rem; font-size: .75rem; font-weight: 500; color: #52525b; }
+/* 通知バナー（成功・注意・エラー・情報）。意味は class 名で決め、配色は1か所にまとめる（成功=emerald・注意=amber・エラー=rose・情報=sky）。
+   赤系は rose に統一し、red は使わない。 */
+.notice { border: 1px solid; border-radius: .5rem; padding: .625rem .875rem; font-size: .875rem; line-height: 1.6; }
+.notice[hidden] { display: none; }
+.notice-success { border-color: #a7f3d0; background: #ecfdf5; color: #064e3b; }
+.notice-warn { border-color: #fcd34d; background: #fffbeb; color: #78350f; }
+.notice-error { border-color: #fecdd3; background: #fff1f2; color: #881337; }
+.notice-info { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+.notice-neutral { border-color: #e5e5e5; background: #fafafa; color: #262626; }
+/* 公開方式のバッジ。配色は方式ごとに固定する（公開サーバー=sky・静的サイト=emerald・待機中=neutral）。どの画面でも同じ色にする。 */
+.badge { display: inline-flex; align-items: center; gap: .25rem; border-radius: 9999px; padding: .125rem .625rem; font-size: .75rem; font-weight: 600; line-height: 1.25rem; white-space: nowrap; }
+.badge-remote { background: #0369a1; color: #fff; }
+.badge-static { background: #047857; color: #fff; }
+.badge-standby { background: #e5e5e5; color: #404040; }
+.badge-unset { background: #fff; color: #737373; box-shadow: inset 0 0 0 1px #d4d4d4; }
+/* 「公開先」の方式のタブ（公開サーバー｜静的サイト。partials/publish_method_banner.html）。浮いたカードにせず、ページの地の上に
+   引いた1本の線と、選んでいるタブの下線（濃い色）で示す。 */
+.publish-tabs { display: flex; flex-wrap: wrap; gap: 1.5rem; border-bottom: 1px solid var(--admin-line); }
+.publish-tab { display: inline-flex; align-items: center; gap: .5rem; margin-bottom: -1px; padding: .625rem .125rem; border-bottom: 2px solid transparent;
+  font-size: .875rem; font-weight: 500; color: var(--admin-muted); text-decoration: none; transition: color .12s ease, border-color .12s ease; }
+.publish-tab:hover { border-bottom-color: #d4d4d8; color: var(--admin-ink); }
+.publish-tab.is-current { border-bottom-color: var(--admin-ink); color: var(--admin-ink); font-weight: 600; }
+.publish-tab:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 2px; border-radius: 2px; }
+/* 両方の方式を設定済みのときの1行の状態（どちらが有効か）。控えめな文字と、方式の色の点だけで示す。 */
+.publish-method-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; margin-top: .875rem;
+  font-size: .8125rem; color: #52525b; }
+.publish-method-dot { display: inline-block; flex-shrink: 0; width: .5rem; height: .5rem; margin-right: .5rem; border-radius: 9999px; background: #a1a1aa; }
+.publish-method-dot.is-remote { background: #0369a1; }
+.publish-method-dot.is-static { background: #047857; }
+/* 画面の最下部の「接続・設定の管理」（接続の解除・設定の削除などを、最初に目に入る位置から外して収める折りたたみ）。 */
+.publish-manage { margin-top: 2.5rem; border-top: 1px solid var(--admin-line); }
+.publish-manage > summary { display: flex; align-items: center; gap: .5rem; padding: 1rem 0; cursor: pointer; list-style: none; font-size: .875rem; font-weight: 600; color: #52525b; }
+.publish-manage > summary::-webkit-details-marker { display: none; }
+.publish-manage > summary::before { content: ""; width: .4rem; height: .4rem; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .12s ease; }
+.publish-manage[open] > summary::before { transform: rotate(45deg); }
+.publish-manage > summary:hover { color: var(--admin-ink); }
+.publish-manage > summary:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 2px; }
+.publish-manage-body { display: flex; flex-direction: column; gap: 1.5rem; padding-bottom: 1rem; }
+.publish-danger { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; border: 1px solid #fecdd3; border-radius: .75rem; background: #fff; padding: 1rem 1.25rem; }
+@media (prefers-reduced-motion: reduce) { .publish-tab, .publish-manage > summary::before { transition: none; } }
+/* スマートフォン幅では、2つのタブを1行に等分して並べる（折り返して上下に分かれないように）。 */
+@media (max-width: 639px) {
+  .publish-tabs { flex-wrap: nowrap; gap: 0; }
+  .publish-tab { flex: 1 1 0; min-width: 0; justify-content: center; gap: .25rem; padding: .625rem .375rem; font-size: .8125rem; }
+}

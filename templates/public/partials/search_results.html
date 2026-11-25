@@ -1,0 +1,27 @@
+{{define "search_results"}}
+{{if .Query}}
+<p class="result-count" role="status">{{if eq .Lang "en"}}Search results for &ldquo;{{.Query}}&rdquo;: {{.Result.Total}} results{{else}}「{{.Query}}」の検索結果: {{.Result.Total}}件{{end}}</p>
+{{if .Result.Hits}}
+<ol class="search-hits">
+  {{range .Result.Hits}}
+  <li class="search-hit">
+    <h2 class="card-title"><a href="{{contentPath .Kind .Slug .Lang}}">{{.TitleHTML}}</a></h2>
+    {{range .Snippets}}<p class="snippet">{{.Fragment}}</p>{{end}}
+    {{if ne .Kind "page"}}
+    <p class="meta">
+      {{with .Category}}<span class="badge">{{.}}</span>{{end}}
+      <time datetime="{{isoTime .PublishedAt}}">{{formatDate .PublishedAt $.Lang}}</time>
+      {{with .Author}}<span>・{{if eq $.Lang "en"}}By: {{else}}文: {{end}}{{.}}</span>{{end}}
+    </p>
+    {{end}}
+  </li>
+  {{end}}
+</ol>
+{{template "pagination" .Pagination}}
+{{else}}
+<p class="empty">{{if eq .Lang "en"}}No matching articles found. Try different keywords.{{else}}一致する記事は見つかりませんでした。別の言葉で検索してみてください。{{end}}</p>
+{{end}}
+{{else}}
+<p class="empty">{{if eq .Lang "en"}}Enter keywords to search articles.{{else}}キーワードを入力して記事を検索できます。{{end}}</p>
+{{end}}
+{{end}}

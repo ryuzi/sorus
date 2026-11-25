@@ -1,0 +1,48 @@
+{{define "content"}}
+{{with .Data}}
+<nav class="breadcrumb" aria-label="{{if eq $.Lang "en"}}Breadcrumb{{else}}パンくずリスト{{end}}">
+  <ol>
+    <li><a href="{{if eq $.Lang "en"}}/en/{{else}}/{{end}}">{{if eq $.Lang "en"}}Home{{else}}ホーム{{end}}</a></li>
+    <li aria-current="page">{{.Article.Title}}</li>
+  </ol>
+</nav>
+<article class="page">
+  <header class="article-header">
+    <h1 class="article-title">{{.Article.Title}}</h1>
+  </header>
+  {{if gt (len .Headings) 1}}
+  <div class="article-layout">
+    <nav class="toc toc-sidebar" aria-label="{{if eq $.Lang "en"}}Table of contents{{else}}目次{{end}}">
+      <details class="toc-collapsible" open>
+        <summary class="toc-summary"><span class="toc-title">{{if eq $.Lang "en"}}Contents{{else}}目次{{end}}</span></summary>
+        <div class="toc-body">
+          <ul>{{range .Headings}}<li class="toc-level-{{.Level}}"><a href="#{{.ID}}">{{.Text}}</a></li>{{end}}</ul>
+        </div>
+      </details>
+    </nav>
+    <div class="prose" data-math-root>{{.HTML}}</div>
+  </div>
+  {{else}}
+  <div class="prose" data-math-root>{{.HTML}}</div>
+  {{end}}
+  {{if .Attachments}}
+  <section class="attachments" aria-labelledby="attachments-title">
+    <h2 id="attachments-title" class="attachments-title">{{if eq $.Lang "en"}}Attachments (PDF / Handouts){{else}}添付ファイル（PDF / 配布資料）{{end}}</h2>
+    <ul class="attachment-cards">
+      {{range .Attachments}}
+      <li class="attachment-card">
+        <a href="{{.URL}}" download>
+          <span class="attachment-type">{{.Label}}</span>
+          <span class="attachment-name">{{.Filename}}</span>
+          <span class="attachment-meta">{{fileSize .FileSize}}・{{if eq $.Lang "en"}}Downloads: {{.DownloadCount}}{{else}}ダウンロード {{.DownloadCount}}回{{end}}</span>
+        </a>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+</article>
+{{end}}
+{{end}}
+
+{{define "head"}}{{template "content_head" .}}{{end}}

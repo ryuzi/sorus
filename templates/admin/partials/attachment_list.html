@@ -1,0 +1,32 @@
+{{define "attachment_list"}}{{$ja := ne .Lang "en"}}
+<ul class="space-y-2" data-attachment-count="{{len .Items}}">
+  {{range .Items}}
+  <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm" data-attachment-id="{{.ID}}">
+    <div class="flex min-w-0 items-center gap-2">
+      <span class="attachment-badge">{{.Label}}</span>
+      <a href="{{.AdminURL}}" class="truncate font-medium text-neutral-800 hover:text-zinc-600" title="{{.Filename}}">{{.Filename}}</a>
+    </div>
+    <div class="flex items-center gap-3 text-xs text-neutral-500">
+      <span>{{fileSize .FileSize}}</span>
+      <span title="{{if $ja}}公開サイトでのダウンロード数{{else}}Downloads on the public site{{end}}">DL {{.DownloadCount}}</span>
+      {{if $.CanEdit}}
+      <button type="button" class="text-zinc-600 hover:underline" data-attachment-link="{{.URL}}" data-filename="{{.Filename}}">{{if $ja}}本文にリンク{{else}}Link in body{{end}}</button>
+      <button type="button" class="text-neutral-400 hover:text-neutral-600" data-attachment-delete="{{.ID}}" data-filename="{{.Filename}}"{{if $ja}}>削除</button>{{else}}>Delete</button>{{end}}
+      {{end}}
+    </div>
+  </li>
+  {{else}}
+  <li class="py-2 text-sm text-neutral-400">{{if $ja}}添付資料はありません。{{else}}No attachments.{{end}}</li>
+  {{end}}
+</ul>
+{{if .CanEdit}}
+<form id="attachment-form" method="post" enctype="multipart/form-data" action="/admin/articles/{{.ArticleID}}/attachments" class="mt-3 flex flex-wrap items-center gap-2">
+  <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+  <label class="sr-only" for="attachment-input">{{if $ja}}添付するファイル{{else}}File to attach{{end}}</label>
+  <input id="attachment-input" type="file" name="file" accept="{{.Accept}}" required
+         class="min-w-0 flex-1 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm hover:file:bg-neutral-200">
+  <button type="submit" id="attachment-upload-button" class="btn btn-secondary btn-sm"{{if $ja}}>アップロード</button>{{else}}>Upload</button>{{end}}
+  <p class="w-full text-xs text-neutral-400">{{if $ja}}PDF・ZIP・TXT・CSV・Word・Excel・PowerPoint（{{.MaxMB}}MBまで）。公開すると記事の末尾にダウンロード欄が表示されます。{{else}}PDF, ZIP, TXT, CSV, Word, Excel, PowerPoint (up to {{.MaxMB}} MB). Once published, a download section appears at the end of the article.{{end}}</p>
+</form>
+{{end}}
+{{end}}

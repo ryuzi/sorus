@@ -1,0 +1,76 @@
+# タグ（v*）を push するとリリースを作る。
+#
+# ソースと配布ファイルは同じ公開リポジトリ ryuzi/sorus で扱い、配布ファイルはこのリポジトリの
+# GitHub Releases に出す（1行インストールや更新確認が認証なしでダウンロードできる）。
+# リリースの作成にはワークフローが自動で受け取る GITHUB_TOKEN を使うため、追加のシークレットは要らない。
+#
+# デスクトップ版・サーバー版のアーカイブ、install.sh / install.ps1 / install-server.sh、
+# SHA256SUMS をリリースに添付する。
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# リリースの作成と添付ファイルのアップロードに contents: write が要る。
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      # ARM 向けのメモリ対策（gen2brain/webp の最適化を止める）は scripts/release.sh にある。
+      - name: Build release archives
+        run: ./scripts/release.sh "$GITHUB_REF_NAME"
+
+      # ------------------------------------------------------------------
+      # TODO(署名): コード署名・公証の差し込み位置（spec 7-2）。
+      # 署名用の証明書を用意したら、ここで dist-release/ の実行ファイルに署名し、
+      # アーカイブと SHA256SUMS を作り直してから下の検証に進む。
+      # 署名対応後は、主経路を署名済みインストーラー（Windows）/ 公証済み dmg（macOS）に差し替える。
+      #
+      # - name: Sign Windows executables
+      #   run: |
+      #     # 例: signtool / Azure Trusted Signing で sorus.exe に署名する
+      #   env:
+      #     WINDOWS_SIGNING_CERT: ${{ secrets.WINDOWS_SIGNING_CERT }}
+      #
+      # - name: Sign and notarize macOS app
+      #   # codesign と notarytool は macOS ランナーが必要（runs-on: macos-latest のジョブに分ける）
+      #   run: |
+      #     # 例: codesign --options runtime --sign "Developer ID Application: ..." sorus
+      #     #     xcrun notarytool submit sorus.zip --wait
+      #   env:
+      #     APPLE_ID: ${{ secrets.APPLE_ID }}
+      #     APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      #     APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      # ------------------------------------------------------------------
+
+      - name: Verify checksums
+        working-directory: dist-release
+        run: sha256sum -c SHA256SUMS
+
+      - name: Render release notes
+        run: sed "s/{{VERSION}}/$GITHUB_REF_NAME/g" install/RELEASE_NOTES_TEMPLATE.md > "$RUNNER_TEMP/release-notes.md"
+
+      # dist-release/ には scripts/release.sh が install/install.sh・install/install.ps1・
+      # deploy/install-server.sh をコピーしてあるので、1行インストールが参照する
+      # latest/download/install* もここから載る。
+      - uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          body_path: ${{ runner.temp }}/release-notes.md
+          files: dist-release/*
+          fail_on_unmatched_files: true

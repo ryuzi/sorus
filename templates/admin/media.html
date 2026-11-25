@@ -1,0 +1,308 @@
+{{define "content"}}{{$d := .Data}}{{$ja := eq .Lang "ja"}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-xl font-bold text-neutral-900">{{if $ja}}メディアライブラリ{{else}}Media library{{end}}</h1>
+      <p class="mt-1 text-sm text-neutral-600">
+        {{if $ja}}アップロードした画像を一覧・検索し、代替テキストやキャプションを整えて記事で再利用できます。{{else}}Browse and search uploaded images, refine their alt text and captions, and reuse them in articles.{{end}}
+      </p>
+    </div>
+    <form method="get" action="/admin/media" id="media-search-form" role="search" class="flex items-center gap-2">
+      <label for="media-search" class="sr-only">{{if $ja}}画像を検索{{else}}Search images{{end}}</label>
+      <input id="media-search" name="q" type="search" value="{{$d.Query}}" maxlength="200"
+             placeholder="{{if $ja}}ファイル名・代替テキスト・キャプション{{else}}File name, alt text, caption{{end}}"
+             class="w-72 max-w-[60vw] rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+      {{with $d.Tag}}<input type="hidden" name="tag" value="{{.}}">{{end}}
+      {{if $d.Untagged}}<input type="hidden" name="untagged" value="1">{{end}}
+      {{/* 並び順。選ぶとすぐ同じ検索語・タグの絞り込みのまま並べ替える（ページ送り・タグのリンクも並び順を残す）。 */}}
+      <label for="media-sort" class="sr-only">{{.T "sort_label"}}</label>
+      <select id="media-sort" name="sort" onchange="this.form.submit()"
+              class="rounded-lg border border-neutral-300 bg-white py-2 pl-2 pr-7 text-sm text-neutral-700 focus:border-zinc-500 focus:outline-none">
+        <option value="taken_desc"{{if eq $d.Sort "taken_desc"}} selected{{end}}>{{.T "media_sort_taken_desc"}}</option>
+        <option value="taken_asc"{{if eq $d.Sort "taken_asc"}} selected{{end}}>{{.T "media_sort_taken_asc"}}</option>
+        <option value="created_desc"{{if eq $d.Sort "created_desc"}} selected{{end}}>{{.T "media_sort_created_desc"}}</option>
+      </select>
+      <button type="submit" class="btn btn-primary btn-md">{{if $ja}}検索{{else}}Search{{end}}</button>
+      {{if or $d.Query $d.Tag $d.Untagged}}<a href="/admin/media" class="text-sm text-neutral-500 hover:text-neutral-800">{{if $ja}}クリア{{else}}Clear{{end}}</a>{{end}}
+    </form>
+  </div>
+
+  {{/* タグの絞り込み（タグクラウド）。押すとそのタグの写真だけを出す（検索語は残す）。文字の大きさ・濃さは写真の枚数を表す。 */}}
+  {{if or $d.TagCounts $d.UntaggedCount $d.Tag $d.Untagged}}
+  <nav id="media-tag-cloud" class="media-tag-cloud mb-4 rounded-lg border border-neutral-200 bg-white px-4 py-3" aria-labelledby="media-tag-cloud-label">
+    <p id="media-tag-cloud-label" class="mb-2 text-xs font-medium text-neutral-600">{{if $ja}}タグで絞り込む（押すとそのタグの写真だけを表示します）{{else}}Filter by tag (click to show only photos with that tag){{end}}</p>
+    <ul class="flex flex-wrap items-center gap-1.5">
+      <li><a href="{{$d.AllURL}}" id="media-tag-all" class="media-cloud-chip"{{if not (or $d.Tag $d.Untagged)}} aria-current="page"{{end}}>{{if $ja}}すべて{{else}}All{{end}}</a></li>
+      <li><a href="{{$d.UntaggedURL}}" id="media-tag-untagged" class="media-cloud-chip is-untagged"{{if $d.Untagged}} aria-current="page"{{end}}>{{if $ja}}タグ未設定{{else}}No tags{{end}} <span class="media-cloud-count">({{$d.UntaggedCount}})</span></a></li>
+      {{range $d.TagCounts}}<li><a href="{{.URL}}" class="media-cloud-chip media-cloud-level-{{.Level}}" data-cloud-tag="{{.Tag}}"{{if .Current}} aria-current="page"{{end}}>{{.Tag}} <span class="media-cloud-count">({{.Count}})</span></a></li>
+      {{end}}
+    </ul>
+    {{if $d.TagCountsMore}}
+    <details id="media-tag-cloud-more" class="mt-2"{{if $d.TagCountsMoreOpen}} open{{end}}>
+      <summary class="cursor-pointer select-none text-xs text-neutral-600 hover:text-neutral-900">{{if $ja}}ほかのタグ（{{len $d.TagCountsMore}}個）{{else}}More tags ({{len $d.TagCountsMore}}){{end}}</summary>
+      <ul class="mt-2 flex flex-wrap items-center gap-1.5">
+        {{range $d.TagCountsMore}}<li><a href="{{.URL}}" class="media-cloud-chip media-cloud-level-{{.Level}}" data-cloud-tag="{{.Tag}}"{{if .Current}} aria-current="page"{{end}}>{{.Tag}} <span class="media-cloud-count">({{.Count}})</span></a></li>
+        {{end}}
+      </ul>
+    </details>
+    {{end}}
+  </nav>
+  {{end}}
+
+  {{with $d.Error}}<p id="media-error" role="alert" class="notice notice-error mb-4">{{.}}</p>{{end}}
+
+  {{if $d.CanUpload}}
+  <label id="media-dropzone" for="media-upload-input"
+         class="dropzone mb-5 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-neutral-300 bg-white px-4 py-6 text-sm text-neutral-500 hover:border-zinc-400 hover:text-zinc-600">
+    <span id="media-dropzone-label" class="font-medium">{{if $ja}}画像をここにドラッグ＆ドロップ（またはクリックして選択）{{else}}Drag and drop images here (or click to choose){{end}}</span>
+    <span class="text-xs text-neutral-400">{{if $ja}}JPEG・PNG・WebP、1枚15MBまで。複数枚をまとめてアップロードできます。{{else}}JPEG, PNG or WebP, up to 15 MB each. You can upload several at once.{{end}}</span>
+  </label>
+  <input id="media-upload-input" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" multiple>
+  {{end}}
+
+  <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+  <p class="text-sm text-neutral-500" id="media-count">
+    {{with $d.Tag}}<span id="media-tag-filter">{{if $ja}}タグ「{{.}}」の写真{{else}}Photos tagged "{{.}}"{{end}}</span> · {{end}}{{if $d.Untagged}}<span id="media-untagged-filter">{{if $ja}}タグ未設定の写真{{else}}Photos without tags{{end}}</span> · {{end}}{{if $d.Query}}{{if $ja}}「{{$d.Query}}」の検索結果: {{$d.Total}}件{{else}}{{$d.Total}} results for "{{$d.Query}}"{{end}}{{else}}{{if $ja}}全{{$d.Total}}件{{else}}{{$d.Total}} images{{end}}{{end}}
+    {{if gt $d.TotalPages 1}}<span class="text-neutral-400">({{$d.Page}} / {{$d.TotalPages}})</span>{{end}}
+  </p>
+  {{if $d.Items}}
+  <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+    <input type="checkbox" id="media-select-all" class="h-4 w-4 rounded border-neutral-300">
+    {{if $ja}}このページをすべて選択{{else}}Select all on this page{{end}}
+  </label>
+  {{end}}
+  </div>
+
+  {{if $d.Items}}
+  <ul id="media-grid" class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+    {{range $d.Items}}
+    <li class="relative">
+      <input type="checkbox" class="media-select-checkbox absolute left-2 top-2 z-10 h-5 w-5 rounded border-neutral-300 bg-white shadow" aria-label="{{if $ja}}画像を選択{{else}}Select image{{end}}" data-filename="{{.Filename}}">
+      <button type="button" class="media-card group block w-full overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm text-left hover:border-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
+              data-media-id="{{.ID}}" data-filename="{{.Filename}}" data-alt="{{.Alt}}" data-caption="{{.Caption}}" data-tags="{{.AITags}}"
+              data-url="{{.URL}}" data-original="{{.OriginalURL}}" data-large="{{.LargeURL}}" data-medium="{{.MediumURL}}" data-small="{{.SmallURL}}"
+              data-width="{{.Width}}" data-height="{{.Height}}" data-mime="{{.MimeType}}" data-created="{{formatTime .CreatedAt}}"
+              data-uploader="{{.UploaderName}}" data-usage="{{.UsageCount}}" data-markdown="{{.Markdown}}">
+        <span class="block aspect-square bg-neutral-100">
+          <img src="{{.ThumbnailURL}}" alt="{{.Alt}}" loading="lazy" decoding="async" class="h-full w-full object-cover">
+        </span>
+        <span class="block px-2.5 py-2">
+          <span class="block truncate text-xs font-medium text-neutral-800" title="{{.Filename}}">{{.Filename}}</span>
+          <span class="mt-0.5 flex items-center justify-between gap-1 text-[11px] text-neutral-500">
+            <span>{{.Width}} x {{.Height}}</span>
+            {{if gt .UsageCount 0}}<span class="rounded-full bg-neutral-100 px-1.5 text-neutral-600">{{if $ja}}使用中 {{.UsageCount}}{{else}}In use {{.UsageCount}}{{end}}</span>{{end}}
+          </span>
+          {{if not .Alt}}<span class="mt-0.5 block text-[11px] text-amber-700">{{if $ja}}代替テキスト未設定{{else}}No alt text{{end}}</span>{{end}}
+          {{if .AITags}}<span class="media-tags-preview mt-0.5 block truncate text-[11px] text-neutral-500">{{.AITags}}</span>{{else}}<span class="media-tags-preview is-empty mt-0.5 block truncate text-[11px] text-neutral-500">{{if $ja}}タグなし{{else}}No tags{{end}}</span>{{end}}
+        </span>
+      </button>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}
+  <div id="media-empty" class="rounded-xl border border-neutral-200 bg-white shadow-sm px-6 py-12 text-center text-sm text-neutral-500">
+    {{if gt $d.Total 0}}{{if $ja}}このページに画像はありません。{{else}}There are no images on this page.{{end}} <a href="{{$d.FirstURL}}" class="underline">{{if $ja}}最初のページへ{{else}}Go to the first page{{end}}</a>{{else if $d.Untagged}}{{if $ja}}タグ未設定の写真はありません。{{else}}Every photo has at least one tag.{{end}}{{else if $d.Tag}}{{if $ja}}このタグの付いた写真はありません。写真を開いてタグ欄にこのタグを入れるか、写真を選んで「タグを追加」で付けられます。{{else}}No photos have this tag. Open a photo and add the tag in the Tags field, or select photos and use Add tags.{{end}}{{else if $d.Query}}{{if $ja}}条件に合う画像はありません。別の言葉で検索してください。{{else}}No images match your search. Try different words.{{end}}{{else}}{{if $ja}}まだ画像はありません。{{if $d.CanUpload}}上の枠に画像をドラッグ＆ドロップしてアップロードできます。{{end}}{{else}}No images yet.{{if $d.CanUpload}} Drag and drop images onto the area above to upload.{{end}}{{end}}{{end}}
+  </div>
+  {{end}}
+
+  {{if or $d.PrevURL $d.NextURL}}
+  <nav class="mt-6 flex items-center justify-between text-sm" aria-label="{{if $ja}}ページ送り{{else}}Pagination{{end}}">
+    {{if $d.PrevURL}}<a href="{{$d.PrevURL}}" id="media-prev" class="btn btn-secondary btn-md">{{if $ja}}前のページ{{else}}Previous{{end}}</a>{{else}}<span></span>{{end}}
+    {{if $d.NextURL}}<a href="{{$d.NextURL}}" id="media-next" class="btn btn-secondary btn-md">{{if $ja}}次のページ{{else}}Next{{end}}</a>{{end}}
+  </nav>
+  {{end}}
+</div>
+
+<div id="media-bulk-bar" class="fixed inset-x-0 bottom-0 z-30 hidden border-t border-neutral-300 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+  <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
+    <span id="media-bulk-count" class="text-sm font-medium text-neutral-800"></span>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" id="media-bulk-add" class="btn btn-primary btn-md">{{$.T "media_bulk_add_tag"}}</button>
+      <button type="button" id="media-bulk-remove" class="btn btn-secondary btn-md">{{$.T "media_bulk_remove_tag"}}</button>
+      <button type="button" id="media-bulk-clear" class="btn btn-ghost btn-md">{{$.T "media_bulk_clear"}}</button>
+    </div>
+  </div>
+</div>
+
+<dialog id="media-inspector" class="ai-modal w-[min(60rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="media-inspector-title">
+  <div class="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-3">
+    <h2 id="media-inspector-title" class="min-w-0 truncate font-semibold text-neutral-800"></h2>
+    <button type="button" data-media-close class="btn btn-ghost btn-sm">{{if $ja}}閉じる{{else}}Close{{end}}</button>
+  </div>
+  <div class="grid max-h-[80vh] overflow-y-auto md:grid-cols-[1fr_22rem]">
+    <div class="flex flex-col gap-3 border-b border-neutral-200 bg-neutral-50 p-4 md:border-b-0 md:border-r">
+      <img id="media-inspector-image" src="" alt="" class="mx-auto max-h-[50vh] w-auto max-w-full rounded-lg object-contain">
+      <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-neutral-600">
+        <dt class="text-neutral-400">{{if $ja}}サイズ{{else}}Dimensions{{end}}</dt><dd id="media-inspector-size"></dd>
+        <dt class="text-neutral-400">{{if $ja}}形式{{else}}Type{{end}}</dt><dd id="media-inspector-mime"></dd>
+        <dt class="text-neutral-400">{{if $ja}}登録日時{{else}}Uploaded{{end}}</dt><dd id="media-inspector-created"></dd>
+        <dt class="text-neutral-400">{{if $ja}}登録者{{else}}Uploaded by{{end}}</dt><dd id="media-inspector-uploader"></dd>
+      </dl>
+      <p id="media-inspector-usage" class="notice notice-warn text-xs" hidden
+         data-template="{{if $ja}}{n}件の記事で使用中です。{{else}}Used in {n} article(s).{{end}}"></p>
+      {{/* 使用中の記事。タイトルは公開中なら公開ページ、それ以外はプレビューを、デスクトップ版では既定のブラウザで開く
+           （admin.js が /admin 外の target=_blank と data-desktop-preview を処理する）。編集画面へは行末の「編集」から。 */}}
+      <div id="media-inspector-articles-container" class="rounded-lg border border-neutral-200 bg-white p-3 text-xs" hidden
+           data-label-edit="{{if $ja}}編集{{else}}Edit{{end}}"
+           data-label-draft="{{if $ja}}未公開{{else}}Not published{{end}}"
+           data-label-featured="{{if $ja}}アイキャッチ{{else}}Featured{{end}}"
+           data-label-body="{{if $ja}}本文{{else}}Body{{end}}"
+           data-label-new-tab="{{if $ja}}（ブラウザで開く）{{else}} (opens in the browser){{end}}">
+        <p class="mb-1.5 font-medium text-neutral-700">{{if $ja}}使用中の記事{{else}}Articles using this image{{end}}</p>
+        <ul id="media-inspector-articles" class="divide-y divide-neutral-100 text-neutral-600"></ul>
+      </div>
+      <div class="space-y-2" id="media-inspector-urls">
+        <div>
+          <label for="media-url-markdown" class="text-xs font-medium text-neutral-600">{{if $ja}}記事に貼る Markdown{{else}}Markdown for articles{{end}}</label>
+          <div class="mt-1 flex gap-2">
+            <input id="media-url-markdown" type="text" readonly class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 font-mono text-xs">
+            <button type="button" data-copy-target="#media-url-markdown" class="btn btn-secondary btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+          </div>
+        </div>
+        <div>
+          <label for="media-url-large" class="text-xs font-medium text-neutral-600">{{if $ja}}画像の URL（大・1200px）{{else}}Image URL (large, 1200px){{end}}</label>
+          <div class="mt-1 flex gap-2">
+            <input id="media-url-large" type="text" readonly class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-2 py-1.5 font-mono text-xs">
+            <button type="button" data-copy-target="#media-url-large" class="btn btn-secondary btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+          </div>
+        </div>
+        <details class="text-xs text-neutral-600">
+          <summary class="cursor-pointer select-none">{{if $ja}}ほかのサイズの URL{{else}}Other sizes{{end}}</summary>
+          <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 break-all font-mono">
+            <dt class="font-sans text-neutral-400">{{if $ja}}原寸{{else}}Original{{end}}</dt><dd id="media-url-original"></dd>
+            <dt class="font-sans text-neutral-400">{{if $ja}}中 800px{{else}}Medium 800px{{end}}</dt><dd id="media-url-medium"></dd>
+            <dt class="font-sans text-neutral-400">{{if $ja}}小 400px{{else}}Small 400px{{end}}</dt><dd id="media-url-small"></dd>
+          </dl>
+        </details>
+      </div>
+    </div>
+    <div class="p-4">
+      <form id="media-meta-form" method="post" action="" class="flex flex-col gap-3">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+        {{/* 画像の AI 自動生成は、AI 機能が OFF のサイト（$.AIEnabled が false）では DOM ごと出さない（handlers_ai_switch.go）。 */}}
+        {{if $.AIEnabled}}
+        <div id="media-ai-panel" class="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs text-neutral-600">{{if $ja}}代替テキスト・キャプション・タグをAIで作成{{else}}Generate alt text, caption and tags with AI{{end}}
+              <span id="media-ai-tags-note" class="block text-[11px] text-neutral-500">{{if $ja}}今のタグは残したまま、AIのタグを足します。{{else}}Your current tags are kept; AI tags are added.{{end}}</span></span>
+            <button type="button" id="media-ai-analyze" data-ai-ready="{{$d.AIAnalyze}}"
+                    class="btn btn-secondary btn-sm shrink-0">{{if $ja}}AI自動生成{{else}}Generate with AI{{end}}</button>
+          </div>
+          {{if not $d.AIAnalyze}}<p id="media-ai-hint" class="mt-1 text-[11px] text-neutral-500">{{if $ja}}画像の自動生成・解析には Gemini の設定が必要です。<a href="/admin/settings/ai" class="underline text-zinc-700 hover:text-zinc-900 ml-1">AIの設定画面で登録する</a>{{else}}Image generation and analysis requires Gemini.<a href="/admin/settings/ai" class="underline text-zinc-700 hover:text-zinc-900 ml-1">Configure in AI Settings</a>{{end}}</p>{{end}}
+          <div id="media-ai-suggestions" class="mt-2 space-y-2" hidden
+               data-title-alt="{{if $ja}}代替テキストのAI案{{else}}AI suggestion for alt text{{end}}"
+               data-title-caption="{{if $ja}}キャプションのAI案{{else}}AI suggestion for caption{{end}}"
+               data-current="{{if $ja}}現在の内容{{else}}Current text{{end}}"
+               data-suggestion="{{if $ja}}AIの案{{else}}AI suggestion{{end}}"
+               data-use="{{if $ja}}この案を入力欄に入れる{{else}}Use this suggestion{{end}}"
+               data-note="{{if $ja}}内容を比べ、置き換える場合は案を入力欄に入れて「保存」を押してください。{{else}}Review the suggestion. To replace the current text, put it in the field and select Save.{{end}}"></div>
+        </div>
+        {{end}}
+        <div>
+          <label for="media-alt" class="text-sm font-medium text-neutral-700">{{if $ja}}代替テキスト（alt）{{else}}Alt text{{end}}</label>
+          <p class="text-xs text-neutral-500">{{if $ja}}画像が見えない人に内容を伝える説明です。検索エンジンも参照します。{{else}}Describes the image for people who cannot see it. Search engines read it too.{{end}}</p>
+          <input id="media-alt" name="alt" type="text" maxlength="300"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+        </div>
+        <div>
+          <label for="media-caption" class="text-sm font-medium text-neutral-700">{{if $ja}}キャプション{{else}}Caption{{end}}</label>
+          <textarea id="media-caption" name="caption" rows="3" maxlength="1000"
+                    class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"></textarea>
+        </div>
+        {{/* タグ（static/js/media.js）。付いているタグは × 付きのチップで常に見せ、1つの欄で既存のタグを部分一致で探して足す
+             （無ければ「新しいタグとして追加」を明示する）。よく使うタグ（多い順）と年のタグ（YYYY年）は押すだけで付け外しできる。
+             ダイアログの中に小さなスクロール枠は作らない。送るのは下の「カンマ区切り」の欄（name="ai_tags"）で、上の部品はその欄を書き換える。 */}}
+        {{/* data-year-tag-suffix は年のタグの書き方（handlers_dam.go の yearTagSuffix。タグはデータなので表示言語によらない）。 */}}
+        <div id="media-tag-editor" data-year-tag-suffix="{{yearTagSuffix}}"
+             data-msg-add-new="{{if $ja}}「{t}」を新しいタグとして追加{{else}}Add “{t}” as a new tag{{end}}"
+             data-msg-remove="{{if $ja}}{t} を外す{{else}}Remove {t}{{end}}"
+             data-msg-none="{{if $ja}}まだタグはありません{{else}}No tags yet{{end}}"
+             data-msg-results="{{if $ja}}候補 {n} 件{{else}}{n} suggestions{{end}}"
+             data-msg-all="{{if $ja}}すべてのタグ（{n}）{{else}}All tags ({n}){{end}}">
+          <p id="media-tag-editor-label" class="text-sm font-medium text-neutral-700">{{if $ja}}タグ{{else}}Tags{{end}}<span class="ml-1 text-xs font-normal text-neutral-500">{{if $ja}}写真を探しやすくする目印{{else}}labels that make photos easy to find{{end}}</span></p>
+          <ul id="media-tag-selected" class="mt-1.5 flex min-h-[2rem] flex-wrap items-center gap-1.5" aria-label="{{if $ja}}付いているタグ{{else}}Tags on this photo{{end}}"></ul>
+          <div class="mt-2">
+            <label for="media-tag-search" class="sr-only">{{if $ja}}タグを探す・追加する{{else}}Find or add a tag{{end}}</label>
+            <input id="media-tag-search" type="text" autocomplete="off" maxlength="100" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="media-tag-options"
+                   placeholder="{{if $ja}}タグを入力（Enter で追加）{{else}}Type a tag (Enter to add){{end}}"
+                   class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+            <ul id="media-tag-options" role="listbox" aria-label="{{if $ja}}タグの候補{{else}}Tag suggestions{{end}}" class="mt-1 overflow-hidden rounded-lg border border-neutral-200 bg-white text-sm shadow-sm" hidden></ul>
+            <p id="media-tag-status" class="sr-only" aria-live="polite"></p>
+          </div>
+          <div id="media-tag-popular-group" class="mt-3" hidden>
+            <p id="media-tag-chips-label" class="text-xs font-medium text-neutral-600">{{if $ja}}よく使うタグ{{else}}Frequently used{{end}}</p>
+            <div id="media-tag-chips" class="mt-1 flex flex-wrap gap-1.5" role="group" aria-labelledby="media-tag-chips-label"></div>
+          </div>
+          <div id="media-tag-year-group" class="mt-3" hidden>
+            <p id="media-tag-years-label" class="text-xs font-medium text-neutral-600">{{if $ja}}年{{else}}Year{{end}}</p>
+            <div id="media-tag-years" class="mt-1 flex flex-wrap gap-1" role="group" aria-labelledby="media-tag-years-label"></div>
+          </div>
+          <details id="media-tag-all-tags" class="mt-3 text-xs" hidden>
+            <summary class="cursor-pointer select-none font-medium text-neutral-600"></summary>
+            <div id="media-tag-all-tags-list" class="mt-2 flex flex-wrap gap-1.5" role="group"></div>
+          </details>
+          <details id="media-tags-raw" class="mt-3 text-xs text-neutral-600">
+            <summary class="cursor-pointer select-none">{{if $ja}}カンマ区切りで直接編集{{else}}Edit as comma-separated text{{end}}</summary>
+            <label for="media-tags" class="mt-2 block text-xs font-medium text-neutral-600">{{if $ja}}タグ（カンマ区切り）{{else}}Tags (comma separated){{end}}</label>
+            <input id="media-tags" name="ai_tags" type="text" maxlength="500"
+                   placeholder="{{if $ja}}カンマで区切って入力{{else}}Enter tags separated by commas{{end}}"
+                   class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+          </details>
+        </div>
+        <button type="submit" id="media-save" class="btn btn-primary btn-md self-start">{{if $ja}}保存{{else}}Save{{end}}</button>
+      </form>
+      {{if $d.CanDelete}}
+      <div class="mt-6 border-t border-neutral-200 pt-4">
+        <button type="button" id="media-delete-open" class="btn btn-danger btn-md">{{if $ja}}この画像を削除{{else}}Delete this image{{end}}</button>
+      </div>
+      {{end}}
+    </div>
+  </div>
+</dialog>
+
+{{if $d.CanDelete}}
+<dialog id="media-delete-dialog" class="ai-modal w-[min(28rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="media-delete-title">
+  <form id="media-delete-form" method="post" action="" class="p-5">
+    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+    <h2 id="media-delete-title" class="text-base font-semibold text-neutral-900">{{if $ja}}画像を削除しますか？{{else}}Delete this image?{{end}}</h2>
+    <p class="mt-2 text-sm text-neutral-600"><span id="media-delete-name" class="font-medium text-neutral-800"></span>
+      {{if $ja}}と、生成したすべてのサイズの画像ファイルを削除します。この操作は取り消せません。{{else}}and every generated size of the image file will be deleted. This cannot be undone.{{end}}</p>
+    <p id="media-delete-usage" class="notice notice-error mt-3" hidden
+       data-template="{{if $ja}}この画像は{n}件の記事で使用中です。削除すると、その記事では画像が表示されなくなります。{{else}}This image is used in {n} article(s). Those articles will show a missing image after deletion.{{end}}"></p>
+    <div class="mt-5 flex justify-end gap-2">
+      <button type="button" data-media-delete-cancel class="btn btn-secondary btn-md">{{if $ja}}キャンセル{{else}}Cancel{{end}}</button>
+      <button type="submit" id="media-delete-confirm" class="btn btn-danger btn-md">{{if $ja}}削除する{{else}}Delete{{end}}</button>
+    </div>
+  </form>
+</dialog>
+{{end}}
+<div id="media-messages" hidden
+     data-saved="{{if $ja}}画像の情報を保存しました{{else}}Image details saved{{end}}"
+     data-save-error="{{if $ja}}保存できませんでした{{else}}Could not save{{end}}"
+     {{if $.AIEnabled}}data-analyzing="{{if $ja}}AIが画像を解析中...{{else}}Analyzing with AI...{{end}}"
+     data-analyzed="{{if $ja}}AI案を作成し、空欄を埋めてタグを足しました{{else}}Created AI suggestions, filled blank fields and added tags{{end}}"{{end}}
+     data-no-tags="{{if $ja}}タグなし{{else}}No tags{{end}}"
+     {{if $.AIEnabled}}data-analyze-error="{{if $ja}}AIで自動生成できませんでした{{else}}AI generation failed{{end}}"{{end}}
+     data-uploading="{{if $ja}}アップロード中...（残り{n}件）{{else}}Uploading... ({n} left){{end}}"
+     data-upload-error="{{if $ja}}アップロードできませんでした{{else}}Upload failed{{end}}"
+     data-upload-type="{{if $ja}}JPEG・PNG・WebP の画像を選んでください{{else}}Choose JPEG, PNG or WebP images{{end}}"
+     data-upload-partial="{{if $ja}}{n}件をアップロードしました。ページを再読み込みすると一覧に表示されます。{{else}}{n} image(s) uploaded. Reload the page to see them.{{end}}"
+     data-bulk-selected="{{$.T "media_bulk_selected"}}"
+     data-bulk-title-add="{{$.T "media_bulk_add_tag"}}"
+     data-bulk-title-remove="{{$.T "media_bulk_remove_tag"}}"
+     data-bulk-prompt-add="{{$.T "media_bulk_prompt_add"}}"
+     data-bulk-prompt-remove="{{$.T "media_bulk_prompt_remove"}}"
+     data-bulk-tags-label="{{if $ja}}タグ{{else}}Tags{{end}}"
+     data-bulk-tags-placeholder="{{if $ja}}例: 運動会, 2026年{{else}}e.g. sports day, 2026{{end}}"
+     data-bulk-suggest-add="{{if $ja}}これまでに使ったタグ（押すと入力欄に入ります）{{else}}Tags already in use (click to add){{end}}"
+     data-bulk-suggest-remove="{{if $ja}}選んだ写真に付いているタグ（押すと入力欄に入ります）{{else}}Tags on the selected photos (click to add){{end}}"
+     data-bulk-success="{{$.T "media_bulk_success_count"}}"
+     data-bulk-error="{{$.T "media_bulk_error_generic"}}"
+     data-bulk-error-request="{{$.T "media_bulk_error_request"}}"
+     data-bulk-error-selection="{{$.T "media_bulk_error_selection"}}"
+     data-bulk-error-tag="{{$.T "media_bulk_error_tag"}}"></div>
+{{end}}
+
+{{define "scripts"}}
+<script src="{{asset "js/media.js"}}"></script>
+{{end}}

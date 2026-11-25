@@ -1,0 +1,62 @@
+/* 管理画面のテーマのプレビュー（/admin/settings/theme/preview）でだけ読み込む。公開ページの上部に固定するバーと、
+   設定画面のカードに縮小して出すとき（?frame=1）の調整。どのテーマでも同じに見えるよう、色・書体・大きさはテーマの
+   トークンを使わずここで決める。 */
+.theme-preview-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: #18181b;
+  color: #fafafa;
+  border-bottom: 1px solid #3f3f46;
+  box-shadow: 0 1px 4px rgb(0 0 0 / .25);
+  font: 500 14px/1.5 system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  letter-spacing: normal;
+  text-align: left;
+}
+.theme-preview-bar .theme-preview-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 16px;
+}
+.theme-preview-bar .theme-preview-title { margin: 0; font-weight: 700; }
+.theme-preview-bar .theme-preview-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fafafa;
+  color: #18181b;
+  font-size: 12px;
+}
+.theme-preview-bar .theme-preview-pages { display: flex; gap: 4px; }
+.theme-preview-bar a { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; }
+.theme-preview-bar .theme-preview-pages a {
+  padding: 3px 12px;
+  border: 1px solid #52525b;
+  border-radius: 4px;
+  text-decoration: none;
+}
+.theme-preview-bar .theme-preview-pages a:hover { border-color: #a1a1aa; }
+.theme-preview-bar .theme-preview-pages a[aria-current="page"] { background: #fafafa; border-color: #fafafa; color: #18181b; }
+.theme-preview-bar .theme-preview-actions { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+.theme-preview-bar form { margin: 0; }
+.theme-preview-bar button {
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 4px;
+  background: #fafafa;
+  color: #18181b;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.theme-preview-bar button:hover { background: #e4e4e7; }
+.theme-preview-bar a:focus-visible,
+.theme-preview-bar button:focus-visible { outline: 2px solid #a1a1aa; outline-offset: 2px; }
+
+/* カードの縮小表示ではスクロールバーを出さない（iframe ごと縮めるため、細い線として残ってしまう）。 */
+html[data-theme-preview="frame"] { overflow: hidden; scrollbar-width: none; }

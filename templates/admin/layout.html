@@ -1,0 +1,171 @@
+{{define "layout"}}<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="sorus">
+  <meta name="csrf-token" content="{{.CSRFToken}}">
+  <title>{{.Title}} | {{if .SiteName}}{{.SiteName}}{{else}}sorus{{end}}</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="icon"{{with .FaviconType}} type="{{.}}"{{end}} href="{{.FaviconURL}}">
+  <link rel="apple-touch-icon" href="{{.FaviconURL}}">
+  <script src="{{asset "vendor/tailwindcss/tailwind.js"}}"></script>
+  <link rel="stylesheet" href="{{asset "css/admin.css"}}">
+</head>
+<body class="min-h-screen bg-neutral-50 text-neutral-800 antialiased"{{if .Desktop}} data-open-external="/admin/desktop/open-external"{{end}}>
+  {{if .User}}{{$section := adminNavSection .CurrentPath}}
+  <header class="sticky top-0 z-40 border-b border-neutral-200 bg-white">
+    {{/* 上部メニューには、ふだん使う項目だけを並べる。設定の画面は「設定」の入口に、アカウント操作はアカウントのメニューにまとめる。 */}}
+    <nav class="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2 md:gap-4 md:py-3" aria-label="{{$.T "admin_menu"}}">
+      {{if .Sites}}<details id="site-menu" class="admin-site-menu relative min-w-0 text-sm md:shrink-0">
+        <summary class="flex max-w-full cursor-pointer list-none items-center gap-1 rounded-md px-2 py-1.5 font-bold text-neutral-900 hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 md:max-w-[14rem] lg:max-w-xs [&::-webkit-details-marker]:hidden">
+          <span class="min-w-0 truncate">{{if .SiteName}}{{.SiteName}}{{else}}sorus{{end}}</span>
+          <span aria-hidden="true" class="shrink-0 text-xs text-neutral-500">▼</span>
+        </summary>
+        <div class="absolute left-0 z-40 mt-1 w-64 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+          {{/* ほかのサイトは同じ PC の別のポートで動く。data-no-external-intercept で、既定のブラウザではなくこのアプリの
+               ウィンドウの中で切り替える（admin.js の externalLink。admin_ux_phase5_spec.md 1.1）。 */}}
+          {{range .Sites}}<a href="{{.AdminURL}}" data-no-external-intercept class="block truncate px-3 py-2 text-neutral-700 hover:bg-neutral-100{{if .Current}} bg-neutral-100 font-semibold text-neutral-900{{end}}"{{if .Current}} aria-current="true"{{end}}>{{.Name}}</a>
+          {{end}}<hr class="my-1 border-neutral-100">
+          <a href="/admin/settings/sites" class="block px-3 py-2 text-neutral-700 hover:bg-neutral-100">{{$.T "site_menu_manage"}}</a>
+        </div>
+      </details>{{else}}<a href="/admin" class="min-w-0 truncate font-bold text-neutral-900 md:max-w-[12rem] md:shrink-0 lg:max-w-xs">{{if .SiteName}}{{.SiteName}}{{else}}sorus{{end}}</a>{{end}}
+      <div class="admin-nav flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-0.5 text-sm">
+        <a href="/admin" id="nav-home" class="rounded-md px-2 py-1.5 hover:bg-neutral-100"{{if eq $section "home"}} aria-current="page"{{end}}>{{$.T "dashboard"}}</a>
+        <a href="/admin/articles" id="nav-articles" class="rounded-md px-2 py-1.5 hover:bg-neutral-100"{{if eq $section "articles"}} aria-current="page"{{end}}>{{$.T "nav_articles"}}</a>
+        {{/* 役割は auth.User.HasRole で判定する（管理者は編集者・ライターのすべての役割を持つ）。 */}}
+        {{if .User.HasRole "editor"}}<a href="/admin/manuscripts" id="nav-manuscripts" class="rounded-md px-2 py-1.5 hover:bg-neutral-100"{{if eq $section "manuscripts"}} aria-current="page"{{end}}>{{$.T "nav_manuscripts"}}</a>{{end}}
+        <a href="/admin/media" id="nav-media" class="rounded-md px-2 py-1.5 hover:bg-neutral-100"{{if eq $section "media"}} aria-current="page"{{end}}>{{$.T "media"}}</a>
+        {{/* 公開先・外観・バックアップなどは設定の入口から開く。その画面にいる間は「設定」を現在地にする。 */}}
+        <a href="/admin/settings" id="nav-settings" class="rounded-md px-2 py-1.5 hover:bg-neutral-100"{{if eq $section "settings"}} aria-current="page"{{end}}>{{$.T "settings"}}</a>
+      </div>
+      {{/* アカウントのメニュー。JavaScript なしでも開閉できるよう details を使う（summary は Tab で移り、Enter・Space で開く）。 */}}
+      <details id="user-menu" class="admin-user-menu relative shrink-0 text-sm">
+        <summary class="flex cursor-pointer list-none items-center gap-1 rounded-md px-2 py-1.5 text-neutral-600 hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 [&::-webkit-details-marker]:hidden">
+          <svg class="h-5 w-5 shrink-0 sm:hidden" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0H3Z"/></svg>
+          <span class="sr-only">{{$.T "user_menu"}}: </span><span class="hidden max-w-[10rem] truncate sm:inline">{{userName .User}}</span>
+          <svg class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4Z"/></svg>
+        </summary>
+        <div class="absolute right-0 z-40 mt-1 w-60 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+          <p class="truncate border-b border-neutral-100 px-3 py-2 font-medium text-neutral-800">{{userName .User}}{{if eq .Lang "ja"}} さん{{end}}</p>
+          <p class="language-switch px-3 py-2"><span>{{$.T "language"}}: </span><a href="/admin/set-lang?lang=ja&amp;return={{.CurrentPath}}" lang="ja"{{if eq .Lang "ja"}} aria-current="true" class="font-semibold"{{end}}>JA</a> | <a href="/admin/set-lang?lang=en&amp;return={{.CurrentPath}}" lang="en"{{if eq .Lang "en"}} aria-current="true" class="font-semibold"{{end}}>EN</a></p>
+          <form method="post" action="/admin/logout" id="logout-form">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <button type="submit" id="nav-logout" class="block w-full px-3 py-2 text-left text-neutral-700 hover:bg-neutral-100">{{$.T "logout"}}</button>
+          </form>
+          {{/* デスクトップモードでは、ここから sorus 自体を終了する。
+               まだサイトに反映していない予約があれば、終わらせ方を選ぶ確認の画面を開く（desktop_app_window_spec.md D5）。 */}}
+          {{if .Desktop}}{{if .QuitPending}}
+          <a href="/admin/desktop/quit" id="nav-desktop-quit" class="block w-full px-3 py-2 text-left text-neutral-700 hover:bg-neutral-100">{{$.T "desktop_quit"}}</a>
+          {{else}}
+          <form method="post" action="/admin/desktop/quit" id="nav-desktop-quit" data-confirm="{{if .Sites}}{{$.T "desktop_quit_all_confirm"}}{{else}}{{$.T "desktop_quit_confirm"}}{{end}}">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <button type="submit" class="block w-full px-3 py-2 text-left text-neutral-700 hover:bg-neutral-100">{{$.T "desktop_quit"}}</button>
+          </form>
+          {{end}}{{end}}
+        </div>
+      </details>
+    </nav>
+  </header>
+  {{/* 公開サーバーへまだ反映していないサイト設定があるときだけ出す共通バナー（admin_ux_redesign_spec.md §2-3）。
+       ボタンは画面全体でここの1つだけ。押すと static/js/remote_sync.js が POST /admin/remote/settings/push を送る。
+       メディアライブラリ（RemoteBannerStandby）では未反映が無くても隠して置き、タグを変えたら static/js/media.js が
+       「フォトギャラリー／メディア」を足して出す（data-remote-dirty-label-media・data-remote-dirty-sep）。 */}}
+  {{$remoteBanner := and .RemoteCanPushSettings .RemoteBannerStandby}}{{if and .RemoteCanPushSettings (gt (len .RemoteDirty) 0)}}{{$remoteBanner = true}}{{end}}
+  {{if $remoteBanner}}{{$ja := ne .Lang "en"}}
+  <div id="remote-dirty-banner" class="remote-dirty-banner border-b border-amber-200 bg-amber-50" role="region" aria-label="{{if $ja}}公開サーバーへの反映{{else}}Push to public server{{end}}"{{if not .RemoteDirty}} hidden{{end}}>
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm text-amber-900">
+      <div class="min-w-0">
+        <p id="remote-dirty-items" data-remote-dirty="{{range $i, $k := .RemoteDirty}}{{if $i}},{{end}}{{$k}}{{end}}"
+           data-remote-dirty-label-media="{{if $ja}}フォトギャラリー／メディア{{else}}Photo gallery / media{{end}}" data-remote-dirty-sep="{{if $ja}}・{{else}}, {{end}}">
+          <span class="font-semibold">{{if $ja}}公開サーバーにまだ反映していない設定があります:{{else}}Some settings have not been pushed to the public server yet:{{end}}</span>
+          {{range $i, $k := .RemoteDirty}}{{if $i}}{{if $ja}}・{{else}}, {{end}}{{end}}<span class="whitespace-nowrap" data-remote-dirty-item="{{$k}}">{{if eq $k "general"}}{{if $ja}}基本設定{{else}}General{{end}}{{else if eq $k "theme"}}{{if $ja}}外観{{else}}Appearance{{end}}{{else if eq $k "structure"}}{{if $ja}}サイト構成{{else}}Site structure{{end}}{{else if eq $k "media"}}{{if $ja}}フォトギャラリー／メディア{{else}}Photo gallery / media{{end}}{{else}}{{$k}}{{end}}</span>{{end}}
+        </p>
+        <p id="remote-push-result" class="text-sm" aria-live="polite" hidden></p>
+      </div>
+      <button type="button" id="remote-push-settings" data-confirm-message="{{.RemotePushConfirm}}" data-running-label="{{$.T "remote_push_running"}}"
+              class="btn btn-primary btn-sm shrink-0">{{$.T "remote_push_settings"}}</button>
+    </div>
+  </div>
+  {{end}}
+  {{end}}
+  <main>{{template "content" .}}</main>
+  <footer class="text-xs text-neutral-400 text-center py-4">sorus {{.Version}}</footer>
+
+  {{/* 管理画面共通の確認・入力モーダル（ブラウザ標準の確認・入力ダイアログは使わない）。共通スクリプト（admin.js）の
+       window.sorusConfirm({title, message, okLabel, danger}) が開き Promise<boolean> を、window.sorusPrompt({...}) が入力欄付きで開き
+       Promise<string|null> を返す。data-confirm="<確認の文>" を付けたフォームは、送る前にこのモーダルで確かめる（data-confirm-title・
+       data-confirm-ok で見出しとボタンを変え、data-confirm-danger か押したボタンが赤なら実行のボタンを赤にする）。 */}}
+  <dialog id="confirm-modal" class="ai-modal w-[min(28rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message"
+          data-default-title="{{$.T "confirm_title"}}" data-default-ok="{{$.T "confirm_ok"}}">
+    <form method="dialog" class="p-5">
+      <h2 id="confirm-modal-title" class="text-base font-semibold text-neutral-900"></h2>
+      <p id="confirm-modal-message" class="mt-2 whitespace-pre-line text-sm text-neutral-600"></p>
+      <div id="confirm-modal-field" class="mt-4" hidden>
+        <label id="confirm-modal-input-label" for="confirm-modal-input" class="text-sm font-medium text-neutral-700"></label>
+        <input type="text" id="confirm-modal-input" autocomplete="off" maxlength="500"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+        <p id="confirm-modal-suggestions-label" class="mt-3 text-xs text-neutral-500" hidden
+           data-default="{{if ne .Lang "en"}}候補（押すと入力欄に入ります）{{else}}Suggestions (click to add){{end}}"></p>
+        <div id="confirm-modal-suggestions" class="mt-1.5 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto" hidden></div>
+      </div>
+      <div class="mt-5 flex justify-end gap-2">
+        <button type="submit" value="cancel" id="confirm-modal-cancel" class="btn btn-secondary btn-md">{{$.T "confirm_cancel"}}</button>
+        <button type="submit" value="ok" id="confirm-modal-ok" class="btn btn-primary btn-md"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast-container" class="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2" aria-live="polite"
+       {{with .Flash}}data-flash="{{.}}"{{end}} data-flash-key="{{.FlashKey}}" data-flash-error="{{.FlashError}}"></div>
+  {{template "js_i18n" .}}
+  <script src="{{asset "js/admin.js"}}"></script>
+  {{- /* 管理画面の共通部品（window.sorus）。各画面のスクリプト（"scripts" ブロック）より前に読み込む。 */}}
+  <script src="{{asset "js/sorus_common.js"}}"></script>
+  <script>
+  // 保存後の遷移先が編集画面以外でも、対応する端末内下書きを消去する。
+  (function() {
+    var token = new URLSearchParams(window.location.search).get('saved_draft_token');
+    if (!token) return;
+    try {
+      Object.keys(localStorage).forEach(function(key) {
+        if (key.indexOf('sorus:draft:') !== 0) return;
+        var draft = JSON.parse(localStorage.getItem(key) || 'null');
+        if (draft && draft.token === token) localStorage.removeItem(key);
+      });
+    } catch (_) {}
+  })();
+  // アカウントのメニューは、外側を押すか Esc キーで閉じる（JavaScript が無くても summary で開閉できる）。
+  (function() {
+    var menu = document.getElementById('user-menu');
+    if (!menu) return;
+    document.addEventListener('click', function(e) {
+      if (menu.open && !menu.contains(e.target)) menu.open = false;
+    });
+    menu.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && menu.open) {
+        menu.open = false;
+        menu.querySelector('summary').focus();
+      }
+    });
+  })();
+  document.getElementById('logout-form')?.addEventListener('submit', function() {
+    try { Object.keys(localStorage).forEach(function(key) { if (key.indexOf('sorus:draft:') === 0) localStorage.removeItem(key); }); } catch (_) {}
+  });
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js').catch(function() {});
+    });
+  }
+  </script>
+  {{block "scripts" .}}{{end}}
+  {{- /* 共通バナーのボタンを動かす。画面側でも読み込んでいるときは remote_sync.js が二重に動かないようにしている。 */ -}}
+  {{if .User}}{{if and .RemoteCanPushSettings (or (gt (len .RemoteDirty) 0) .RemoteBannerStandby)}}<script src="{{asset "js/remote_sync.js"}}"></script>{{end}}{{end}}
+  {{- /* デスクトップモードでは、この画面を開いている画面として数えてもらう（ログイン・はじめにの画面も含む）。 */ -}}
+  {{- .WindowScript}}
+</body>
+</html>{{end}}

@@ -1,0 +1,78 @@
+{{define "article_rows"}}{{$ja := ne .Lang "en"}}{{$csrf := .CSRFToken}}
+{{range .Data.Rows}}
+<tr class="article-row hover:bg-neutral-50" data-article-id="{{.ID}}">
+  {{- /* タイトルだけを折り返し、作成者〜操作の列は whitespace-nowrap で1行に保つ（長いタイトルでほかの列が縦に潰れないように）。 */}}
+  <td class="article-title-cell min-w-0 max-w-md px-4 py-3 [overflow-wrap:anywhere]">
+    <div class="flex flex-wrap items-center gap-1.5">
+      {{if not ($.User.HasRole "editor" "writer")}}
+      <a href="/admin/articles/{{.ID}}" class="font-medium text-neutral-900 hover:underline">{{.Title}}</a>
+      {{else}}
+      <a href="/admin/articles/{{.ID}}/edit" class="font-medium text-neutral-900 hover:text-zinc-600">{{.Title}}</a>
+      {{end}}
+      {{- /* 言語のバッジと「+ EN」は、多言語対応を有効にしているときだけ出す（基本設定の「多言語対応」）。 */}}
+      {{if $.MultilingualEnabled}}
+      {{if eq .Lang "en"}}
+      <span class="inline-flex items-center rounded border border-zinc-300 bg-zinc-100 px-1.5 py-0.5 text-xs font-semibold text-zinc-700">EN</span>
+      {{if .IsOutdated}}
+      <span class="inline-flex items-center rounded border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">{{if $ja}}要更新{{else}}Needs update{{end}}</span>
+      {{end}}
+      {{else}}
+      <span class="inline-flex items-center rounded border border-neutral-300 bg-neutral-100 px-1.5 py-0.5 text-xs font-semibold text-neutral-700">JA</span>
+      {{if .HasEnTranslation}}
+      <a href="/admin/articles/{{.EnArticleID}}/edit" class="inline-flex items-center rounded border border-zinc-300 bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-700 hover:bg-zinc-200">EN</a>
+      {{if .EnTranslationOutdated}}<span class="inline-flex items-center rounded border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">{{if $ja}}要更新{{else}}Needs update{{end}}</span>{{end}}
+      {{else if and ($.User.HasRole "editor" "writer") (ne .Status "deleted")}}
+      <a href="/admin/articles/new?source_article_id={{.ID}}&lang=en" class="inline-flex items-center rounded border border-neutral-300 bg-white px-1.5 py-0.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100">+ EN</a>
+      {{end}}
+      {{end}}
+      {{end}}
+    </div>
+    <div class="text-xs text-neutral-400">/{{.Slug}}</div>
+    {{with .LockedBy}}<div class="mt-1 text-xs text-neutral-700">{{$.T "lock_row_label" .}}</div>{{end}}
+  </td>
+  <td class="whitespace-nowrap px-4 py-3 text-neutral-600">{{.AuthorName}}</td>
+  <td class="whitespace-nowrap px-4 py-3">
+    <span class="status-badge rounded-full px-2.5 py-0.5 text-xs font-medium {{statusBadge .Status}}">{{statusLabelFor .Status $.Lang}}</span>
+  </td>
+  <td class="article-date whitespace-nowrap px-4 py-3 text-neutral-500">
+    <div class="article-date-primary">{{.DatePrimary}}</div>
+    {{with .DateNote}}<div class="article-date-note mt-0.5 text-xs text-neutral-400">{{.}}</div>{{end}}
+  </td>
+  <td class="article-views whitespace-nowrap px-4 py-3 text-right tabular-nums text-neutral-600">{{formatCount .TotalViews}}</td>
+  <td class="whitespace-nowrap px-4 py-3 text-right">
+    {{if eq .Status "published"}}
+    <a href="{{contentPath .Kind .Slug .Lang}}" target="_blank" class="mr-2 text-xs text-neutral-500 hover:underline">{{if eq $.Lang "en"}}View{{else}}確認{{end}}</a>
+    {{if $.AIEnabled}}<button type="button" data-social-open data-article-id="{{.ID}}" class="mb-1 text-xs text-zinc-600 hover:underline">{{$.T "btn_social"}}</button>{{end}}
+    {{end}}
+    {{if and (eq .Status "deleted") ($.User.HasRole "editor" "writer")}}
+    <div class="trash-actions inline-flex items-center justify-end gap-3">
+      <form method="post" action="/admin/articles/{{.ID}}/restore" class="trash-restore-form">
+        <input type="hidden" name="_csrf" value="{{$csrf}}">
+        <button type="submit" class="text-xs font-medium text-neutral-700 hover:underline">{{$.T "trash_restore"}}</button>
+      </form>
+      {{if $.Data.CanPublish}}
+      <form method="post" action="/admin/articles/{{.ID}}/purge" class="trash-purge-form"
+            data-confirm="{{$.T "trash_purge_confirm" .Title}}" data-confirm-title="{{$.T "trash_purge_title"}}" data-confirm-ok="{{$.T "trash_purge"}}" data-confirm-danger>
+        <input type="hidden" name="_csrf" value="{{$csrf}}">
+        <button type="submit" class="text-xs font-medium text-rose-700 hover:underline">{{$.T "trash_purge"}}</button>
+      </form>
+      {{end}}
+    </div>
+    {{end}}
+    {{if and ($.User.HasRole "editor" "writer") (ne .Status "deleted") (or $.Data.CanPublish (and (ne .Status "published") (ne .Status "scheduled")))}}
+    <form method="post" action="/admin/articles/{{.ID}}/delete" data-confirm="{{if $ja}}「{{.Title}}」をゴミ箱に移動しますか？{{else}}Move “{{.Title}}” to the trash?{{end}}">
+      <input type="hidden" name="_csrf" value="{{$csrf}}">
+      {{- /* 移したあとはゴミ箱ではなく、いま見ている一覧（タブ・言語・検索語）へ戻す（handleArticleDelete）。 */}}
+      <input type="hidden" name="return_status" value="{{$.Data.Status}}">
+      {{with $.Data.Lang}}<input type="hidden" name="return_lang" value="{{.}}">{{end}}
+      {{with $.Data.Query}}<input type="hidden" name="return_q" value="{{.}}">{{end}}
+      {{with $.Data.Sort}}<input type="hidden" name="return_sort" value="{{.}}">{{end}}
+      <button type="submit" class="text-xs text-neutral-400 hover:text-neutral-600">{{if eq $.Lang "en"}}Trash{{else}}ゴミ箱へ{{end}}</button>
+    </form>
+    {{end}}
+  </td>
+</tr>
+{{else}}
+<tr><td colspan="6" class="px-4 py-10 text-center text-neutral-400">{{if eq .Data.Status "deleted"}}{{if $ja}}ゴミ箱は空です。{{else}}The trash is empty.{{end}}{{else if eq .Data.Status "review"}}{{if $ja}}校閲待ちの記事はありません。{{else}}No articles are awaiting review.{{end}}{{else if eq .Data.Status "scheduled"}}{{if $ja}}予約投稿の記事はありません。{{else}}No scheduled articles.{{end}}{{else if eq .Data.Kind "page"}}{{.T "no_pages"}}{{else}}{{if $ja}}まだ記事がありません。「＋ 新しい記事」から書き始めましょう！{{else}}No articles yet. Start writing with "+ New article"!{{end}}{{if $.User.HasRole "admin"}} <a href="/admin/import" id="import-wordpress-link" class="text-zinc-600 underline">{{$.T "import_wordpress_title"}}</a>{{end}}{{end}}</td></tr>
+{{end}}
+{{end}}

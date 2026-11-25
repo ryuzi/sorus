@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>回帰テスト</title>
+    <link>https://media.example.ac.jp/</link>
+    <description>固定ページのないサイト</description>
+    <language>ja</language>
+    <lastBuildDate>Sun, 01 Jun 2025 16:00:00 +0000</lastBuildDate>
+    <atom:link href="https://media.example.ac.jp/feed.xml" rel="self" type="application/rss+xml"></atom:link>
+    <item>
+      <title>記事その13</title>
+      <link>https://media.example.ac.jp/articles/post-13</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-13</guid>
+      <pubDate>Sun, 01 Jun 2025 16:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>未分類</category>
+      <description>抜粋13</description>
+      <content:encoded><![CDATA[<h2 id="見出し13">見出し13</h2>
+<p>本文13。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その12</title>
+      <link>https://media.example.ac.jp/articles/post-12</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-12</guid>
+      <pubDate>Sun, 01 Jun 2025 15:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>サークル</category>
+      <description>抜粋12</description>
+      <content:encoded><![CDATA[<h2 id="見出し12">見出し12</h2>
+<p>本文12。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その11</title>
+      <link>https://media.example.ac.jp/articles/post-11</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-11</guid>
+      <pubDate>Sun, 01 Jun 2025 14:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>未分類</category>
+      <description>抜粋11</description>
+      <content:encoded><![CDATA[<h2 id="見出し11">見出し11</h2>
+<p>本文11。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その10</title>
+      <link>https://media.example.ac.jp/articles/post-10</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-10</guid>
+      <pubDate>Sun, 01 Jun 2025 13:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>未分類</category>
+      <description>抜粋10</description>
+      <content:encoded><![CDATA[<h2 id="見出し10">見出し10</h2>
+<p>本文10。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その9</title>
+      <link>https://media.example.ac.jp/articles/post-9</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-9</guid>
+      <pubDate>Sun, 01 Jun 2025 12:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>サークル</category>
+      <description>抜粋9</description>
+      <content:encoded><![CDATA[<h2 id="見出し9">見出し9</h2>
+<p>本文9。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その8</title>
+      <link>https://media.example.ac.jp/articles/post-8</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-8</guid>
+      <pubDate>Sun, 01 Jun 2025 11:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>未分類</category>
+      <description>抜粋8</description>
+      <content:encoded><![CDATA[<h2 id="見出し8">見出し8</h2>
+<p>本文8。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その7</title>
+      <link>https://media.example.ac.jp/articles/post-7</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-7</guid>
+      <pubDate>Sun, 01 Jun 2025 10:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>未分類</category>
+      <description>抜粋7</description>
+      <content:encoded><![CDATA[<h2 id="見出し7">見出し7</h2>
+<p>本文7。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その6</title>
+      <link>https://media.example.ac.jp/articles/post-6</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-6</guid>
+      <pubDate>Sun, 01 Jun 2025 09:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>サークル</category>
+      <description>抜粋6</description>
+      <content:encoded><![CDATA[<h2 id="見出し6">見出し6</h2>
+<p>本文6。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その5</title>
+      <link>https://media.example.ac.jp/articles/post-5</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-5</guid>
+      <pubDate>Sun, 01 Jun 2025 08:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>未分類</category>
+      <description>抜粋5</description>
+      <content:encoded><![CDATA[<h2 id="見出し5">見出し5</h2>
+<p>本文5。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その4</title>
+      <link>https://media.example.ac.jp/articles/post-4</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-4</guid>
+      <pubDate>Sun, 01 Jun 2025 07:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>未分類</category>
+      <description>抜粋4</description>
+      <content:encoded><![CDATA[<h2 id="見出し4">見出し4</h2>
+<p>本文4。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その3</title>
+      <link>https://media.example.ac.jp/articles/post-3</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-3</guid>
+      <pubDate>Sun, 01 Jun 2025 06:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>サークル</category>
+      <description>抜粋3</description>
+      <content:encoded><![CDATA[<h2 id="見出し3">見出し3</h2>
+<p>本文3。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その2</title>
+      <link>https://media.example.ac.jp/articles/post-2</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-2</guid>
+      <pubDate>Sun, 01 Jun 2025 05:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>未分類</category>
+      <description>抜粋2</description>
+      <content:encoded><![CDATA[<h2 id="見出し2">見出し2</h2>
+<p>本文2。</p>
+]]></content:encoded>
+    </item>
+    <item>
+      <title>記事その1</title>
+      <link>https://media.example.ac.jp/articles/post-1</link>
+      <guid isPermaLink="true">https://media.example.ac.jp/articles/post-1</guid>
+      <pubDate>Sun, 01 Jun 2025 04:00:00 +0000</pubDate>
+      <dc:creator>山田</dc:creator>
+      <category>未分類</category>
+      <description>抜粋1</description>
+      <content:encoded><![CDATA[<h2 id="見出し1">見出し1</h2>
+<p>本文1。</p>
+]]></content:encoded>
+    </item>
+  </channel>
+</rss>

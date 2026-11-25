@@ -1,0 +1,9 @@
+{{define "preview"}}{{$ja := ne .Lang "en"}}
+{{if .Headings}}
+<nav class="preview-toc mb-4 rounded-lg bg-neutral-50 p-3 text-sm">
+  <p class="mb-1 font-semibold text-neutral-600"{{if $ja}}>目次</p>{{else}}>Contents</p>{{end}}
+  <ul>{{range .Headings}}<li class="toc-level-{{.Level}}"><a href="#{{.ID}}">{{.Text}}</a></li>{{end}}</ul>
+</nav>
+{{end}}
+<div class="prose-preview">{{.HTML}}</div>
+{{end}}

@@ -1,0 +1,1131 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$st := $d.Form.Status}}{{$noSave := or $d.ReadOnly $d.Locked}}{{$ml := $.MultilingualEnabled}}
+{{/* 多言語対応が無効なとき（$ml が false）は、翻訳・原文との並列表示・言語の表示を出さない（admin_ux_polish_and_mcp_spec.md §2-5）。 */}}
+{{/* 「公開デザインで確認 ↗」（admin_ux_phase5_spec.md §1.4）: 保存済みの記事なら下書き・校閲待ち・予約中でも、公開テーマを当てた
+     保存済みの内容を /admin/articles/{id}/preview で開ける。公開中の記事は実際の公開ページを開く。未保存の新規記事では案内だけを出す。
+     $tr は翻訳モード（原文がある英語版を、多言語対応が有効な状態で編集している）。 */}}
+{{$canDesign := and (not $d.IsNew) (ne $d.Form.ID "")}}{{$designURL := printf "/admin/articles/%s/preview" $d.Form.ID}}{{if and (eq $st "published") $d.Form.Slug}}{{$designURL = contentPath $d.Form.Kind $d.Form.Slug $d.Form.Lang}}{{end}}{{$tr := and $d.SourceArticle $ml}}
+{{/* $localOnly: 公開サーバーに執筆者として参加中（ここでの公開はこの PC の中だけ）。$alsoRemote: 編集者以上で参加中（公開サーバーにも反映）。 */}}
+{{$localOnly := and $d.RemoteSync.CanSubmit (not $noSave)}}{{$alsoRemote := and $d.RemoteSync.CanPublish $d.CanPublish (not $noSave)}}
+{{/* $previewOpen: 公開デザインの確認が /admin/articles/{id}/preview（未公開の保存済み記事）のとき、デスクトップ版で OS の既定の
+     ブラウザ（Chrome など）に開かせる POST 先（ux_security_docs_final_polish_spec.md §1.2。static/js/admin.js が data-desktop-preview を使う）。 */}}
+{{$previewOpen := ""}}{{if and $canDesign (not (and (eq $st "published") $d.Form.Slug))}}{{$previewOpen = printf "/admin/articles/%s/preview-open" $d.Form.ID}}{{end}}
+<div class="mx-auto max-w-7xl px-4 py-6{{if not $noSave}} pb-28 lg:pb-6{{end}}">
+  {{template "lock_banner" .}}
+
+  {{if and (not $d.IsNew) (eq $st "review")}}
+  <section id="review-panel" class="mb-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-neutral-950">
+    <p class="font-semibold"> {{if $ja}}この記事は校閲待ちです{{else}}This article is awaiting review{{end}}</p>
+    {{if $d.CanPublish}}
+    <p class="mt-1 text-sm text-neutral-900">{{if $ja}}内容を確認し、承認して公開するか、理由を添えて差し戻してください。承認・差し戻しの対象は<strong>保存済みの内容</strong>です（編集した場合は先に「保存」してください）。{{else}}Check the content, then approve and publish it, or send it back with a reason. Approval and send-back apply to the <strong>saved content</strong> (if you have edited it, save first).{{end}}</p>
+    <div class="mt-3 grid gap-4 md:grid-cols-2">
+      <form id="approve-form" method="post" action="/admin/articles/{{$d.Form.ID}}/approve-publish" class="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3"
+            data-confirm="{{if $ja}}この記事を承認して公開（または予約）しますか？{{else}}Approve and publish (or schedule) this article?{{end}}">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+        {{if $d.Form.WasPublished}}
+        {{/* 一度公開した記事は予約にできない（見えなくなる事故を防ぐ）。最初の公開日時のまま公開する。 */}}
+        <p id="publish-at-kept" class="text-xs text-neutral-600">{{if $ja}}一度公開した記事のため、最初の公開日時（{{formatTimePtr $d.Form.PublishedAt}}）のまま公開します。{{else}}This article was published before, so it keeps its original publish date ({{formatTimePtr $d.Form.PublishedAt}}).{{end}}</p>
+        {{else}}
+        <label for="publish_at" class="text-xs font-medium text-neutral-600">{{if $ja}}公開日時（空欄なら今すぐ公開・日本時間）{{else}}Publish date (leave blank to publish now; Japan time){{end}}</label>
+        <input id="publish_at" name="publish_at" type="datetime-local" min="{{$d.MinScheduleAt}}"
+               class="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none">
+        {{end}}
+        <label for="approve-comment" class="sr-only">{{if $ja}}執筆者へのコメント{{else}}Comment to the writer{{end}}</label>
+        <textarea id="approve-comment" name="comment" rows="2" maxlength="2000" placeholder="{{if $ja}}執筆者へのコメント（任意）{{else}}Comment to the writer (optional){{end}}"
+                  class="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"></textarea>
+        <button type="submit" id="approve-button" class="btn btn-primary btn-md self-start"> {{if $ja}}承認して公開{{else}}Approve and publish{{end}}</button>
+      </form>
+      <form id="reject-form" method="post" action="/admin/articles/{{$d.Form.ID}}/reject-review" class="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+        <label for="reject-reason" class="text-xs font-medium text-neutral-600">{{if $ja}}差し戻しの理由（必須・申し送りメモに残ります）{{else}}Reason for sending back (required; kept in the review notes){{end}}</label>
+        <textarea id="reject-reason" name="reason" rows="4" required maxlength="2000" placeholder="{{if $ja}}例: 2段落目の数値の出典を追記してください{{else}}e.g. Please add a source for the figures in the second paragraph{{end}}"
+                  class="flex-1 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm focus:border-zinc-500 focus:outline-none"></textarea>
+        <button type="submit" id="reject-button" class="btn btn-secondary btn-md self-start">{{$.T "action_reject"}}</button>
+      </form>
+    </div>
+    {{else}}
+    <p class="mt-1 text-sm text-neutral-900">{{if $ja}}編集長・管理者の確認をお待ちください。内容を直すときは「保存（校閲待ちのまま）」、申請をやめるときは「申請を取り下げる」を使います。{{else}}Please wait for an editor or administrator to review it. To make changes, use "Save (keep in review)"; to cancel the request, use "Withdraw request".{{end}}</p>
+    {{end}}
+  </section>
+  {{end}}
+
+  {{if eq $st "scheduled"}}
+  <div id="schedule-banner" class="mb-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-900">
+     <strong>{{formatTimePtr $d.Form.PublishedAt}}</strong> {{if $ja}}に自動で公開されます。予約を取り消すときは「下書きに戻す」を使います。{{else}}. To cancel the schedule, use "Back to draft".{{end}}
+  </div>
+  {{end}}
+
+  {{if $d.Locked}}
+  <div id="publisher-only-banner" class="mb-4 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-600">
+    {{$.T "status_locked_banner" ($.T (statusKey $st))}}
+  </div>
+  {{end}}
+
+  {{if and $d.IsOutdated $ml}}
+  <div id="outdated-banner" class="notice notice-warn mb-4 p-4" role="alert">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center rounded border border-amber-400 bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900">{{if $ja}}要更新{{else}}Needs update{{end}}</span>
+        <p class="font-medium">{{if $ja}}原文（日本語）が更新されています。内容を確認し、翻訳を更新してください。{{else}}The original (Japanese) has been updated. Check it and update the translation.{{end}}</p>
+      </div>
+      {{if and (not $d.ReadOnly) $d.SourceArticle $.AIEnabled}}
+      <button type="button" id="retranslate-button" class="btn btn-primary btn-sm">{{if $ja}}AIで再翻訳{{else}}Retranslate with AI{{end}}</button>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  {{/* AI 機能が OFF のサイト（$.AIEnabled が false）では、AI アプリ（MCP）からの変更案を出さない（handlers_ai_switch.go）。 */}}
+  {{if $.AIEnabled}}{{with $d.Proposal}}
+  {{/* AI アプリ（MCP）から届いた変更案（handlers_proposal.go）。記事はまだ変わっていない。差分を確かめて「編集欄に反映」し、
+       いつもの保存ボタンで保存したときにだけ記事に入る。 */}}
+  <section id="article-proposal" class="mb-4 rounded-xl border border-zinc-300 bg-zinc-50 px-4 py-3 text-sm text-zinc-900" role="status">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="min-w-0">
+        <p class="font-semibold">{{if $ja}}{{.KindLabel}}が届いています（記事はまだ変わっていません）{{else}}{{.KindLabel}} received (the article has not changed yet){{end}}</p>
+        <p class="mt-1 text-xs text-zinc-700">{{if $ja}}{{.ProposedBy}}さんがAIアプリから作成（{{formatTime .CreatedAt}}）。差分を確かめて「編集欄に反映」し、保存すると記事に入ります。{{else}}Created by {{.ProposedBy}} from an AI app ({{formatTime .CreatedAt}}). Check the differences, choose "Apply to editor", and save to put it in the article.{{end}}</p>
+        {{if eq .SourceStatus "changed" "unknown"}}
+        <p id="proposal-source-warning" class="notice notice-warn mt-2 text-xs font-medium" role="alert">
+          {{if eq .SourceStatus "changed"}}{{if $ja}}注意: この翻訳案を作った後に原文が変わっています。{{else}}Note: The original changed after this translation proposal was made.{{end}}{{else}}{{if $ja}}注意: この翻訳案がどの版の原文から作られたかを確かめられませんでした。{{else}}Note: We could not confirm which version of the original this translation proposal was made from.{{end}}{{end}}{{if $ja}}反映するかは、差分と原文を確かめて判断してください（反映して保存しても「要更新」のままです）。{{else}}Check the differences and the original before applying it (even after applying and saving, it stays "Needs update").{{end}}
+        </p>
+        {{end}}
+        <p id="proposal-applied-note" class="mt-1 text-xs font-semibold text-zinc-900" hidden>{{if $ja}}編集欄に反映しました。内容を確かめて保存すると記事に入ります（保存するまで記事は変わりません）。{{else}}Applied to the editor. Check the content and save to put it in the article (the article does not change until you save).{{end}}</p>
+      </div>
+      <button type="button" id="proposal-open-btn" class="btn btn-primary btn-sm shrink-0">{{if $ja}}差分を確かめる{{else}}Review differences{{end}}</button>
+    </div>
+  </section>
+  {{else}}{{if $d.ProposalWaiting}}
+  <div id="article-proposal-waiting" class="mb-4 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700" role="status">
+    {{if $ja}}AIアプリからの変更案が確認を待っています。この記事を編集できる人が、編集できる状態で開くと差分を確かめられます。{{else}}A change proposal from an AI app is waiting for review. Someone who can edit this article can review the differences by opening it for editing.{{end}}
+  </div>
+  {{end}}{{end}}{{end}}
+
+  <form id="article-form" method="post"
+        action="{{if $d.IsNew}}/admin/articles/new{{else}}/admin/articles/{{$d.Form.ID}}{{end}}"
+        data-article-id="{{$d.Form.ID}}"
+        data-saved-draft-token="{{$d.SavedDraftToken}}"
+        data-read-only="{{$d.ReadOnly}}"
+        data-updated-at="{{if not $d.Form.UpdatedAt.IsZero}}{{$d.Form.UpdatedAt.Unix}}{{else}}0{{end}}"
+        data-heartbeat-seconds="{{$d.HeartbeatSeconds}}"
+        data-saved-by="{{$d.SavedBy}}" data-saved-by-known="{{if ne $d.SavedBy "不明"}}true{{end}}" data-saved-at="{{if not $d.Form.UpdatedAt.IsZero}}{{formatTime $d.Form.UpdatedAt}}{{end}}"
+        data-msg-saving="{{$.T "offline_status_saving"}}" data-msg-unavailable="{{$.T "offline_status_unavailable"}}" data-msg-offline="{{$.T "offline_status_offline_short"}}" data-msg-online="{{$.T "offline_status_online"}}" data-msg-saved="{{$.T "offline_status_saved"}}" data-msg-submit-error="{{$.T "offline_submit_error"}}" data-msg-conflict="{{$.T "offline_conflict"}}" data-msg-discard-confirm="{{$.T "offline_discard_confirm"}}">
+    {{if not $d.IsNew}}<input type="hidden" name="base_updated_at" value="{{$d.Form.UpdatedAt.Unix}}">{{end}}
+    <input type="hidden" name="draft_token" id="draft-token" value="">
+    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+    <input type="hidden" name="lang" id="article-lang" value="{{$d.Form.Lang}}">
+    <input type="hidden" name="translation_group_id" value="{{$d.Form.TranslationGroupID}}">
+    <input type="hidden" name="source_article_id" id="source-article-id" value="{{$d.Form.SourceArticleID}}">
+    {{/* 「編集欄に反映」した変更案と、差分を作ったときの記事の内容の印。保存のときに照らし合わせる（handlers_proposal.go）。 */}}
+    <input type="hidden" name="proposal_id" id="proposal-id" value="">
+    <input type="hidden" name="proposal_base" id="proposal-base" value="">
+    <input type="hidden" name="proposal_source" id="proposal-source" value="">
+
+    <div id="translation-notification-banner" class="notice notice-success hidden mb-4 p-4" role="status">
+      <div class="flex items-center justify-between gap-3">
+        <span id="translation-notification-text">{{if $ja}}AI翻訳を反映しました。内容を確認・修正してください。{{else}}AI translation applied. Check and correct the content.{{end}}</span>
+        <button type="button" onclick="this.closest('#translation-notification-banner').classList.add('hidden')" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">{{if $ja}}閉じる{{else}}Close{{end}}</button>
+      </div>
+    </div>
+
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <a href="/admin/articles{{if $d.Form.IsPage}}?kind=page{{end}}" class="text-sm text-neutral-500 hover:text-neutral-800">{{if $ja}}← 一覧へ{{else}}← Back to list{{end}}</a>
+        <span class="status-badge rounded-full px-2.5 py-0.5 text-xs font-medium {{statusBadge $st}}">{{$.T (statusKey $st)}}</span>
+        {{if not $d.Form.UpdatedAt.IsZero}}<span class="text-xs text-neutral-400">{{if $ja}}最終更新 {{formatTime $d.Form.UpdatedAt}}{{else}}Last updated {{formatTime $d.Form.UpdatedAt}}{{end}}</span>{{end}}
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        {{if and (not $d.CanPublish) (not $noSave) (or $d.IsNew (eq $st "draft") (eq $st "deleted"))}}
+        <label for="review-note" class="sr-only">{{if $ja}}校閲者へのメモ{{else}}Note to the reviewer{{end}}</label>
+        <input id="review-note" name="note" type="text" maxlength="2000" placeholder="{{if $ja}}校閲者へのメモ（任意）{{else}}Note to the reviewer (optional){{end}}"
+               class="w-56 rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+        {{end}}
+        {{if eq $st "review"}}
+        <button type="submit" id="withdraw-button" name="action" value="draft"{{if $noSave}} disabled{{end}}
+                class="btn btn-ghost btn-md">{{if $ja}}申請を取り下げる{{else}}Withdraw request{{end}}</button>
+        <button type="submit" id="save-button" name="action" value="save"{{if $noSave}} disabled{{end}}
+                class="btn btn-secondary btn-md">{{if $ja}}保存（校閲待ちのまま）{{else}}Save (keep in review){{end}}</button>
+        {{else if eq $st "scheduled"}}
+        <button type="submit" id="save-button" name="action" value="draft"{{if $noSave}} disabled{{end}}
+                class="btn btn-secondary btn-md">{{if $ja}}下書きに戻す{{else}}Back to draft{{end}}</button>
+        <button type="submit" id="keep-schedule-button" name="action" value="save"{{if $noSave}} disabled{{end}}
+                class="btn btn-secondary btn-md">{{if $ja}}保存（予約を維持）{{else}}Save (keep schedule){{end}}</button>
+        {{else}}
+        <button type="submit" id="save-button" name="action" value="draft"{{if $noSave}} disabled{{end}}
+                class="btn btn-secondary btn-md">
+          {{if $ja}}{{if eq $st "published"}}下書きに戻す{{else}}下書き保存{{end}}{{else}}{{if eq $st "published"}}Back to draft{{else}}Save draft{{end}}{{end}}
+        </button>
+        {{end}}
+        {{if $d.CanPublish}}
+        {{/* 公開サーバーに執筆者として参加しているとき（$localOnly）は、ここでの公開はこの PC の中だけの公開状態（確認用）で、
+             公開サーバーには出ない。誤解しないよう「この PC で」を付け、公開サーバーへは「原稿を下書きとして提出」で送ると案内する。
+             編集者以上で参加しているとき（$alsoRemote）は、公開サーバーにも反映することを添える（ux_security_docs_final_polish_spec.md §1.3）。 */}}
+        <button type="submit" id="publish-button" name="action" value="publish"{{if $noSave}} disabled{{end}}{{if $localOnly}} aria-describedby="publish-scope-note"
+                title="{{if $ja}}この PC の中だけで公開状態にします（確認用）。公開サーバーのサイトには出ません。公開サーバーへ送るには「原稿を下書きとして提出」を押します。{{else}}Publishes only on this PC (for checking). It does not appear on the publish server's site. To send it to the publish server, use “Submit manuscript as draft”.{{end}}"{{else if $alsoRemote}} aria-describedby="publish-scope-note"
+                title="{{if $ja}}この PC で公開し、公開サーバーのサイトにも反映します{{else}}Publishes on this PC and also on the publish server's site{{end}}"{{end}}
+                class="btn btn-primary btn-md">
+          {{if $localOnly}}{{if $ja}}{{if eq $st "published"}}この PC で更新して公開{{else if eq $st "scheduled"}}この PC で今すぐ公開{{else if eq $st "review"}}この PC で保存して公開{{else}}この PC で公開{{end}}{{else}}{{if eq $st "published"}}Update and publish on this PC{{else if eq $st "scheduled"}}Publish now on this PC{{else if eq $st "review"}}Save and publish on this PC{{else}}Publish on this PC{{end}}{{end}}{{else}}
+          {{if $ja}}{{if eq $st "published"}}更新して公開{{else if eq $st "scheduled"}}今すぐ公開{{else if eq $st "review"}}保存して公開{{else}}公開する{{end}}{{else}}{{if eq $st "published"}}Update and publish{{else if eq $st "scheduled"}}Publish now{{else if eq $st "review"}}Save and publish{{else}}Publish{{end}}{{end}}{{end}}
+        </button>
+        {{if and (not $noSave) (not $d.Form.WasPublished) (or $d.IsNew (eq $st "draft") (eq $st "deleted"))}}
+        {{/* 「日時を決めて予約」: 編集中の内容を保存し、選んだ日時に公開する予約投稿にする（action=publish ＋ publish_at）。
+             一度公開した記事は予約にできない（見えなくなる事故を防ぐ）ため出さない。入力欄は開いているときだけ送り、
+             他のボタンで送るときは外す（下のスクリプト）。日時の規則は承認して公開の欄と同じ。 */}}
+        <details id="schedule-box" class="relative"{{if $d.Form.PublishAt}} open{{end}}>
+          <summary class="btn btn-secondary btn-md">{{if $ja}}日時を決めて予約{{else}}Schedule{{end}}</summary>
+          <div class="absolute right-0 z-20 mt-2 flex w-72 flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
+            <label for="schedule-publish-at" class="text-xs font-medium text-neutral-600">{{if $ja}}公開する日時（日本時間）{{else}}Publish date (Japan time){{end}}</label>
+            <input id="schedule-publish-at" name="publish_at" type="datetime-local" min="{{$d.MinScheduleAt}}" value="{{$d.Form.PublishAt}}" required{{if not $d.Form.PublishAt}} disabled{{end}}
+                   class="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-900 focus:border-zinc-500 focus:outline-none">
+            <p class="text-xs text-neutral-500">{{if $ja}}編集中の内容を保存し、この日時に自動で公開します。{{else}}Saves what you are editing and publishes it automatically at this date and time.{{end}}</p>
+            <button type="submit" id="schedule-button" name="action" value="publish"
+                    class="btn btn-primary btn-sm self-start">{{if $ja}}この日時に予約する{{else}}Schedule for this time{{end}}</button>
+          </div>
+        </details>
+        {{end}}
+        {{else if or $d.IsNew (eq $st "draft") (eq $st "deleted")}}
+        <button type="submit" id="publish-button" name="action" value="review"{{if not $d.IsNew}} formaction="/admin/articles/{{$d.Form.ID}}/submit-review"{{end}}{{if $noSave}} disabled{{end}}
+                class="btn btn-primary btn-md">
+           {{if $ja}}校閲を申請{{else}}Request review{{end}}
+        </button>
+        {{end}}
+        {{if and $d.RemoteSync.CanSubmit (not $d.ReadOnly)}}{{template "remote_sync_submit_button" $d.RemoteSubmitButton}}{{end}}
+      </div>
+    </div>
+    {{if $localOnly}}
+    {{/* 本文は結論（このPCの中だけ・公開サーバーには出ない）だけにし、公開サーバーへ送る手順は「?」に入れる。 */}}
+    <p id="publish-scope-note" class="notice notice-neutral -mt-2 mb-4 text-xs">
+      {{if $ja}}{{if $d.CanPublish}}「この PC で公開」は、この PC の中での公開状態（確認用）です。<strong>公開サーバーのサイトには出ません。</strong>{{else}}「校閲を申請」は、この PC の中での申請です。<strong>公開サーバーには届きません。</strong>{{end}}{{else}}{{if $d.CanPublish}}"Publish on this PC" only changes the status on this PC (for checking). <strong>It does not appear on the publish server's site.</strong>{{else}}"Request review" is a request on this PC only. <strong>It does not reach the publish server.</strong>{{end}}{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{if $ja}}説明を表示{{else}}Show help{{end}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}公開サーバーへは「原稿を下書きとして提出」で送り、公開サーバーの編集者が承認すると公開されます。{{if $d.IsNew}}（提出は下書き保存のあとにできます）{{end}}{{else}}To send it to the publish server, use "Submit manuscript as draft"; it is published once an editor on the publish server approves it.{{if $d.IsNew}} (You can submit after saving a draft.){{end}}{{end}}</span></span>
+    </p>
+    {{else if $alsoRemote}}
+    <p id="publish-scope-note" class="-mt-2 mb-4 text-right text-xs text-neutral-500">{{if $ja}}「公開する」を押すと、この PC で公開したうえで公開サーバーのサイトにも反映します。{{else}}"Publish" publishes on this PC and also updates the publish server's site.{{end}}</p>
+    {{end}}
+
+    <div id="offline-draft-banner" class="notice notice-warn hidden mb-4 p-4" role="alert"
+         data-msg-view-diff="{{$.T "offline_draft_view_diff"}}" data-msg-hide-diff="{{$.T "offline_draft_hide_diff"}}"
+         data-msg-current="{{$.T "offline_draft_current"}}" data-msg-local="{{$.T "offline_draft_local"}}"
+         data-msg-no-diff="{{$.T "offline_draft_no_diff"}}" data-msg-no-body-diff="{{$.T "offline_draft_no_body_diff"}}"
+         data-msg-changed-fields="{{$.T "offline_draft_changed_fields"}}" data-msg-empty="{{$.T "offline_draft_empty"}}"
+         data-msg-chars="{{$.T "offline_draft_chars"}}" data-msg-lines-skipped="{{$.T "offline_draft_lines_skipped"}}"
+         data-msg-diff-legend="{{$.T "offline_draft_diff_legend"}}"
+         data-label-title="{{$.T "offline_draft_field_title"}}" data-label-slug="{{$.T "offline_draft_field_slug"}}"
+         data-label-excerpt="{{$.T "offline_draft_field_excerpt"}}" data-label-kind="{{$.T "offline_draft_field_kind"}}"
+         data-label-category-id="{{$.T "offline_draft_field_category"}}" data-label-content-markdown="{{$.T "offline_draft_field_body"}}">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <svg class="h-5 w-5 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <div>
+            <p class="font-medium" id="offline-draft-banner-title" data-normal-title="{{$.T "offline_draft_banner_title"}}" data-conflict-title="{{$.T "offline_conflict"}}">{{$.T "offline_draft_banner_title"}}</p>
+            <p class="text-xs text-amber-700" id="offline-draft-banner-desc">{{if $ja}}（保存日時: <span id="offline-draft-time"></span>）{{else}}(Saved: <span id="offline-draft-time"></span>){{end}}</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" id="offline-draft-diff-toggle" class="btn btn-secondary btn-sm" aria-expanded="false" aria-controls="offline-draft-diff">{{$.T "offline_draft_view_diff"}}</button>
+          <button type="button" id="offline-draft-restore-btn" class="btn btn-primary btn-sm">{{$.T "offline_draft_restore"}}</button>
+          <button type="button" id="offline-draft-discard-btn" class="btn btn-secondary btn-sm">{{$.T "offline_draft_discard"}}</button>
+        </div>
+      </div>
+      {{/* 差分の中身は offline_draft.js が textContent で組み立てる（端末の下書きをそのまま HTML として扱わない）。 */}}
+      <div id="offline-draft-diff" class="hidden mt-3 space-y-3 border-t border-amber-200 pt-3" aria-live="polite"></div>
+    </div>
+    <div class="mb-4 flex justify-end"><span id="offline-save-status" class="text-xs text-neutral-500" aria-live="polite"></span></div>
+
+    {{if and $d.SourceArticle $ml}}
+    <div id="source-article-banner" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800">
+      {{/* 翻訳ヘッダーバー（admin_ux_phase5_spec.md §1.5, ux_security_docs_final_polish_spec.md §1.3）: 左に原文 → EN、右に
+           「公開デザインで確認 ↗」。主導線の「全文をAI翻訳」と表示の2択（原文と比較 / 仕上がりプレビュー）は、左右のペインの
+           すぐ上の AI ツールバー（partials/ai_modal.html の ai_toolbar）の先頭に置く。閲覧専用でツールバーが無いときだけ、
+           表示の2択をここに出す。表示の切り替えは static/js/editor.js。 */}}
+      <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <div class="flex min-w-0 items-center gap-2">
+          <span class="shrink-0 rounded border border-neutral-300 bg-neutral-200 px-1.5 py-0.5 text-xs font-semibold text-neutral-700">{{if $ja}}原文 (JA){{else}}Original (JA){{end}}</span>
+          <a id="source-article-link" href="/admin/articles/{{$d.SourceArticle.ID}}/edit" target="_blank" rel="noopener"
+             title="{{if $ja}}原文を別タブで開きます{{else}}Open the original in a new tab{{end}}"
+             class="min-w-0 truncate font-medium text-zinc-700 underline hover:text-zinc-900">{{$d.SourceArticle.Title}}</a>
+          <span class="shrink-0 text-neutral-400" aria-hidden="true">→</span>
+          <span class="shrink-0 rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-xs font-semibold text-zinc-700">EN</span>
+        </div>
+        {{if and (not $d.ReadOnly) $.AIEnabled}}<span class="text-xs text-neutral-500">{{if $ja}}下の「全文をAI翻訳」から始めると、原文をまとめて英語にできます。{{else}}Start with "Translate all with AI" below to put the whole original into English.{{end}}</span>{{end}}
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        {{/* 表示の2択は、AI ツールバーが無いとき（閲覧専用・AI 機能が OFF）だけここに出す。 */}}
+        {{if or $d.ReadOnly (not $.AIEnabled)}}{{template "translation_view_toggle" $d}}{{end}}
+        {{if $canDesign}}
+        <a id="translation-public-design-link" href="{{$designURL}}" target="_blank" rel="noopener"{{if $previewOpen}} data-desktop-preview="{{$previewOpen}}"{{end}}
+           title="{{if $ja}}公開テーマを当てた見た目を別タブで開きます（表示されるのは保存済みの内容です）{{else}}Open it with the site theme applied in a new tab (shows the saved content){{end}}"
+           class="btn btn-ghost btn-sm px-2 text-xs text-neutral-600">{{if $ja}}公開デザインで確認 ↗{{else}}View in site design ↗{{end}}</a>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+
+    <div class="mb-4 grid gap-3 md:grid-cols-[1fr_14rem_8rem_minmax(16rem,auto)]">
+      <div>
+        <label for="title" class="sr-only">{{if $ja}}タイトル{{else}}Title{{end}}</label>
+        <input id="title" name="title" type="text" required placeholder="{{if $ja}}タイトルを入力{{else}}Enter a title{{end}}" value="{{$d.Form.Title}}"{{if $d.ReadOnly}} readonly{{end}}
+               class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-lg font-semibold focus:border-zinc-500 focus:outline-none">
+      </div>
+      <div>
+        <label for="slug" class="sr-only">{{if $ja}}スラッグ{{else}}Slug{{end}}</label>
+        <input id="slug" name="slug" type="text" placeholder="{{if $ja}}スラッグ（空欄ならタイトルから）{{else}}Slug (leave blank to use the title){{end}}" value="{{$d.Form.Slug}}"{{if $d.ReadOnly}} readonly{{end}}
+               class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+      </div>
+      <div>
+        <label for="kind" class="sr-only">{{.T "kind_label"}}</label>
+        {{/* 種類の変更は他の変更と同じ権限に従う（公開中・予約中の記事は編集長だけが変えられる）。 */}}
+        <select id="kind" name="kind"{{if $noSave}} disabled{{end}} aria-describedby="kind-help"
+                class="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
+          <option value="post"{{if not $d.Form.IsPage}} selected{{end}}>{{.T "kind_post"}}</option>
+          <option value="page"{{if $d.Form.IsPage}} selected{{end}}>{{.T "kind_page"}}</option>
+        </select>
+      </div>
+      <div id="category-field"{{if $d.Form.IsPage}} hidden{{end}}>
+        <div class="flex items-center gap-2">
+          <label for="category_id" class="sr-only">{{if $ja}}カテゴリ{{else}}Category{{end}}</label>
+          <select id="category_id" name="category_id"{{if $d.ReadOnly}} disabled{{end}}
+                  class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+            {{range $d.Categories}}<option value="{{.ID}}"{{if eq .ID $d.Form.CategoryID}} selected{{end}}>{{.Name}}</option>{{end}}
+          </select>
+          <a href="/admin/settings/categories" id="category-manage-link" class="btn btn-ghost btn-sm shrink-0 px-2 text-xs text-neutral-600">{{.T "category_manage"}}</a>
+        </div>
+      </div>
+    </div>
+    <p id="kind-help" class="-mt-2 mb-4 text-xs text-neutral-500"{{if not $d.Form.IsPage}} hidden{{end}}>{{.T "kind_help"}}</p>
+    <div class="mb-4">
+      <label for="excerpt" class="sr-only">{{if $ja}}抜粋{{else}}Excerpt{{end}}</label>
+      <input id="excerpt" name="excerpt" type="text" placeholder="{{if $ja}}抜粋（一覧やSNSで表示される紹介文・任意）{{else}}Excerpt (summary shown in lists and on social media; optional){{end}}" value="{{$d.Form.Excerpt}}"{{if $d.ReadOnly}} readonly{{end}}
+             class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+    </div>
+    <div id="featured-image-field" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2">
+      <input type="hidden" id="featured_image_url" name="featured_image_url" value="{{$d.Form.FeaturedImage}}">
+      <img id="featured-image-preview" alt=""{{with $d.Form.FeaturedImage}} src="{{.}}"{{else}} hidden{{end}} class="h-12 w-20 rounded object-cover">
+      <span class="text-sm font-medium text-neutral-700">{{if $ja}}アイキャッチ画像{{else}}Featured image{{end}}</span>
+      <span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{if $ja}}アイキャッチ画像とは{{else}}About the featured image{{end}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}記事の一覧・トップページのカード・SNS で共有したときに表示する画像です。{{else}}Shown in article lists, front page cards and when the article is shared on social media.{{end}}</span></span>
+      <span id="featured-image-label" data-empty="{{if $ja}}未設定{{else}}Not set{{end}}" class="min-w-0 flex-1 truncate text-xs text-neutral-500">{{with $d.Form.FeaturedImage}}{{.}}{{else}}{{if $ja}}未設定{{else}}Not set{{end}}{{end}}</span>
+      {{if not $d.ReadOnly}}
+      {{/* 未設定で本文に画像があるときだけ media_picker.js が出す。モーダルを開かずに本文の最初の画像を使う。 */}}
+      <button type="button" id="featured-image-use-first" hidden
+              class="btn btn-secondary btn-sm">{{if $ja}}本文の最初の画像を使う{{else}}Use the first image in the article{{end}}</button>
+      <button type="button" id="featured-image-select" data-media-picker-open="featured"
+              class="btn btn-secondary btn-sm">{{if $ja}}メディアライブラリから選択{{else}}Choose from media library{{end}}</button>
+      <button type="button" id="featured-image-clear"{{if not $d.Form.FeaturedImage}} hidden{{end}}
+              class="btn btn-ghost btn-sm">{{if $ja}}外す{{else}}Remove{{end}}</button>
+      {{end}}
+    </div>
+
+    {{/* スマートフォン（lg 未満）では編集欄とプレビューを並べず、タブで切り替える。lg 以上ではタブを隠して両方を
+         並べる（隠すのは max-lg:hidden なので、プレビューを選んだままウィンドウを広げても編集欄は消えない）。 */}}
+    {{/* AI ツールバーは通常の執筆・翻訳編集のどちらでも、左右のペインの上に1本だけ置く（右端の「過去記事を参照」「使う AI」の
+         位置と高さをそろえる。ux_security_docs_final_polish_spec.md §1.3）。 */}}
+    {{/* AI 機能が OFF のサイトでは AI ツールバーを DOM ごと出さない（handlers_ai_switch.go）。 */}}
+    {{if and (not $d.ReadOnly) $.AIEnabled}}{{template "ai_toolbar" $d}}{{end}}
+    <div id="editor-tabs" class="mb-3 flex gap-1 rounded-lg border border-neutral-200 bg-white p-1 lg:hidden" role="tablist" aria-label="{{if $ja}}編集とプレビューの切り替え{{else}}Switch between editing and preview{{end}}">
+      <button type="button" role="tab" id="editor-tab-edit" data-editor-tab="edit" aria-controls="editor-pane-edit" aria-selected="true"
+              class="flex-1 rounded-md px-3 py-2 text-sm font-medium text-neutral-600 aria-selected:bg-neutral-900 aria-selected:text-white">{{if $ja}}編集{{else}}Edit{{end}}</button>
+      <button type="button" role="tab" id="editor-tab-preview" data-editor-tab="preview" aria-controls="editor-pane-preview" aria-selected="false"
+              class="flex-1 rounded-md px-3 py-2 text-sm font-medium text-neutral-600 aria-selected:bg-neutral-900 aria-selected:text-white">{{if $ja}}プレビュー{{else}}Preview{{end}}</button>
+    </div>
+    <div class="grid gap-4 lg:grid-cols-2">
+      {{if and $d.SourceArticle $ml}}
+      <section id="split-source-pane" class="{{if not $d.ShowSplitView}}hidden{{end}} flex min-w-0 flex-col" aria-label="{{if $ja}}原文{{else}}Original{{end}}">
+        {{/* 原文（左）と翻訳の編集欄（右）は、上の操作行（右の装飾ツールバーと同じ枠・高さ）と本文の枠（同じ高さ・余白・
+             文字の大きさ・行の高さ）をそろえ、見比べながら直せるようにする。スクロールは既定で連動する（editor.js）。 */}}
+        <div id="source-pane-toolbar" class="mb-1.5 flex flex-wrap items-center gap-1 rounded-lg border border-neutral-200 bg-neutral-50 px-1 py-1">
+          <span class="px-1.5 text-xs font-semibold text-neutral-700">{{if $ja}}原文 (JA){{else}}Original (JA){{end}}</span>
+          {{if and (not $d.ReadOnly) $.AIEnabled}}
+          <button type="button" id="source-partial-translate-btn" class="btn btn-secondary btn-sm px-2 text-xs"
+                  title="{{if $ja}}原文で選んだ文を英語に翻訳し、右の編集欄のカーソル位置（未選択なら末尾）に入れます{{else}}Translate the sentences you selected in the original and insert them at the cursor in the editor on the right (or at the end){{end}}">{{if $ja}}選択文を翻訳して挿入 →{{else}}Translate selection and insert →{{end}}</button>
+          {{end}}
+          <label class="ml-auto flex items-center gap-1 whitespace-nowrap px-1 text-xs text-neutral-500">
+            <input id="source-scroll-sync" type="checkbox" checked class="rounded border-neutral-300 text-zinc-600 focus:ring-zinc-500">
+            {{if $ja}}スクロールを合わせる{{else}}Sync scrolling{{end}}
+          </label>
+        </div>
+        <div id="source-body-scroll" tabindex="0" class="h-[60vh] overflow-y-auto rounded border border-neutral-300 bg-neutral-50 p-4 text-base leading-relaxed text-neutral-800 lg:h-[65vh] lg:text-sm">
+          <div class="mb-3 border-b border-neutral-200 pb-3 font-sans">
+            <div class="text-xs text-neutral-400">{{if $ja}}タイトル{{else}}Title{{end}}</div>
+            <div id="source-title-display" class="font-semibold text-neutral-900">{{$d.SourceArticle.Title}}</div>
+            {{if $d.SourceArticle.Excerpt}}
+            <div class="mt-2 text-xs text-neutral-400">{{if $ja}}抜粋{{else}}Excerpt{{end}}</div>
+            <div id="source-excerpt-display" class="text-xs text-neutral-700">{{$d.SourceArticle.Excerpt}}</div>
+            {{end}}
+          </div>
+          <div id="source-body-display" class="whitespace-pre-wrap break-words font-mono">{{$d.SourceArticle.ContentMarkdown}}</div>
+        </div>
+      </section>
+      {{end}}
+      <section id="editor-pane-edit" data-editor-pane="edit" role="tabpanel" aria-labelledby="editor-tab-edit" class="flex min-w-0 flex-col">
+        {{/* 装飾ツールバー（desktop_quit_and_editor_ux_spec.md §1.3-2）。「Markdown」という言葉を前面に出さず、押すと本文の
+             カーソル位置・選択範囲に記法を入れる（editor.js）。押したあとは input イベントでプレビューと端末の下書きを更新する。 */}}
+        {{if not $d.ReadOnly}}
+        <div id="editor-format-toolbar" role="toolbar" aria-controls="content_markdown" aria-label="{{if $ja}}文字の装飾{{else}}Text formatting{{end}}"
+             class="mb-1.5 flex flex-wrap items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 px-1 py-1">
+          <button type="button" class="btn btn-ghost btn-sm px-1.5 text-xs" data-md-format="heading" title="{{if $ja}}行の先頭に「## 」を付けて見出しにします{{else}}Turn the line into a heading (adds “## ”){{end}}">{{if $ja}}見出し{{else}}Heading{{end}}</button>
+          <button type="button" class="btn btn-ghost btn-sm px-1.5 text-xs" data-md-format="bold" data-md-placeholder="{{if $ja}}太字{{else}}bold text{{end}}" title="{{if $ja}}選んだ文字を太字にします{{else}}Make the selected text bold{{end}}">{{if $ja}}太字{{else}}Bold{{end}}</button>
+          <button type="button" class="btn btn-ghost btn-sm px-1.5 text-xs" data-md-format="link" data-md-placeholder="{{if $ja}}リンクの文字{{else}}link text{{end}}" title="{{if $ja}}選んだ文字をリンクにします（URL の部分を書き換えてください）{{else}}Turn the selected text into a link (replace the URL part){{end}}">{{if $ja}}リンク{{else}}Link{{end}}</button>
+          <button type="button" class="btn btn-ghost btn-sm px-1.5 text-xs" data-md-format="list" title="{{if $ja}}行の先頭に「- 」を付けて箇条書きにします{{else}}Turn the lines into a bulleted list (adds “- ”){{end}}">{{if $ja}}箇条書き{{else}}List{{end}}</button>
+          <button type="button" class="btn btn-ghost btn-sm px-1.5 text-xs" data-md-format="quote" title="{{if $ja}}行の先頭に「> 」を付けて引用にします{{else}}Turn the lines into a quote (adds “> ”){{end}}">{{if $ja}}引用{{else}}Quote{{end}}</button>
+          <button type="button" class="btn btn-ghost btn-sm px-1.5 text-xs" data-md-format="code" data-md-placeholder="{{if $ja}}コード{{else}}code{{end}}" title="{{if $ja}}プログラムなどをそのまま表示します（複数行なら枠で囲みます）{{else}}Show code as is (several lines become a code block){{end}}">{{if $ja}}コード{{else}}Code{{end}}</button>
+          <button type="button" class="btn btn-ghost btn-sm px-1.5 text-xs" data-md-format="math" data-md-placeholder="E=mc^2" title="{{if $ja}}数式を入れます（複数行なら独立した行の数式にします）{{else}}Insert a formula (several lines become a display formula){{end}}">{{if $ja}}数式{{else}}Math{{end}}</button>
+          <span id="editor-writing-guide" class="help-tip ml-1">
+            <button type="button" class="help-tip-btn editor-guide-btn" aria-expanded="false">{{if $ja}}? 書き方ガイド{{else}}? Writing guide{{end}}</button>
+            <span class="help-tip-pop" hidden>
+              {{if $ja}}
+              <span><strong>見出し</strong>: 行の先頭に <code>## </code>（小見出しは <code>### </code>）を付けます。</span>
+              <span><strong>太字</strong>: 文字を <code>**</code> で挟みます（例: <code>**大事**</code>）。</span>
+              <span><strong>箇条書き</strong>: 行の先頭に <code>- </code>（番号付きは <code>1. </code>）を付けます。</span>
+              <span><strong>リンク</strong>: <code>[表示する文字](https://example.com)</code> と書きます。</span>
+              <span><strong>画像</strong>: 本文欄にドラッグ＆ドロップするか、コピーした画像を貼り付けると入ります。</span>
+              <span><strong>数式</strong>: 文の中は <code>$E=mc^2$</code>、独立した行は前後の行を <code>$$</code> だけにして挟みます。</span>
+              <span class="text-neutral-500">詳しい方向け: Markdown 記法に対応しています。</span>
+              {{else}}
+              <span><strong>Heading</strong>: start the line with <code>## </code> (<code>### </code> for a subheading).</span>
+              <span><strong>Bold</strong>: wrap text in <code>**</code> (e.g. <code>**important**</code>).</span>
+              <span><strong>List</strong>: start the line with <code>- </code> (<code>1. </code> for a numbered list).</span>
+              <span><strong>Link</strong>: write <code>[text to show](https://example.com)</code>.</span>
+              <span><strong>Image</strong>: drag and drop an image onto the body, or paste a copied image.</span>
+              <span><strong>Math</strong>: inline <code>$E=mc^2$</code>; for a formula on its own lines, put <code>$$</code> on the lines before and after.</span>
+              <span class="text-neutral-500">For advanced users: Markdown syntax is supported.</span>
+              {{end}}
+            </span>
+          </span>
+        </div>
+        {{end}}
+        {{/* シンタックスハイライト（依存ゼロ）: 文字を透明にした textarea の背面に、同じ文字・同じ折り返しの色付きミラー
+             （#editor-highlight）を重ねる。ミラーは editor.js が HTML エスケープしてから描画し、スクロール・大きさを textarea に合わせる。
+             スクリプトが動かないときは .has-highlight が付かず、ふつうの textarea として表示する。 */}}
+        <div id="editor-wrap" class="editor-wrap">
+          <pre class="editor-highlight text-base lg:text-sm" aria-hidden="true"><code id="editor-highlight"></code></pre>
+          {{/* 音声入力（スマートフォンのキーボードのマイク）で話し続けられるよう、Enter は改行（enterkeyhint="enter"）、
+               文頭は大文字（autocapitalize）にする。iOS Safari が入力時に画面を拡大しないよう、狭い画面では 16px（admin.css）。 */}}
+          <textarea id="content_markdown" name="content_markdown" spellcheck="false" enterkeyhint="enter" autocapitalize="sentences"{{if $d.ReadOnly}} readonly{{end}}
+                    class="editor-input h-[60vh] w-full resize-y rounded-lg border border-neutral-300 bg-white text-base focus:border-zinc-500 focus:outline-none lg:h-[65vh] lg:text-sm"
+                    placeholder="{{if $ja}}# 見出し&#10;&#10;ここに本文を書きます。{{else}}# Heading&#10;&#10;Write the body here.{{end}}">{{$d.Form.ContentMarkdown}}</textarea>
+        </div>
+        {{if not $d.ReadOnly}}
+        {{/* メディアバー: 画像のドロップ枠と、ギャラリー・メディアライブラリからの挿入を1行にまとめる。 */}}
+        <div id="editor-media-bar" class="mt-2 flex flex-wrap items-stretch gap-2">
+          <label id="dropzone" for="image-input" title="{{if $ja}}画像をここにドラッグ＆ドロップするか、本文に貼り付けると入ります。クリックしてファイルから選ぶこともできます。{{else}}Drag and drop images here or paste them into the body. You can also click to choose a file.{{end}}"
+                 class="dropzone flex min-w-[12rem] flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-neutral-300 px-3 py-1.5 text-xs text-neutral-500 hover:border-zinc-400 hover:text-zinc-600">
+            <span aria-hidden="true">+</span>
+            <span id="dropzone-label">{{if $ja}}画像はドロップ・貼り付けで挿入{{else}}Drop or paste images to insert{{end}}</span>
+          </label>
+          <input id="image-input" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" multiple>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" id="gallery-modal-open" data-gallery-modal-open aria-haspopup="dialog"
+                    class="btn btn-secondary btn-sm text-xs">{{.T "gallery_open"}}</button>
+            <button type="button" id="media-picker-open" data-media-picker-open="insert"
+                    class="btn btn-secondary btn-sm text-xs">{{if $ja}}メディアライブラリから選択{{else}}Choose from media library{{end}}</button>
+          </div>
+        </div>
+        {{end}}
+      </section>
+      <section id="editor-pane-preview" data-editor-pane="preview" role="tabpanel" aria-labelledby="editor-tab-preview" class="flex min-w-0 flex-col {{if and $d.ShowSplitView $ml}}hidden{{else}}max-lg:hidden{{end}}">
+        {{/* プレビューは本文だけの簡易表示。公開テーマを当てた実際の見た目は「公開デザインで確認」で開く（保存済みの記事なら
+             ステータスを問わず開ける。開くのは保存済みの内容。リンク先は上の $designURL）。 */}}
+        <div id="preview-header" class="mb-1.5 flex min-h-[2.625rem] flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
+          <span>{{if $ja}}内容のプレビュー（簡易表示）{{else}}Content preview (quick view){{end}}</span>
+          {{if $canDesign}}
+          <a id="public-design-link" href="{{$designURL}}" target="_blank" rel="noopener"{{if $previewOpen}} data-desktop-preview="{{$previewOpen}}"{{end}}
+             title="{{if $ja}}公開テーマを当てた見た目を別タブで開きます（表示されるのは保存済みの内容です。下書きでも公開はされません）{{else}}Open it with the site theme applied in a new tab (shows the saved content; drafts are not published){{end}}"
+             class="btn btn-ghost btn-sm px-2 text-xs text-neutral-600">{{if $ja}}公開デザインで確認 ↗{{else}}View in site design ↗{{end}}</a>
+          {{else}}
+          <span id="public-design-hint" class="text-neutral-400">{{if $ja}}下書き保存すると公開デザインで確認できます{{else}}Save a draft to check it in the site design{{end}}</span>
+          {{end}}
+        </div>
+        <div id="preview" class="h-[60vh] overflow-y-auto rounded-lg border border-neutral-200 bg-white p-4 lg:h-[65vh] lg:p-6" data-math-root>
+          {{template "preview" $d.Preview}}
+        </div>
+      </section>
+    </div>
+
+    {{if not $noSave}}
+    {{/* スマートフォン向けの画面下の操作バー。各ボタンは上部の同じ役割のボタン（data-proxy-for）を押したのと同じになり、
+         文言も写す（editor.js）。対応するボタンが無ければ出さない。 */}}
+    <div id="mobile-action-bar" class="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-neutral-200 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lg backdrop-blur lg:hidden">
+      <span id="offline-save-status-mobile" class="absolute -top-6 right-4 rounded bg-white/95 px-2 py-1 text-xs text-neutral-500" aria-live="polite"></span>
+      <button type="button" data-proxy-for="save-button"
+              class="btn btn-secondary btn-md flex-1">{{if $ja}}下書き保存{{else}}Save draft{{end}}</button>
+      <button type="button" data-proxy-for="publish-button"
+              class="btn btn-primary btn-md flex-1">{{if $ja}}公開する{{else}}Publish{{end}}</button>
+    </div>
+    {{end}}
+  </form>
+
+  {{if not $d.ReadOnly}}{{template "media_picker_modal" .}}{{template "gallery_modal" .}}
+  {{/* AI のモーダル（AI 執筆アシスタント・SNS 告知文・部分翻訳・翻訳の確認・変更案）は、AI 機能が OFF のサイトでは出さない。 */}}
+  {{if $.AIEnabled}}{{template "ai_modal" $d}}{{template "social_modal" $d}}
+  <dialog id="partial-translate-modal" class="ai-modal w-[min(42rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="partial-translate-title">
+    <div class="flex items-center justify-between border-b border-neutral-200 px-5 py-3">
+      <h3 id="partial-translate-title" class="font-semibold text-neutral-800">{{if $ja}}AI翻訳・推敲アシスタント{{else}}AI translation & polishing assistant{{end}}</h3>
+      <button type="button" id="partial-translate-close-x" class="btn btn-ghost btn-sm" aria-label="{{if $ja}}閉じる{{else}}Close{{end}}">{{if $ja}}閉じる{{else}}Close{{end}}</button>
+    </div>
+    <div class="p-5 flex flex-col gap-4">
+      <div>
+        <label for="partial-translate-input" class="mb-1 block text-xs font-semibold text-neutral-600">{{if $ja}}対象テキスト（未選択時は直接入力できます）{{else}}Target text (type it directly if nothing is selected){{end}}</label>
+        <textarea id="partial-translate-input" rows="4" class="w-full rounded-lg border border-neutral-300 p-2.5 font-mono text-sm leading-relaxed focus:border-zinc-500 focus:outline-none" placeholder="{{if $ja}}翻訳・推敲したい文章を入力または選択してください{{else}}Enter or select the text to translate or polish{{end}}"></textarea>
+      </div>
+
+      <div>
+        <span class="mb-1.5 block text-xs font-semibold text-neutral-600">{{if $ja}}トーン・目的の選択{{else}}Tone and purpose{{end}}</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs" id="partial-translate-style-options">
+          <label class="flex items-center gap-2 rounded-lg border border-neutral-200 p-2.5 cursor-pointer hover:bg-neutral-50 has-[:checked]:border-zinc-800 has-[:checked]:bg-zinc-50">
+            <input type="radio" name="partial-style" value="natural" checked class="text-zinc-800 focus:ring-zinc-600">
+            <div>
+              <div class="font-medium text-neutral-800">{{if $ja}}自然な洗練 (Natural Polish){{else}}Natural Polish{{end}}</div>
+              <div class="text-[11px] text-neutral-500">{{if $ja}}原文の意味を保ちつつ自然な表現に洗練{{else}}Refines wording naturally while keeping the meaning{{end}}</div>
+            </div>
+          </label>
+          <label class="flex items-center gap-2 rounded-lg border border-neutral-200 p-2.5 cursor-pointer hover:bg-neutral-50 has-[:checked]:border-zinc-800 has-[:checked]:bg-zinc-50">
+            <input type="radio" name="partial-style" value="professional" class="text-zinc-800 focus:ring-zinc-600">
+            <div>
+              <div class="font-medium text-neutral-800">{{if $ja}}フォーマル・高品位 (Professional){{else}}Professional{{end}}</div>
+              <div class="text-[11px] text-neutral-500">{{if $ja}}企業や学術向けの格調高いトーン{{else}}A polished tone for business or academic readers{{end}}</div>
+            </div>
+          </label>
+          <label class="flex items-center gap-2 rounded-lg border border-neutral-200 p-2.5 cursor-pointer hover:bg-neutral-50 has-[:checked]:border-zinc-800 has-[:checked]:bg-zinc-50">
+            <input type="radio" name="partial-style" value="friendly" class="text-zinc-800 focus:ring-zinc-600">
+            <div>
+              <div class="font-medium text-neutral-800">{{if $ja}}親しみやすく・平易に (Friendly){{else}}Friendly{{end}}</div>
+              <div class="text-[11px] text-neutral-500">{{if $ja}}ブログや一般読者向けの親しみやすいトーン{{else}}An approachable tone for blogs and general readers{{end}}</div>
+            </div>
+          </label>
+          <label class="flex items-center gap-2 rounded-lg border border-neutral-200 p-2.5 cursor-pointer hover:bg-neutral-50 has-[:checked]:border-zinc-800 has-[:checked]:bg-zinc-50">
+            <input type="radio" name="partial-style" value="compelling" class="text-zinc-800 focus:ring-zinc-600">
+            <div>
+              <div class="font-medium text-neutral-800">{{if $ja}}魅力的に伝える (Compelling){{else}}Compelling{{end}}</div>
+              <div class="text-[11px] text-neutral-500">{{if $ja}}魅力や熱量を引き出し読者を惹きつけるトーン{{else}}Brings out appeal and energy to draw readers in{{end}}</div>
+            </div>
+          </label>
+          <label class="flex items-center gap-2 rounded-lg border border-neutral-200 p-2.5 cursor-pointer hover:bg-neutral-50 has-[:checked]:border-zinc-800 has-[:checked]:bg-zinc-50 sm:col-span-2">
+            <input type="radio" name="partial-style" value="concise" class="text-zinc-800 focus:ring-zinc-600">
+            <div>
+              <div class="font-medium text-neutral-800">{{if $ja}}簡潔に要約 (Concise){{else}}Concise{{end}}</div>
+              <div class="text-[11px] text-neutral-500">{{if $ja}}不要な修飾を削ぎ落とし要点を明快に伝達{{else}}Cuts unnecessary words and states the point clearly{{end}}</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label for="partial-translate-instruction" class="mb-1 block text-xs font-semibold text-neutral-600">{{if $ja}}追加のこだわり指示（任意）{{else}}Additional instructions (optional){{end}}</label>
+        <input type="text" id="partial-translate-instruction" class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-xs focus:border-zinc-500 focus:outline-none" placeholder="{{if $ja}}例: 朝の空気感が伝わる表現で / 専門用語〇〇を主語にして{{else}}e.g. Convey the feel of the morning air / Make term X the subject{{end}}">
+      </div>
+
+      <div id="partial-translate-status" class="text-xs text-neutral-600 hidden py-1" role="status"></div>
+    </div>
+    <div class="flex items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3">
+      <button type="button" id="partial-translate-cancel" class="btn btn-secondary btn-sm">{{if $ja}}キャンセル{{else}}Cancel{{end}}</button>
+      <button type="button" id="partial-translate-submit" class="btn btn-primary btn-sm">{{if $ja}}意図を反映して置換 / 挿入{{else}}Replace / insert with these settings{{end}}</button>
+    </div>
+  </dialog>
+
+  {{/* 「AI翻訳を実行」「AIで再翻訳」で、すでに入っているタイトル・本文を置き換える前に、差分を見せて確かめる。 */}}
+  <dialog id="translate-confirm-modal" class="ai-modal w-[min(64rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="translate-confirm-title">
+    <div class="flex items-center justify-between border-b border-neutral-200 px-5 py-3">
+      <h2 id="translate-confirm-title" class="font-semibold text-neutral-800">{{if $ja}}AI翻訳で編集欄を置き換えますか？{{else}}Replace the editor content with the AI translation?{{end}}</h2>
+      <button type="button" data-translate-confirm-cancel class="btn btn-ghost btn-sm" aria-label="{{if $ja}}閉じる{{else}}Close{{end}}">{{if $ja}}閉じる{{else}}Close{{end}}</button>
+    </div>
+    <div class="max-h-[70vh] overflow-y-auto px-5 py-4">
+      <p id="translate-confirm-saved" class="mb-1 text-xs text-neutral-600"></p>
+      <p id="translate-confirm-unsaved" class="mb-1 text-xs font-semibold text-neutral-800" hidden>{{if $ja}}編集欄には、まだ保存していない変更も含まれています。置き換えると、その変更も消えます。{{else}}The editor contains unsaved changes. Replacing will discard them too.{{end}}</p>
+      <p class="mb-3 text-xs text-neutral-500">{{if $ja}}<del class="diff-del">赤の取り消し線</del> は編集欄から消える部分、<ins class="diff-add">緑の下線</ins> はAI翻訳で入る部分です。反映しても、保存するまで記事は変わりません。{{else}}<del class="diff-del">Red strikethrough</del> marks text removed from the editor, and <ins class="diff-add">green underline</ins> marks text added by the AI translation. The article does not change until you save.{{end}}</p>
+      <div class="mb-1 text-xs font-semibold text-neutral-500">{{if $ja}}タイトル{{else}}Title{{end}}</div>
+      <div id="translate-confirm-title-diff" class="diff-view mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm"></div>
+      <div class="mb-1 text-xs font-semibold text-neutral-500">{{if $ja}}抜粋{{else}}Excerpt{{end}}</div>
+      <div id="translate-confirm-excerpt-diff" class="diff-view mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm"></div>
+      <div class="mb-1 text-xs font-semibold text-neutral-500">{{if $ja}}本文{{else}}Body{{end}}</div>
+      <div id="translate-confirm-body-diff" class="diff-view rounded-lg border border-neutral-200 bg-neutral-50 p-3 font-mono text-sm leading-relaxed"></div>
+    </div>
+    <div class="flex items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3">
+      <button type="button" data-translate-confirm-cancel class="btn btn-secondary btn-sm">{{if $ja}}キャンセル{{else}}Cancel{{end}}</button>
+      <button type="button" id="translate-confirm-apply" class="btn btn-primary btn-sm">{{if $ja}}編集欄に反映{{else}}Apply to editor{{end}}</button>
+    </div>
+  </dialog>
+
+  {{with $d.Proposal}}
+  <dialog id="proposal-modal" class="ai-modal w-[min(64rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="proposal-modal-title"
+          data-proposal-id="{{.ID}}" data-proposal-base="{{.Base}}" data-proposal-source="{{.SourceSeen}}" data-source-status="{{.SourceStatus}}"
+          data-has-title="{{.HasTitle}}" data-has-excerpt="{{.HasExcerpt}}" data-has-body="{{.HasBody}}"
+          data-has-slug="{{.HasSlug}}" data-slug="{{.Slug}}" data-category-id="{{if .CategoryID}}{{.CategoryID}}{{end}}" data-kind="{{.Kind}}"
+          data-lang="{{.Lang}}" data-translation-group-id="{{.TranslationGroupID}}" data-source-article-id="{{.SourceArticleID}}">
+    <div class="flex items-center justify-between border-b border-neutral-200 px-5 py-3">
+      <h2 id="proposal-modal-title" class="font-semibold text-neutral-800">{{.KindLabel}}</h2>
+      <button type="button" data-proposal-close class="btn btn-ghost btn-sm" aria-label="{{if $ja}}閉じる{{else}}Close{{end}}">{{if $ja}}閉じる{{else}}Close{{end}}</button>
+    </div>
+    <div class="max-h-[70vh] overflow-y-auto px-5 py-4">
+      <dl class="mb-3 grid gap-2 text-xs text-neutral-700 sm:grid-cols-2">
+        <div class="rounded-lg border border-neutral-200 bg-white p-2">
+          <dt class="font-semibold text-neutral-800">{{if $ja}}今の保存内容（置き換えられる側）{{else}}Current saved content (to be replaced){{end}}</dt>
+          <dd id="proposal-saved-by">{{if $ja}}{{if eq .SavedBy "不明"}}保存した人: 不明{{else}}{{.SavedBy}}さんが保存{{end}}（最終更新 {{formatTime .SavedAt}}）{{else}}{{if eq .SavedBy "不明"}}Saved by: unknown{{else}}Saved by {{.SavedBy}}{{end}} (last updated {{formatTime .SavedAt}}){{end}}</dd>
+        </div>
+        <div class="rounded-lg border border-neutral-200 bg-white p-2">
+          <dt class="font-semibold text-neutral-800">{{if $ja}}変更案{{else}}Proposal{{end}}</dt>
+          <dd id="proposal-proposed-by">{{if $ja}}{{.ProposedBy}}さんがAIアプリから作成（{{formatTime .CreatedAt}}）{{with .SourceTitle}}・原文「{{.}}」{{end}}{{else}}Created by {{.ProposedBy}} from an AI app ({{formatTime .CreatedAt}}){{with .SourceTitle}} · Original: "{{.}}"{{end}}{{end}}</dd>
+        </div>
+      </dl>
+      {{if .SourceStatus}}
+      {{/* 翻訳の案: どの原文から作られたかを示す。原文が変わった・確かめられないときは、反映する前に警告する（handlers_proposal.go）。 */}}
+      <div id="proposal-source-check" class="mb-3 notice text-xs {{if eq .SourceStatus "current"}}notice-neutral{{else}}notice-warn{{end}}"{{if ne .SourceStatus "current"}} role="alert"{{end}}>
+        {{if eq .SourceStatus "current"}}
+        <p>{{if $ja}}原文「{{.SourceTitle}}」の今の内容から作られた案です（原文の最終更新 {{formatTime .SourceUpdatedAt}}）。{{else}}This proposal was made from the current content of the original "{{.SourceTitle}}" (original last updated {{formatTime .SourceUpdatedAt}}).{{end}}</p>
+        {{else}}
+        <p class="font-semibold">{{if $ja}}{{if eq .SourceStatus "changed"}}注意: 原文が変わっています{{else}}注意: 原文を確かめられませんでした{{end}}{{else}}{{if eq .SourceStatus "changed"}}Note: The original has changed{{else}}Note: The original could not be checked{{end}}{{end}}</p>
+        <p class="mt-1">{{.SourceNote}}{{if $ja}}{{if not .SourceUpdatedAt.IsZero}}（原文の最終更新 {{formatTime .SourceUpdatedAt}}）{{end}}。{{if eq .SourceStatus "changed"}}この案は、今の原文ではなく、案を作ったときの原文を訳したものです。{{else}}今の原文を訳した案かどうかは分かりません。{{end}}{{else}}{{if not .SourceUpdatedAt.IsZero}} (original last updated {{formatTime .SourceUpdatedAt}}){{end}}. {{if eq .SourceStatus "changed"}}This proposal translates the original as it was when the proposal was made, not the current original.{{else}}We cannot tell whether it translates the current original.{{end}}{{end}}</p>
+        <p class="mt-1 font-semibold">{{if $ja}}反映して保存しても、この翻訳は「要更新」のままになります。原文を確かめてから、反映するか判断してください。{{else}}Even after applying and saving, this translation stays "Needs update". Check the original before deciding whether to apply it.{{end}}</p>
+        {{end}}
+      </div>
+      {{end}}
+      <p class="mb-3 text-xs text-neutral-500">{{if $ja}}<del class="diff-del">赤の取り消し線</del> は今の保存内容から消える部分、<ins class="diff-add">緑の下線</ins> は案で入る部分です。AIアプリの側で承認しても記事は変わりません。ここで確かめて保存したときだけ記事に入ります。{{else}}<del class="diff-del">Red strikethrough</del> marks text removed from the current saved content, and <ins class="diff-add">green underline</ins> marks text added by the proposal. Approving in the AI app does not change the article; it changes only when you check and save it here.{{end}}</p>
+      {{if .HasTitle}}
+      <div class="mb-1 text-xs font-semibold text-neutral-500">{{if $ja}}タイトル{{else}}Title{{end}}</div>
+      <div id="proposal-title-diff" class="diff-view mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm">{{.TitleDiff}}</div>
+      {{end}}
+      {{if .HasExcerpt}}
+      <div class="mb-1 text-xs font-semibold text-neutral-500">{{if $ja}}抜粋{{else}}Excerpt{{end}}</div>
+      <div id="proposal-excerpt-diff" class="diff-view mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm">{{.ExcerptDiff}}</div>
+      {{end}}
+      {{if .HasBody}}
+      <div class="mb-1 text-xs font-semibold text-neutral-500">{{if $ja}}本文{{else}}Body{{end}}</div>
+      <div id="proposal-body-diff" class="diff-view mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 font-mono text-sm leading-relaxed">{{.BodyDiff}}</div>
+      {{end}}
+      {{if .Others}}
+      <div class="mb-1 text-xs font-semibold text-neutral-500">{{if $ja}}そのほかの変更{{else}}Other changes{{end}}</div>
+      <ul id="proposal-other-changes" class="mb-2 space-y-1 text-xs text-neutral-700">
+        {{range .Others}}<li><span class="font-semibold">{{.Label}}</span>: {{.From}} → {{.To}}</li>{{end}}
+      </ul>
+      {{end}}
+      <textarea id="proposal-title-value" hidden>{{.Title}}</textarea>
+      <textarea id="proposal-excerpt-value" hidden>{{.Excerpt}}</textarea>
+      <textarea id="proposal-content-value" hidden>{{.Content}}</textarea>
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-5 py-3">
+      <form id="proposal-discard-form" method="post" action="/admin/articles/{{$d.Form.ID}}/proposal/discard" data-confirm="{{if $ja}}この変更案を破棄しますか？記事は変わりません。{{else}}Discard this proposal? The article will not change.{{end}}">
+        <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+        <input type="hidden" name="proposal_id" value="{{.ID}}">
+        <button type="submit" id="proposal-discard-btn" class="btn btn-ghost btn-sm">{{if $ja}}案を破棄{{else}}Discard proposal{{end}}</button>
+      </form>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-neutral-500">{{if $ja}}反映しても、保存するまで記事は変わりません。{{else}}The article does not change until you save.{{end}}</span>
+        <button type="button" data-proposal-close class="btn btn-secondary btn-sm">{{if $ja}}閉じる{{else}}Close{{end}}</button>
+        <button type="button" id="proposal-apply-btn" class="btn btn-primary btn-sm">{{if $ja}}編集欄に反映{{else}}Apply to editor{{end}}</button>
+      </div>
+    </div>
+  </dialog>
+  {{end}}
+  {{end}}
+  {{end}}
+
+  {{if not $d.IsNew}}
+  <div class="mt-6 grid gap-4 lg:grid-cols-[1fr_24rem]">
+    <section id="comments" class="rounded-xl border border-neutral-200 bg-white p-4"
+             data-comments-url="/admin/articles/{{$d.Form.ID}}/comments">
+      <h2 class="mb-3 text-sm font-semibold text-neutral-800"> {{if $ja}}校閲・申し送りメモ{{else}}Review notes{{end}} <span class="text-xs font-normal text-neutral-400">{{if $ja}}（公開サイトには表示されません）{{else}}(not shown on the public site){{end}}</span></h2>
+      <div id="comment-list" class="max-h-96 overflow-y-auto pr-1">{{template "comment_list" $d.Comments}}</div>
+      <form id="comment-form" method="post" action="/admin/articles/{{$d.Form.ID}}/comments" class="mt-3 flex flex-col gap-2">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+        <label for="comment-content" class="sr-only">{{if $ja}}メモ{{else}}Note{{end}}</label>
+        <textarea id="comment-content" name="content" rows="2" required maxlength="2000" placeholder="{{if $ja}}校閲の依頼・修正の申し送りなど（Ctrl+Enter で送信）{{else}}Review requests, notes on corrections, etc. (Ctrl+Enter to send){{end}}"
+                  class="rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none"></textarea>
+        <button type="submit" id="comment-submit" class="btn btn-primary btn-sm self-end">{{if $ja}}送信{{else}}Send{{end}}</button>
+      </form>
+    </section>
+
+    <div class="flex flex-col gap-4">
+      <section id="attachments" class="rounded-xl border border-neutral-200 bg-white p-4">
+        <h2 class="mb-3 text-sm font-semibold text-neutral-800">{{$.T "btn_attachments"}}</h2>
+        <div id="attachment-list">{{template "attachment_list" $d.Attachments}}</div>
+      </section>
+      <section id="revisions" class="rounded-xl border border-neutral-200 bg-white p-4">
+        <h2 class="mb-1 text-sm font-semibold text-neutral-800"> {{if $ja}}リビジョン履歴{{else}}Revision history{{end}}</h2>
+        <p class="mb-3 text-xs text-neutral-500">{{if $ja}}保存・校閲申請・公開のたびに自動で記録されます（最新50件）。過去の版との差分を確認し、復元できます。{{else}}Recorded automatically each time you save, request review, or publish (latest 50). You can compare with past versions and restore them.{{end}}</p>
+        <button type="button" id="revision-button" data-revisions-url="/admin/articles/{{$d.Form.ID}}/revisions"
+                class="btn btn-secondary btn-sm">{{if $ja}}履歴を表示{{else}}Show history{{end}}</button>
+      </section>
+    </div>
+  </div>
+  {{template "revision_modal" $d}}
+  {{end}}
+
+  {{if and (not $d.IsNew) (not $noSave) (ne $st "deleted")}}
+  <form method="post" action="/admin/articles/{{$d.Form.ID}}/delete" class="mt-6 text-right" data-confirm="{{if $ja}}この記事をゴミ箱に移動しますか？{{else}}Move this article to the trash?{{end}}">
+    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+    <button type="submit" class="text-sm text-neutral-400 hover:text-neutral-600">{{if $ja}}ゴミ箱に移動{{else}}Move to trash{{end}}</button>
+  </form>
+  {{end}}
+</div>
+{{end}}
+
+{{define "scripts"}}{{$ja := ne .Lang "en"}}{{template "katex_assets"}}<script src="{{asset "js/offline_draft.js"}}" defer></script><script src="{{asset "js/editor.js"}}"></script><script src="{{asset "js/social.js"}}"></script>{{if not .Data.ReadOnly}}<script src="{{asset "js/media_picker.js"}}"></script><script src="{{asset "js/gallery_modal.js"}}"></script>{{end}}{{if .Data.RemoteSync.CanSubmit}}{{template "remote_sync_assets"}}{{end}}
+<script>
+// 「日時を決めて予約」の入力欄は、開いているときだけ送る。「この日時に予約する」以外のボタン（「公開する」など）で
+// 送るときは外し、日時を入れたまま「公開する」を押しても今すぐ公開する。
+(function () {
+  var box = document.getElementById('schedule-box');
+  var input = document.getElementById('schedule-publish-at');
+  var form = document.getElementById('article-form');
+  if (!box || !input || !form) return;
+  box.addEventListener('toggle', function () { input.disabled = !box.open; });
+  form.addEventListener('click', function (e) {
+    var button = e.target.closest && e.target.closest('button[type="submit"]');
+    if (!button) return;
+    input.disabled = !box.open || button.id !== 'schedule-button';
+    // 送信する値はクリックの処理の中で決まる。入力の不備で送られなかったときも、続けて日時を入れられるよう戻す。
+    setTimeout(function () { input.disabled = !box.open; }, 0);
+  }, true);
+})();
+(function () {
+  var translateBtn = document.getElementById('translate-article-btn');
+  var retranslateBtn = document.getElementById('retranslate-button');
+  var sourceIdInput = document.getElementById('source-article-id');
+  var notifBanner = document.getElementById('translation-notification-banner');
+
+  function showTranslationNotification(msg, isError) {
+    if (!notifBanner) return;
+    var notifText = document.getElementById('translation-notification-text');
+    if (notifText) {
+      notifText.textContent = msg;
+    }
+    if (isError) {
+      notifBanner.className = 'notice notice-error mb-4';
+    } else {
+      notifBanner.className = 'notice notice-success mb-4';
+    }
+    notifBanner.classList.remove('hidden');
+  }
+
+  // 編集欄の読み込み時の値。AI翻訳で置き換える前の確認で、保存していない変更があるかを示すために使う。
+  var articleForm = document.getElementById('article-form');
+  function fieldValue(id) {
+    var el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+  var loadedValues = { title: fieldValue('title'), excerpt: fieldValue('excerpt'), content: fieldValue('content_markdown') };
+
+  function setField(id, value) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'TEXTAREA') {
+      insertOrReplaceInTextarea(el, 0, el.value.length, value);
+      return;
+    }
+    el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // 編集欄に反映した変更案を保存のフォームから外す（AI翻訳などで別の内容に置き換えたとき）。
+  function clearAppliedProposal() {
+    var pid = document.getElementById('proposal-id');
+    var pbase = document.getElementById('proposal-base');
+    var psource = document.getElementById('proposal-source');
+    if (pid) pid.value = '';
+    if (pbase) pbase.value = '';
+    if (psource) psource.value = '';
+    var note = document.getElementById('proposal-applied-note');
+    if (note) note.hidden = true;
+  }
+
+  function applyTranslation(data) {
+    var titleInput = document.getElementById('title');
+    var excerptInput = document.getElementById('excerpt');
+    var contentInput = document.getElementById('content_markdown');
+    if (titleInput && data.title) setField('title', data.title);
+    if (excerptInput && data.excerpt !== undefined) setField('excerpt', data.excerpt);
+    if (contentInput && data.markdown) {
+      insertOrReplaceInTextarea(contentInput, 0, contentInput.value.length, data.markdown);
+    }
+    clearAppliedProposal();
+    showTranslationNotification('{{if $ja}}AI翻訳を反映しました。内容を確認・修正してから保存してください（保存するまで記事は変わりません）。{{else}}AI translation applied. Check and correct it, then save (the article does not change until you save).{{end}}', false);
+  }
+
+  // すでにタイトル・本文が入っている編集欄を AI翻訳で置き換える前に、誰が保存した何がどう変わるかを見せて確かめる。
+  var translateConfirm = document.getElementById('translate-confirm-modal');
+  var pendingTranslation = null;
+  function closeTranslateConfirm() {
+    pendingTranslation = null;
+    if (translateConfirm && translateConfirm.open) translateConfirm.close();
+  }
+  function confirmTranslation(data) {
+    if (!translateConfirm) {
+      window.sorusConfirm({ message: '{{if $ja}}編集欄のタイトル・本文をAI翻訳で置き換えます。よろしいですか？（保存するまで記事は変わりません）{{else}}Replace the title and body in the editor with the AI translation? (The article does not change until you save.){{end}}' })
+        .then(function (ok) { if (ok) applyTranslation(data); });
+      return;
+    }
+    pendingTranslation = data;
+    var savedBy = articleForm ? articleForm.dataset.savedBy : '';
+    var savedByKnown = !!(articleForm && articleForm.dataset.savedByKnown === 'true' && savedBy);
+    var savedAt = articleForm ? (articleForm.dataset.savedAt || '') : '';
+    var who = savedByKnown ? {{if $ja}}savedBy + 'さんが保存した内容'{{else}}'content saved by ' + savedBy{{end}} : '{{if $ja}}保存した人: 不明{{else}}saved by: unknown{{end}}';
+    document.getElementById('translate-confirm-saved').textContent =
+      '{{if $ja}}置き換えられる編集欄の内容: {{else}}Editor content to be replaced: {{end}}' + who + (savedAt ? '{{if $ja}}（最終更新 {{else}} (last updated {{end}}' + savedAt + '{{if $ja}}）{{else}}){{end}}' : '{{if $ja}}（まだ保存していない記事）{{else}} (article not saved yet){{end}}');
+    var dirty = fieldValue('title') !== loadedValues.title || fieldValue('excerpt') !== loadedValues.excerpt ||
+      fieldValue('content_markdown') !== loadedValues.content;
+    document.getElementById('translate-confirm-unsaved').hidden = !dirty;
+    // 差分の HTML はサーバーが ai.RenderDiffHTML でエスケープ済み（<ins>/<del> だけを含む）。
+    document.getElementById('translate-confirm-title-diff').innerHTML = data.diff.title_html || '';
+    document.getElementById('translate-confirm-excerpt-diff').innerHTML = data.diff.excerpt_html || '';
+    document.getElementById('translate-confirm-body-diff').innerHTML = data.diff.body_html || '';
+    translateConfirm.showModal();
+  }
+  if (translateConfirm) {
+    translateConfirm.querySelectorAll('[data-translate-confirm-cancel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        closeTranslateConfirm();
+        showTranslationNotification('{{if $ja}}AI翻訳での置き換えをやめました。編集欄は変わっていません。{{else}}AI translation replacement canceled. The editor has not changed.{{end}}', false);
+      });
+    });
+    translateConfirm.addEventListener('cancel', function () { pendingTranslation = null; });
+    document.getElementById('translate-confirm-apply').addEventListener('click', function () {
+      var data = pendingTranslation;
+      closeTranslateConfirm();
+      if (data) applyTranslation(data);
+    });
+  }
+
+  function doTranslate(btn) {
+    var sourceId = sourceIdInput ? sourceIdInput.value : '';
+    if (!sourceId) return;
+    var originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '{{if $ja}}翻訳中...{{else}}Translating...{{end}}';
+    var csrf = window.cmsCSRFToken ? window.cmsCSRFToken() : '';
+    var currentTitle = fieldValue('title');
+    var currentExcerpt = fieldValue('excerpt');
+    var currentContent = fieldValue('content_markdown');
+    var hasContent = currentTitle.trim() !== '' || currentContent.trim() !== '';
+
+    fetch('/admin/articles/translate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrf,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        source_article_id: sourceId,
+        target_lang: 'en',
+        current_title: currentTitle,
+        current_excerpt: currentExcerpt,
+        current_markdown: currentContent
+      })
+    })
+    .then(function (res) {
+      return res.json().then(function (data) {
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || '{{if $ja}}翻訳処理に失敗しました{{else}}Translation failed{{end}}');
+        }
+        return data;
+      });
+    })
+    .then(function (data) {
+      if (!hasContent) {
+        applyTranslation(data);
+        return;
+      }
+      if (data.diff && !data.diff.changed) {
+        showTranslationNotification('{{if $ja}}AI翻訳の結果は、編集欄の内容と同じでした。{{else}}The AI translation is the same as the editor content.{{end}}', false);
+        return;
+      }
+      if (!data.diff) {
+        // 差分が返らない古いサーバーでも、確かめずに置き換えない。
+        data.diff = { title_html: '', excerpt_html: '', body_html: '' };
+      }
+      confirmTranslation(data);
+    })
+    .catch(function (err) {
+      showTranslationNotification(err.message || '{{if $ja}}翻訳中にエラーが発生しました{{else}}An error occurred while translating{{end}}', true);
+    })
+    .finally(function () {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    });
+  }
+
+  if (translateBtn) {
+    translateBtn.addEventListener('click', function () { doTranslate(translateBtn); });
+  }
+  if (retranslateBtn) {
+    retranslateBtn.addEventListener('click', function () { doTranslate(retranslateBtn); });
+  }
+
+  // AI アプリ（MCP）から届いた変更案: 差分を確かめ、「編集欄に反映」で編集欄に入れる。保存はいつもの保存ボタンで行い、
+  // そのときにサーバーが、確かめた案（proposal_id）と記事の内容（proposal_base）が変わっていないかを確かめる。
+  var proposalModal = document.getElementById('proposal-modal');
+  if (proposalModal) {
+    var openProposal = function () {
+      if (typeof proposalModal.showModal === 'function') proposalModal.showModal();
+      else proposalModal.setAttribute('open', '');
+    };
+    var closeProposal = function () {
+      if (typeof proposalModal.close === 'function') proposalModal.close();
+      else proposalModal.removeAttribute('open');
+    };
+    var openBtn = document.getElementById('proposal-open-btn');
+    if (openBtn) openBtn.addEventListener('click', openProposal);
+    proposalModal.querySelectorAll('[data-proposal-close]').forEach(function (b) { b.addEventListener('click', closeProposal); });
+    document.getElementById('proposal-apply-btn').addEventListener('click', function () {
+      var d = proposalModal.dataset;
+      if (d.hasTitle === 'true') setField('title', document.getElementById('proposal-title-value').value);
+      if (d.hasExcerpt === 'true') setField('excerpt', document.getElementById('proposal-excerpt-value').value);
+      if (d.hasBody === 'true') setField('content_markdown', document.getElementById('proposal-content-value').value);
+      if (d.hasSlug === 'true') setField('slug', d.slug || '');
+      if (d.kind) setField('kind', d.kind);
+      if (d.categoryId) setField('category_id', d.categoryId);
+      if (d.lang) setField('article-lang', d.lang);
+      if (d.translationGroupId) {
+        var group = articleForm && articleForm.querySelector('input[name="translation_group_id"]');
+        if (group) group.value = d.translationGroupId;
+      }
+      if (d.sourceArticleId) setField('source-article-id', d.sourceArticleId);
+      document.getElementById('proposal-id').value = d.proposalId;
+      document.getElementById('proposal-base').value = d.proposalBase;
+      document.getElementById('proposal-source').value = d.proposalSource || '';
+      var message = '{{if $ja}}変更案を編集欄に反映しました。内容を確かめて保存すると記事に入ります（保存するまで記事は変わりません）。{{else}}Proposal applied to the editor. Check the content and save to put it in the article (the article does not change until you save).{{end}}';
+      if (d.sourceStatus === 'changed' || d.sourceStatus === 'unknown') {
+        // 原文が変わる前の（または確かめられない）翻訳の案。保存しても要更新の印は外れない（handlers_proposal.go）。
+        message += d.sourceStatus === 'changed'
+          ? '{{if $ja}}案を作った後に原文が変わっているため、保存してもこの翻訳は「要更新」のままです。{{else}}The original changed after the proposal was made, so this translation stays "Needs update" even after saving.{{end}}'
+          : '{{if $ja}}原文を確かめられなかったため、保存してもこの翻訳は「要更新」のままです。{{else}}The original could not be checked, so this translation stays "Needs update" even after saving.{{end}}';
+      }
+      var note = document.getElementById('proposal-applied-note');
+      if (note) {
+        note.textContent = message;
+        note.hidden = false;
+      }
+      closeProposal();
+      showTranslationNotification(message, false);
+    });
+    if (location.hash === '#article-proposal') openProposal();
+  }
+
+  // 普遍的・意図指定型 部分翻訳 & 推敲モーダル。本文側は AI ツールバーの「文章を整える ▾」（翻訳モードでは先頭のボタン）、
+  // 原文側は「選択文を翻訳して挿入」から開く。
+  var partialModal = document.getElementById('partial-translate-modal');
+  var sourcePartialBtn = document.getElementById('source-partial-translate-btn');
+  var partialCloseX = document.getElementById('partial-translate-close-x');
+  var partialCancel = document.getElementById('partial-translate-cancel');
+  var partialSubmit = document.getElementById('partial-translate-submit');
+  var partialInput = document.getElementById('partial-translate-input');
+  var partialInstruction = document.getElementById('partial-translate-instruction');
+  var partialStatus = document.getElementById('partial-translate-status');
+  var editorTextarea = document.getElementById('content_markdown');
+  var articleLangInput = document.getElementById('article-lang');
+
+  var currentOriginPane = 'editor';
+  var savedSelStart = 0;
+  var savedSelEnd = 0;
+  var activeAbortController = null;
+
+  function abortPendingRequest() {
+    if (activeAbortController) {
+      activeAbortController.abort();
+      activeAbortController = null;
+    }
+  }
+
+  function insertOrReplaceInTextarea(textarea, start, end, text) {
+    textarea.focus();
+    textarea.setSelectionRange(start, end);
+    var ok = false;
+    try {
+      ok = document.execCommand('insertText', false, text);
+    } catch (e) {
+      ok = false;
+    }
+    if (!ok) {
+      if (typeof textarea.setRangeText === 'function') {
+        textarea.setRangeText(text, start, end, 'end');
+      } else {
+        textarea.value = textarea.value.substring(0, start) + text + textarea.value.substring(end);
+      }
+    }
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function openPartialModal(origin) {
+    if (!partialModal) return;
+    abortPendingRequest();
+    currentOriginPane = origin;
+    partialStatus.classList.add('hidden');
+    partialStatus.textContent = '';
+    partialInstruction.value = '';
+
+    var selectedText = '';
+    if (origin === 'editor' && editorTextarea) {
+      savedSelStart = editorTextarea.selectionStart || 0;
+      savedSelEnd = editorTextarea.selectionEnd || 0;
+      if (savedSelStart !== savedSelEnd) {
+        selectedText = editorTextarea.value.substring(savedSelStart, savedSelEnd);
+      }
+    } else if (origin === 'source') {
+      var sel = window.getSelection();
+      if (sel) {
+        selectedText = sel.toString();
+      }
+      if (editorTextarea) {
+        var start = editorTextarea.selectionStart;
+        var end = editorTextarea.selectionEnd;
+        if (start === 0 && end === 0 && editorTextarea.value.length > 0) {
+          savedSelStart = editorTextarea.value.length;
+          savedSelEnd = editorTextarea.value.length;
+        } else {
+          savedSelStart = (typeof start === 'number') ? start : editorTextarea.value.length;
+          savedSelEnd = (typeof end === 'number') ? end : editorTextarea.value.length;
+        }
+      }
+    }
+
+    partialInput.value = selectedText;
+    var defaultRadio = partialModal.querySelector('input[name="partial-style"][value="natural"]');
+    if (defaultRadio) defaultRadio.checked = true;
+
+    if (typeof partialModal.showModal === 'function') {
+      partialModal.showModal();
+    } else {
+      partialModal.setAttribute('open', '');
+    }
+  }
+
+  function closePartialModal() {
+    abortPendingRequest();
+    if (!partialModal) return;
+    if (typeof partialModal.close === 'function') {
+      partialModal.close();
+    } else {
+      partialModal.removeAttribute('open');
+    }
+  }
+
+  // AI ツールバーの「選択範囲を AI 推敲（翻訳・推敲）」（data-ai-partial）から static/js/ai.js が呼ぶ。
+  window.sorusOpenPartialTranslate = function (origin) {
+    openPartialModal(origin === 'source' ? 'source' : 'editor');
+  };
+  if (sourcePartialBtn) {
+    sourcePartialBtn.addEventListener('click', function () {
+      openPartialModal('source');
+    });
+  }
+  if (partialCloseX) {
+    partialCloseX.addEventListener('click', closePartialModal);
+  }
+  if (partialCancel) {
+    partialCancel.addEventListener('click', closePartialModal);
+  }
+  if (partialModal) {
+    partialModal.addEventListener('cancel', function () {
+      abortPendingRequest();
+    });
+  }
+
+  if (partialSubmit) {
+    partialSubmit.addEventListener('click', function () {
+      var text = partialInput.value.trim();
+      if (!text) {
+        partialStatus.textContent = '{{if $ja}}対象テキストを入力または選択してください。{{else}}Enter or select the target text.{{end}}';
+        partialStatus.classList.remove('hidden');
+        return;
+      }
+
+      var styleInput = partialModal.querySelector('input[name="partial-style"]:checked');
+      var style = styleInput ? styleInput.value : 'natural';
+      var instruction = partialInstruction.value.trim();
+      var targetLang = (articleLangInput && articleLangInput.value) ? articleLangInput.value : 'en';
+      var sourceId = sourceIdInput ? sourceIdInput.value : '';
+
+      var beforeContext = '';
+      var afterContext = '';
+      if (editorTextarea && currentOriginPane === 'editor') {
+        var beforeStart = Math.max(0, savedSelStart - 200);
+        beforeContext = editorTextarea.value.substring(beforeStart, savedSelStart);
+        var afterEnd = Math.min(editorTextarea.value.length, savedSelEnd + 200);
+        afterContext = editorTextarea.value.substring(savedSelEnd, afterEnd);
+      }
+
+      var originalBtnText = partialSubmit.textContent;
+      partialSubmit.disabled = true;
+      partialSubmit.textContent = '{{if $ja}}AI翻訳・推敲中...{{else}}AI translating / polishing...{{end}}';
+      partialStatus.classList.add('hidden');
+
+      abortPendingRequest();
+      activeAbortController = new AbortController();
+
+      var csrf = window.cmsCSRFToken ? window.cmsCSRFToken() : '';
+
+      fetch('/admin/articles/translate', {
+        method: 'POST',
+        signal: activeAbortController.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrf,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          text: text,
+          target_lang: targetLang,
+          source_lang: currentOriginPane === 'source' ? 'ja' : '',
+          style: style,
+          instruction: instruction,
+          source_article_id: sourceId,
+          before_context: beforeContext,
+          after_context: afterContext
+        })
+      })
+      .then(function (res) {
+        return res.json().then(function (data) {
+          if (!res.ok || !data.ok) {
+            throw new Error(data.error || '{{if $ja}}処理に失敗しました{{else}}Processing failed{{end}}');
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        var translated = data.translated_text || '';
+        if (editorTextarea) {
+          var insertStart = savedSelStart;
+          var insertEnd = savedSelEnd;
+          var textToInsert = translated;
+
+          if (currentOriginPane === 'source') {
+            if (insertStart === 0 && insertEnd === 0 && editorTextarea.value.length > 0) {
+              insertStart = editorTextarea.value.length;
+              insertEnd = editorTextarea.value.length;
+            }
+            if (insertStart === editorTextarea.value.length && editorTextarea.value.length > 0) {
+              if (!editorTextarea.value.endsWith('\n\n')) {
+                if (editorTextarea.value.endsWith('\n')) {
+                  textToInsert = '\n' + textToInsert;
+                } else {
+                  textToInsert = '\n\n' + textToInsert;
+                }
+              }
+            }
+          }
+
+          insertOrReplaceInTextarea(editorTextarea, insertStart, insertEnd, textToInsert);
+        }
+
+        closePartialModal();
+
+        var notifMsg = '{{if $ja}}選択部分のAI翻訳・推敲を反映しました。{{else}}AI translation / polishing of the selection applied.{{end}}';
+        if (data.warning) {
+          notifMsg += '{{if $ja}}（{{else}} ({{end}}' + data.warning + '{{if $ja}}）{{else}}){{end}}';
+        }
+        showTranslationNotification(notifMsg, false);
+      })
+      .catch(function (err) {
+        if (err.name === 'AbortError') {
+          return;
+        }
+        partialStatus.textContent = err.message || '{{if $ja}}通信エラーが発生しました{{else}}A network error occurred{{end}}';
+        partialStatus.classList.remove('hidden');
+      })
+      .finally(function () {
+        activeAbortController = null;
+        partialSubmit.disabled = false;
+        partialSubmit.textContent = originalBtnText;
+      });
+    });
+  }
+})();
+</script>{{end}}

@@ -1,0 +1,153 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}{{$csrf := .CSRFToken}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  <div class="mb-5">
+    <h1 class="text-xl font-bold text-neutral-900">{{$.T "settings_nav_general"}}</h1>
+    <p class="mt-1 text-sm text-neutral-600">
+      {{if $d.BasicAuth}}{{$.T "general_settings_intro_access"}}{{else}}{{$.T "general_settings_intro"}}{{end}}
+    </p>
+  </div>
+
+  <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <form method="post" action="/admin/settings/general" enctype="multipart/form-data" class="flex flex-col gap-5">
+      <input type="hidden" name="_csrf" value="{{$csrf}}">
+
+      <div>
+        <div class="flex items-center"><label for="site_name" class="text-sm font-semibold text-neutral-800">{{if $ja}}サイト名{{else}}Site name{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}ブラウザのタイトルバー、RSSフィード、サイト全体のヘッダーに表示されます。{{else}}Shown in the browser title bar, the RSS feed, and the site-wide header.{{end}}</span></span></div>
+        <input id="site_name" name="site_name" type="text" required maxlength="100" value="{{$d.SiteName}}"
+               class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+      </div>
+
+      {{/* 公開サイトの多言語対応の ON/OFF（admin_ux_polish_and_mcp_spec.md §2-5、admin_ux_and_desktop_polish_spec.md §1-3）。管理画面の表示言語とは別の設定。OFF のときは英語のサイト名を隠す（値は消さずに送る）。 */}}
+      <div class="flex items-center">
+        <label class="flex cursor-pointer items-center gap-2.5">
+          <input id="multilingual_enabled" type="checkbox" name="multilingual_enabled" value="1" {{if $.MultilingualEnabled}}checked{{end}}
+                 class="h-4 w-4 rounded border-neutral-300 text-zinc-800 focus:ring-zinc-500">
+          <span class="text-sm font-semibold text-neutral-800">{{if $ja}}公開サイトの多言語対応（英語ページ /en/ を使う）{{else}}Multilingual public site (use English pages at /en/){{end}}</span>
+        </label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}公開サイトに英語ページ（<code>/en/</code>）と言語の切り替えリンクを出し、編集画面で記事の英語版の作成・AI翻訳を使えるようにします。{{else}}Adds English pages (<code>/en/</code>) and a language switch link to your public site, and lets you write English versions of articles and translate them with AI in the editor.{{end}}</span><span>{{if $ja}}管理画面自体の表示言語は、この設定とは別に、右上のアカウントメニューからいつでも切り替えられます。{{else}}This does not change the language of this admin screen. You can switch the admin language at any time from the account menu in the top right.{{end}}</span><span>{{if $ja}}無効にしても、作成済みの英語記事は削除されません。{{else}}Turning it off does not delete English articles you already have.{{end}}</span></span></span>
+      </div>
+
+      <div id="site-name-en-field"{{if not $.MultilingualEnabled}} hidden{{end}}>
+        <div class="flex items-center"><label for="site_name_en" class="text-sm font-semibold text-neutral-800">{{if $ja}}サイト名（英語）{{else}}Site name (English){{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}英語ページ表示時や英語RSSで使用されます。未設定の場合は日本語のサイト名が使用されます。{{else}}Used on English pages and in the English RSS feed. If not set, the Japanese site name is used.{{end}}</span></span></div>
+        <input id="site_name_en" name="site_name_en" type="text" maxlength="100" value="{{$d.SiteNameEn}}"
+               class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+      </div>
+
+      <div class="flex items-center">
+        <label class="flex cursor-pointer items-center gap-2.5">
+          <input type="checkbox" name="show_author" value="1" {{if $d.ShowAuthor}}checked{{end}}
+                 class="h-4 w-4 rounded border-neutral-300 text-zinc-800 focus:ring-zinc-500">
+          <span class="text-sm font-semibold text-neutral-800">{{if eq $.Lang "en"}}Show author names on articles and lists{{else}}記事や一覧に執筆者名を表示する{{end}}</span>
+        </label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if eq $.Lang "en"}}When unchecked, author names are hidden and articles are presented as official posts under the site name (the site name is also output as the author in structured data).{{else}}チェックを外すと、執筆者名を非表示にし、サイト名による公式発信として表示します（構造化データの著者にもサイト名が出力されます）。{{end}}</span></span>
+      </div>
+
+      <div>
+        <div class="flex items-center"><label for="site_description" class="text-sm font-semibold text-neutral-800">{{if $ja}}サイト説明文{{else}}Site description{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}検索エンジンやSNS共有（OGP）で使われるサイト全体の概要説明文（メタディスクリプション）です。{{else}}A summary of the whole site used by search engines and social media sharing (OGP), also called the meta description.{{end}}</span></span></div>
+        <textarea id="site_description" name="site_description" rows="3"
+                  class="mt-1.5 w-full rounded-lg border border-neutral-300 p-3 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">{{$d.SiteDescription}}</textarea>
+      </div>
+
+      <div>
+        <div class="flex items-center"><label for="base_url" class="text-sm font-semibold text-neutral-800">{{if $ja}}公開サイトURL{{else}}Public site URL{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}本番公開時のURL（Base URL）です。サイトマップやRSSフィードの絶対URLに使用します。{{else}}The URL of the live site (Base URL). Used for absolute URLs in the sitemap and RSS feed.{{end}}</span></span></div>
+        <input id="base_url" name="base_url" type="url" value="{{$d.BaseURL}}" placeholder="https://media.example.jp"
+               class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm font-mono text-neutral-800 focus:border-zinc-500 focus:outline-none">
+      </div>
+
+      <div>
+        <div class="flex items-center"><label for="favicon" class="text-sm font-semibold text-neutral-800">{{if $ja}}Favicon（サイトアイコン）{{else}}Favicon (site icon){{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}ブラウザのタブやブックマークに表示されるアイコンです。SVG・PNG・ICO・WebP 形式、2MB まで。正方形の画像を推奨します。{{else}}The icon shown in browser tabs and bookmarks. SVG, PNG, ICO, or WebP, up to 2 MB. A square image is recommended.{{end}}</span></span></div>
+        <div class="mt-2 flex flex-wrap items-center gap-4">
+          <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50">
+            <img id="favicon-preview" src="{{$d.FaviconURL}}" alt="{{if $ja}}現在の Favicon{{else}}Current favicon{{end}}" width="32" height="32" class="h-8 w-8 object-contain">
+          </div>
+          <div class="flex flex-col gap-1 text-xs text-neutral-600">
+            <span id="favicon-status">{{if $ja}}{{if $d.FaviconCustom}}カスタム Favicon を使用中: <code>{{$d.FaviconURL}}</code>{{else}}既定の Favicon を使用中{{end}}{{else}}{{if $d.FaviconCustom}}Using a custom favicon: <code>{{$d.FaviconURL}}</code>{{else}}Using the default favicon{{end}}{{end}}</span>
+            <input id="favicon" name="favicon" type="file" accept=".svg,.png,.ico,.webp,image/svg+xml,image/png,image/x-icon,image/vnd.microsoft.icon,image/webp"
+                   class="text-sm text-neutral-700 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-neutral-800 hover:file:bg-neutral-200">
+          </div>
+          {{if $d.FaviconCustom}}
+          <button type="submit" name="favicon_reset" value="1" formnovalidate
+                  class="btn btn-secondary btn-sm"
+                  data-confirm="{{if $ja}}カスタム Favicon を削除して既定のアイコンに戻しますか？{{else}}Delete the custom favicon and go back to the default icon?{{end}}" data-confirm-danger>{{if $ja}}デフォルトに戻す（削除）{{else}}Reset to default (delete){{end}}</button>
+          {{end}}
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center"><label for="copyright" class="text-sm font-semibold text-neutral-800">{{if $ja}}コピーライト表記{{else}}Copyright notice{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}フッターの最下部に表示する著作権表記です。空欄の場合は「&copy; サイト名」になります。{{else}}The copyright notice shown at the bottom of the footer. If blank, "&copy; Site name" is used.{{end}}</span></span></div>
+        <input id="copyright" name="copyright" type="text" value="{{$d.Copyright}}" placeholder="{{if $ja}}例: &copy; 2026 メディア運営委員会{{else}}e.g. &copy; 2026 Example Media{{end}}"
+               class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+      </div>
+
+      <div class="border-t border-neutral-200 pt-5">
+        <div class="flex items-center"><label for="analytics_tag" class="text-sm font-semibold text-neutral-800">{{if $ja}}アクセス解析タグ{{else}}Analytics tag{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}Cloudflare Web Analytics や Google Analytics などの計測タグ（<code>&lt;script&gt;...&lt;/script&gt;</code>）を貼り付けます。{{else}}Paste a tracking tag (<code>&lt;script&gt;...&lt;/script&gt;</code>) from Cloudflare Web Analytics, Google Analytics, etc.{{end}}</span><span>{{if $ja}}公開ページの <code>&lt;head&gt;</code> 内に自動的に埋め込まれます。{{else}}It is embedded automatically in the <code>&lt;head&gt;</code> of public pages.{{end}}</span></span></span></div>
+        <textarea id="analytics_tag" name="analytics_tag" rows="5" spellcheck="false" placeholder="<!-- Cloudflare Web Analytics -->&#10;<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{...}'></script>"
+                  class="mt-2 w-full rounded-lg border border-neutral-300 bg-neutral-50 p-3 font-mono text-xs text-neutral-800 focus:border-zinc-500 focus:outline-none">{{$d.AnalyticsTag}}</textarea>
+      </div>
+
+      <div>
+        <div class="flex items-center"><label for="analytics_dashboard_url" class="text-sm font-semibold text-neutral-800">{{if $ja}}詳細なアクセス解析の URL{{else}}Detailed analytics URL{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}Google Analytics や Cloudflare Web Analytics などの解析画面の URL です（例: <code>https://analytics.google.com/...</code>、<code>https://dash.cloudflare.com/...</code>）。{{else}}The URL of your analytics dashboard such as Google Analytics or Cloudflare Web Analytics (e.g. <code>https://analytics.google.com/...</code>, <code>https://dash.cloudflare.com/...</code>).{{end}}</span><span>{{if $ja}}ダッシュボードに「詳細なアクセス解析を開く」ボタンが表示されます。静的公開先（Cloudflare Pages 等）の閲覧数はこちらで確認します。{{else}}An "Open detailed analytics" button appears on the dashboard. Check page views for static destinations (Cloudflare Pages, etc.) there.{{end}}</span></span></span></div>
+        <input id="analytics_dashboard_url" name="analytics_dashboard_url" type="url" value="{{$d.AnalyticsDashboardURL}}" placeholder="https://dash.cloudflare.com/..."
+               class="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm font-mono text-neutral-800 focus:border-zinc-500 focus:outline-none">
+      </div>
+
+      {{if $d.BasicAuth}}
+      <fieldset id="basic-auth" class="border-t border-neutral-200 pt-5">
+        <legend class="sr-only">{{$.T "basic_auth_title"}}</legend>
+        <div class="flex items-center"><h2 class="text-sm font-semibold text-neutral-800" aria-hidden="true">{{$.T "basic_auth_title"}}</h2><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{$.T "basic_auth_desc"}}</span><span>{{$.T "basic_auth_scope_note"}}</span><span id="basic-auth-remote-note">{{$.T "basic_auth_remote_note"}}</span></span></span></div>
+        <input type="hidden" name="basic_auth_revision" value="{{$d.BasicAuthRevision}}">
+        <label for="basic_auth_enabled" class="mt-3 flex items-center gap-2 text-sm font-medium text-neutral-800">
+          <input id="basic_auth_enabled" name="basic_auth_enabled" type="checkbox" value="1"{{if $d.BasicAuthEnabled}} checked{{end}}
+                 class="h-4 w-4 rounded border-neutral-300 text-zinc-800 focus:ring-zinc-500">
+          {{$.T "basic_auth_enable"}}
+        </label>
+        <div class="mt-3 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="basic_auth_user" class="block text-sm font-semibold text-neutral-800">{{$.T "basic_auth_user"}}</label>
+            <input id="basic_auth_user" name="basic_auth_user" type="text" value="{{$d.BasicAuthUser}}" maxlength="100"
+                   autocomplete="off" autocapitalize="off" spellcheck="false"
+                   class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+          </div>
+          <div>
+            <div class="flex items-center"><label for="basic_auth_pass" class="text-sm font-semibold text-neutral-800">{{$.T "basic_auth_pass"}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" id="basic_auth_pass_hint" hidden>{{if $d.BasicAuthPassSet}}{{$.T "basic_auth_pass_set_hint"}}{{else}}{{$.T "basic_auth_pass_new_hint"}}{{end}}</span></span></div>
+            <input id="basic_auth_pass" name="basic_auth_pass" type="password" autocomplete="new-password"
+                   {{if $d.BasicAuthPassSet}}placeholder="{{$.T "basic_auth_pass_keep"}}"{{end}} aria-describedby="basic_auth_pass_hint"
+                   class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+          </div>
+        </div>
+      </fieldset>
+      {{end}}
+
+      <div class="flex items-center justify-end gap-3 border-t border-neutral-200 pt-4">
+        <button type="submit" class="btn btn-primary btn-md">{{if $ja}}設定を保存する{{else}}Save settings{{end}}</button>
+      </div>
+    </form>
+  </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "scripts"}}{{$ja := ne .Lang "en"}}
+<script>
+(function() {
+  // 多言語対応のチェックに合わせて、英語のサイト名の欄を出し入れする。
+  var multi = document.getElementById('multilingual_enabled');
+  var enField = document.getElementById('site-name-en-field');
+  if (multi && enField) multi.addEventListener('change', function() { enField.hidden = !multi.checked; });
+})();
+(function() {
+  var input = document.getElementById('favicon');
+  var preview = document.getElementById('favicon-preview');
+  var status = document.getElementById('favicon-status');
+  if (!input || !preview) return;
+  input.addEventListener('change', function() {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    preview.src = URL.createObjectURL(file);
+    status.textContent = '{{if $ja}}選択中: ' + file.name + '（保存すると反映されます）{{else}}Selected: ' + file.name + ' (applied when you save){{end}}';
+  });
+})();
+</script>
+{{end}}

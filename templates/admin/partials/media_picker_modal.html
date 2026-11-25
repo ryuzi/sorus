@@ -1,0 +1,59 @@
+{{define "media_picker_modal"}}{{$ja := ne .Lang "en"}}
+<dialog id="media-picker" class="ai-modal w-[min(64rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="media-picker-title"
+        data-api="/admin/api/media"
+        data-msg-loading="{{if $ja}}読み込み中...{{else}}Loading...{{end}}"
+        data-msg-empty="{{if $ja}}画像が見つかりません。メディアライブラリや本文欄から画像をアップロードできます。{{else}}No images found. Upload images from the media library or the editor.{{end}}"
+        data-msg-error="{{if $ja}}画像の一覧を読み込めませんでした{{else}}Could not load images{{end}}"
+        data-msg-inserted="{{if $ja}}画像を挿入しました{{else}}Image inserted{{end}}"
+        data-msg-featured="{{if $ja}}アイキャッチ画像に設定しました{{else}}Featured image set{{end}}"
+        data-msg-count="{{if $ja}}{n}件{{else}}{n} images{{end}}"
+        data-msg-used="{{if $ja}}この記事で使っている画像（{n}枚）{{else}}Images in this article ({n}){{end}}">
+  <div class="flex items-center justify-between gap-3 border-b border-neutral-200 px-5 py-3">
+    <h2 id="media-picker-title" class="font-semibold text-neutral-800">{{if $ja}}メディアライブラリから選択{{else}}Select from media library{{end}}</h2>
+    <button type="button" data-media-picker-close class="btn btn-ghost btn-sm">{{if $ja}}閉じる{{else}}Close{{end}}</button>
+  </div>
+  {{/* アイキャッチを選ぶときだけ、本文で使っている画像を先頭に出す（media_picker.js が開くたびに本文から集める。0枚なら出さない）。
+       ここの画像は押すだけでアイキャッチに設定して閉じる。 */}}
+  <section id="media-picker-used" hidden class="border-b border-neutral-200 bg-neutral-50 px-5 py-3" aria-labelledby="media-picker-used-title">
+    <h3 id="media-picker-used-title" class="text-sm font-semibold text-neutral-800"></h3>
+    <ul id="media-picker-used-grid" class="mt-2 flex gap-2 overflow-x-auto pb-1" aria-labelledby="media-picker-used-title"></ul>
+  </section>
+  <h3 id="media-picker-library-title" hidden class="px-5 pt-3 text-sm font-semibold text-neutral-800">{{if $ja}}メディアライブラリ{{else}}Media library{{end}}</h3>
+  <form id="media-picker-search" role="search" class="flex items-center gap-2 border-b border-neutral-200 px-5 py-3">
+    <label for="media-picker-q" class="sr-only">{{if $ja}}画像を検索{{else}}Search images{{end}}</label>
+    <input id="media-picker-q" type="search" maxlength="200" autocomplete="off"
+           placeholder="{{if $ja}}ファイル名・代替テキスト・キャプションで検索{{else}}Search by file name, alt text or caption{{end}}"
+           class="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+    <button type="submit" class="btn btn-primary btn-md">{{if $ja}}検索{{else}}Search{{end}}</button>
+    <span id="media-picker-count" class="hidden text-xs text-neutral-500 sm:inline" aria-live="polite"></span>
+  </form>
+  <div class="max-h-[50vh] overflow-y-auto px-5 py-4">
+    <ul id="media-picker-grid" class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6" aria-label="{{if $ja}}画像の一覧{{else}}Images{{end}}"></ul>
+    <p id="media-picker-status" class="py-6 text-center text-sm text-neutral-500" aria-live="polite"></p>
+    <div class="text-center">
+      <button type="button" id="media-picker-more" hidden class="btn btn-secondary btn-md">{{if $ja}}さらに読み込む{{else}}Load more{{end}}</button>
+    </div>
+  </div>
+  <div id="media-picker-selection" class="flex flex-col gap-3 border-t border-neutral-200 bg-neutral-50 px-5 py-3 md:flex-row md:items-end">
+    <img id="media-picker-selected" src="" alt="" hidden class="h-16 w-16 flex-shrink-0 rounded-lg border border-neutral-200 bg-white object-cover">
+    <div class="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+      <div>
+        <label for="media-picker-alt" class="text-xs font-medium text-neutral-600">{{if $ja}}代替テキスト{{else}}Alt text{{end}}</label>
+        <input id="media-picker-alt" type="text" maxlength="300" disabled
+               class="mt-0.5 w-full rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:bg-neutral-100">
+      </div>
+      <div>
+        <label for="media-picker-caption" class="text-xs font-medium text-neutral-600">{{if $ja}}キャプション（任意）{{else}}Caption (optional){{end}}</label>
+        <input id="media-picker-caption" type="text" maxlength="1000" disabled
+               class="mt-0.5 w-full rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-zinc-500 focus:outline-none disabled:bg-neutral-100">
+      </div>
+    </div>
+    <div class="flex flex-shrink-0 gap-2">
+      <button type="button" id="media-picker-featured" disabled
+              class="btn btn-secondary btn-md">{{if $ja}}アイキャッチに設定{{else}}Set as featured{{end}}</button>
+      <button type="button" id="media-picker-insert" disabled
+              class="btn btn-primary btn-md">{{if $ja}}本文に挿入{{else}}Insert into article{{end}}</button>
+    </div>
+  </div>
+</dialog>
+{{end}}

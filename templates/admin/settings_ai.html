@@ -1,0 +1,256 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}{{$csrf := .CSRFToken}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  {{template "ai_tabs" $}}
+  {{/* 見出しは共通の「AI」（partials/ai_tabs.html）。この画面は「使う AI」（管理者）・「文章スタイル」（編集者・ライター）のタブ。 */}}
+  <p id="ai-settings-intro" class="mb-5 text-sm text-neutral-600">{{if $d.IsAdmin}}{{if $ja}}執筆と翻訳に使う AI を選び、APIキーを登録します。保存するとすぐに使えます。{{else}}Choose the AI for writing and translation and register its API key. Saved settings take effect immediately.{{end}}{{else}}{{if $ja}}記事エディタの AI が使う文章スタイルと専門用語集を設定します。{{else}}Set the writing style and glossary the editor's AI uses.{{end}}{{end}}</p>
+
+  <section id="ai-current" class="mb-6 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+    <h2 class="text-sm font-semibold text-neutral-800">{{if $ja}}いまの状態{{else}}Current status{{end}}</h2>
+    <dl class="mt-3 grid grid-cols-[8rem_1fr] gap-x-3 gap-y-2 text-sm">
+      <dt class="text-neutral-500">{{if $ja}}使っているAI{{else}}AI in use{{end}}</dt>
+      <dd id="ai-current-name" class="font-medium {{if $d.Configured}}text-neutral-900{{else}}text-rose-700{{end}}">{{if $d.Configured}}{{$d.Current}}{{else}}{{if $ja}}未設定（AIの機能は使えません）{{else}}Not set (AI features are unavailable){{end}}{{end}}</dd>
+      <dt class="text-neutral-500">{{if $ja}}APIキー{{else}}API key{{end}}</dt>
+      <dd id="ai-key-source" class="text-neutral-800">{{$d.KeySource}}</dd>
+      <dt class="text-neutral-500">{{if $ja}}設定のしかた{{else}}Configured by{{end}}</dt>
+      <dd class="text-neutral-800">{{if $ja}}{{if $d.HasSaved}}この画面で保存した設定{{else}}環境変数（この画面ではまだ保存していません）{{end}}{{else}}{{if $d.HasSaved}}Settings saved on this page{{else}}Environment variables (not saved on this page yet){{end}}{{end}}</dd>
+      {{if $d.EnvKeys}}
+      <dt class="text-neutral-500">{{if $ja}}環境変数{{else}}Environment variables{{end}}</dt>
+      <dd id="ai-env-keys" class="text-neutral-800">{{if $ja}}{{range $i, $k := $d.EnvKeys}}{{if $i}}・{{end}}<code class="text-xs">{{$k}}</code>{{end}} が設定されています{{else}}{{range $i, $k := $d.EnvKeys}}{{if $i}}, {{end}}<code class="text-xs">{{$k}}</code>{{end}} set{{end}}</dd>
+      {{end}}
+    </dl>
+  </section>
+
+  {{if $d.Errors}}
+  <div id="ai-errors" class="notice notice-error mb-4" role="alert">
+    <ul class="list-disc pl-5">{{range $d.Errors}}<li>{{.}}</li>{{end}}</ul>
+  </div>
+  {{end}}
+
+  <form id="ai-settings-form" method="post" action="/admin/settings/ai" class="flex flex-col gap-5 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" autocomplete="off">
+    <input type="hidden" name="_csrf" value="{{$csrf}}">
+
+    {{if $d.IsAdmin}}
+    {{/* AIプロバイダーごとに APIキー・モデルを別々に保存する（admin_ux_redesign_spec.md §2-7）。メインAIを切り替えても、ほかのプロバイダーのキーは消えない。
+         入力欄の名前は api_key_<キー>・model_<キー>・base_url_<キー>・clear_key_<キー>（キーは gemini / openai / claude / custom / deepl）。 */}}
+    <div>
+      <div class="flex items-center"><label for="ai-main-provider" class="text-sm font-semibold text-neutral-800">{{if $ja}}メインAI（執筆・推敲・要約に使うAI）{{else}}Main AI (used for writing, polishing, and summaries){{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}記事エディタの「AI推敲」「AI下書き作成」「タイトル提案」「要約」「ファクトチェック」などで、ふだん使うAIです。記事エディタでは、APIキーを登録したほかのAIに切り替えて使うこともできます。{{else}}The AI normally used for "AI polish", "AI draft", "Title suggestions", "Summary", "Fact check", and more in the article editor. In the editor you can also switch to another AI whose API key is registered.{{end}}</span></span></div>
+      <select id="ai-main-provider" name="provider" class="mt-1.5 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+        {{range $d.ProviderConfigs}}{{if ne .Key "deepl"}}
+        <option value="{{.Key}}"{{if eq .Key $d.Form.Provider}} selected{{end}}>{{.Label}}{{if .HasSavedKey}}{{if $ja}}（キー登録済み）{{else}} (key registered){{end}}{{end}}</option>
+        {{end}}{{end}}
+      </select>
+    </div>
+
+    <fieldset>
+      <legend class="text-sm font-semibold text-neutral-800">{{if $ja}}AIプロバイダーごとの設定{{else}}Settings per AI provider{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}接続テストは、カードに入力中の設定（保存前でも可）で短い文章のタイトル案を1回作ってもらい（DeepL は短い文を翻訳し）、応答までの時間を表示します。{{else}}The connection test uses the settings entered in the card (even before saving) to request one title suggestion for a short text (DeepL translates a short sentence) and shows the response time.{{end}}</span></span></span></legend>
+      <div id="ai-provider-cards" class="mt-2 flex flex-col gap-2">
+        {{range $d.ProviderConfigs}}{{$key := .Key}}{{if or (ne $key "deepl") $.MultilingualEnabled}}
+        <details id="ai-provider-{{$key}}" class="ai-provider-card rounded-lg border border-neutral-200 bg-white" data-provider="{{$key}}"{{if or (eq $key $d.Form.Provider) (and (eq $key "deepl") (eq $d.Form.TranslationProvider "deepl"))}} open{{end}}>
+          <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span class="text-sm font-semibold text-neutral-800">{{.Label}}{{if eq $key "deepl"}}<span class="ml-1 text-xs font-normal text-neutral-500">{{if $ja}}（翻訳専用）{{else}} (translation only){{end}}</span>{{end}}</span>
+            <span class="flex flex-wrap items-center gap-1.5 text-xs">
+              {{if eq $key $d.Form.Provider}}<span class="whitespace-nowrap rounded bg-zinc-800 px-1.5 py-0.5 font-semibold text-white">{{if $ja}}メインAI{{else}}Main AI{{end}}</span>{{end}}
+              {{if eq $key $d.Form.TranslationProvider}}<span class="whitespace-nowrap rounded bg-neutral-200 px-1.5 py-0.5 font-semibold text-neutral-800">{{if $ja}}翻訳{{else}}Translation{{end}}</span>{{end}}
+              {{if .HasSavedKey}}<span class="whitespace-nowrap rounded bg-emerald-100 px-1.5 py-0.5 font-semibold text-emerald-800">{{if $ja}}キー登録済み{{else}}Key registered{{end}}</span>
+              {{else}}<span class="whitespace-nowrap rounded bg-neutral-100 px-1.5 py-0.5 text-neutral-600">{{if $ja}}未登録{{else}}Not registered{{end}}</span>{{end}}
+            </span>
+          </summary>
+          <div class="flex flex-col gap-4 border-t border-neutral-100 px-4 pb-4 pt-3">
+            <div>
+              <div class="flex items-center"><label for="ai-api-key-{{$key}}" class="text-sm font-semibold text-neutral-800">{{if $ja}}APIキー{{if eq $key "custom"}}（必要なときだけ）{{end}}{{else}}API key{{if eq $key "custom"}} (only if needed){{end}}{{end}}</label>{{with .KeyHint}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{.}}</span></span>{{end}}</div>
+              <p class="text-xs text-neutral-500">
+                {{if .HasSavedKey}}{{if $ja}}保存済みのキーがあります（<code>{{.KeyPreview}}</code>）。変えないときは空欄のまま保存します。{{else}}A key is saved (<code>{{.KeyPreview}}</code>). Leave blank to keep it.{{end}}
+                {{else if .KeyEnv}}{{if $ja}}空欄のまま保存すると、環境変数 <code>{{.KeyEnv}}</code> のキー（設定されていれば）を使います。{{else}}If left blank, the key in the environment variable <code>{{.KeyEnv}}</code> (if set) is used.{{end}}
+                {{else}}{{if $ja}}APIキーを貼り付けてください。{{else}}Paste your API key.{{end}}{{end}}
+              </p>
+              <input id="ai-api-key-{{$key}}" name="api_key_{{$key}}" type="password" autocomplete="new-password" spellcheck="false" maxlength="512"
+                     placeholder="{{if .HasSavedKey}}{{if $ja}}変えないときは空欄{{else}}Leave blank to keep{{end}}{{else}}{{if $ja}}APIキーを貼り付け{{else}}Paste API key{{end}}{{end}}"
+                     class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm focus:border-zinc-500 focus:outline-none">
+              {{with .KeyURL}}<p class="mt-1 text-xs"><a href="{{.}}" target="_blank" rel="noopener noreferrer" class="text-zinc-700 underline">{{if $ja}}APIキーを発行する画面を開く{{else}}Open the page to issue an API key{{end}}</a></p>{{end}}
+              {{if .HasSavedKey}}
+              <label class="mt-2 flex items-center gap-2 text-xs text-neutral-600">
+                <input id="ai-clear-key-{{$key}}" type="checkbox" name="clear_key_{{$key}}" value="1"> {{if $ja}}保存済みのキーを消す{{if .KeyEnv}}（環境変数のキーに戻す）{{end}}{{else}}Delete the saved key{{if .KeyEnv}} (go back to the environment variable key){{end}}{{end}}
+              </label>
+              {{end}}
+            </div>
+            {{if ne $key "deepl"}}
+            <div>
+              <div class="flex items-center"><label for="ai-model-{{$key}}" class="text-sm font-semibold text-neutral-800">{{if $ja}}モデル（空欄なら既定）{{else}}Model (blank for default){{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}ふだんは空欄のままで構いません。{{if .DefaultModel}}既定: <code>{{.DefaultModel}}</code>{{else}}モデル名を入力してください。{{end}}{{else}}You can normally leave this blank. {{if .DefaultModel}}Default: <code>{{.DefaultModel}}</code>{{else}}Enter a model name.{{end}}{{end}}</span></span></div>
+              <input id="ai-model-{{$key}}" name="model_{{$key}}" type="text" value="{{.Model}}" list="ai-model-list-{{$key}}" maxlength="100" spellcheck="false"{{with .DefaultModel}} placeholder="{{.}}"{{end}}
+                     class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm focus:border-zinc-500 focus:outline-none">
+              <datalist id="ai-model-list-{{$key}}">{{range .Models}}<option value="{{.}}"></option>{{end}}</datalist>
+            </div>
+            {{end}}
+            {{if eq $key "custom"}}
+            <div>
+              <div class="flex items-center"><label for="ai-base-url-{{$key}}" class="text-sm font-semibold text-neutral-800">{{if $ja}}ベースURL{{else}}Base URL{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}/chat/completions の手前までの URL です。例: Ollama は <code>http://localhost:11434/v1</code>、LM Studio は <code>http://localhost:1234/v1</code>。{{else}}The URL up to just before /chat/completions. e.g. <code>http://localhost:11434/v1</code> for Ollama, <code>http://localhost:1234/v1</code> for LM Studio.{{end}}</span></span></div>
+              <input id="ai-base-url-{{$key}}" name="base_url_{{$key}}" type="url" value="{{.BaseURL}}" maxlength="500" spellcheck="false" placeholder="http://localhost:11434/v1"
+                     class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-sm focus:border-zinc-500 focus:outline-none">
+            </div>
+            {{end}}
+            <div class="flex justify-end">
+              <button type="button" class="btn btn-secondary btn-sm" data-ai-test="{{$key}}">{{if $ja}}{{.Label}} の接続テスト{{else}}Test {{.Label}} connection{{end}}</button>
+            </div>
+          </div>
+        </details>
+        {{end}}{{end}}
+      </div>
+    </fieldset>
+    {{else}}
+    <div class="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-700">
+      <div class="font-semibold text-neutral-800">{{if $ja}}AIプロバイダー・インフラ設定（管理者管理）{{else}}AI provider & infrastructure settings (managed by administrators){{end}}</div>
+      <p class="mt-1 text-xs text-neutral-600">
+        {{if $ja}}現在のAI: {{else}}Current AI: {{end}}<span class="font-medium text-neutral-900">{{$d.Current}}</span>
+        {{if $d.Configured}}<span class="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">{{if $ja}}有効{{else}}Enabled{{end}}</span>
+        {{else}}<span class="ml-1 rounded bg-rose-100 px-1.5 py-0.5 text-xs font-semibold text-rose-800">{{if $ja}}未設定{{else}}Not set{{end}}</span>{{end}}
+      </p>
+      <p class="mt-2 text-xs text-neutral-500">{{if $ja}}変更できるのはサイト管理者だけです。{{else}}Only site administrators can change these.{{end}}</p>
+    </div>
+    {{end}}
+
+    <div class="border-t border-neutral-200 pt-5 mt-2">
+      <h3 class="mb-4 flex items-center text-sm font-semibold text-neutral-800">{{if $.MultilingualEnabled}}{{if $ja}}多言語翻訳・文章スタイル設定{{else}}Translation & writing style settings{{end}}{{else}}{{if $ja}}文章スタイル設定{{else}}Writing style settings{{end}}{{end}}</h3>
+
+      {{/* 翻訳の設定は多言語対応が有効なときだけ出す（admin_ux_polish_and_mcp_spec.md §2-5）。無効なときも値は消さずに送り返す。 */}}
+      {{if $.MultilingualEnabled}}
+      <div class="mb-4">
+        <div class="flex items-center"><label for="ai-trans-provider" class="text-sm font-semibold text-neutral-800">{{if $ja}}優先翻訳エンジン{{else}}Preferred translation engine{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}記事エディタの翻訳（日本語→英語など）に使うAIです。上で設定したプロバイダー（DeepL を含む）から選べます。{{else}}The AI used for translation in the article editor (e.g. Japanese → English). Choose from the providers set up above (including DeepL).{{end}}</span></span></div>
+        <select id="ai-trans-provider" name="translation_provider" class="mt-1.5 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+          <option value=""{{if eq $d.Form.TranslationProvider ""}} selected{{end}}>{{if $ja}}メインAIと同じ{{else}}Same as main AI{{end}}</option>
+          {{range $d.ProviderConfigs}}<option value="{{.Key}}"{{if eq .Key $d.Form.TranslationProvider}} selected{{end}}>{{.Label}}{{if eq .Key "deepl"}}{{if $ja}}（翻訳専用）{{else}} (translation only){{end}}{{end}}{{if .HasSavedKey}}{{if $ja}}（キー登録済み）{{else}} (key registered){{end}}{{end}}</option>
+          {{end}}
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <div class="flex items-center"><label for="ai-glossary" class="text-sm font-semibold text-neutral-800">{{if $ja}}専門用語集{{else}}Glossary{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}翻訳で使う訳語を、1行に1組「原文=訳文」の形式で書きます（例: <code>人工知能=Artificial Intelligence</code>、<code>#</code> で始まる行はコメント）。{{else}}Terms used in translation, one pair per line in the form "source=translation" (e.g. <code>AI=Artificial Intelligence</code>; lines starting with <code>#</code> are comments).{{end}}</span></span></div>
+        <textarea id="ai-glossary" name="glossary" rows="4" spellcheck="false"
+                  placeholder="{{if $ja}}人工知能=Artificial Intelligence&#10;機械学習=Machine Learning{{else}}AI=Artificial Intelligence&#10;ML=Machine Learning{{end}}"
+                  class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono text-xs focus:border-zinc-500 focus:outline-none">{{$d.Form.Glossary}}</textarea>
+      </div>
+      {{else}}
+      <input type="hidden" name="translation_provider" value="{{$d.Form.TranslationProvider}}">
+      <input type="hidden" name="glossary" value="{{$d.Form.Glossary}}">
+      {{end}}
+
+      <div class="mb-4">
+        <div class="flex items-center"><label for="ai-writing-style" class="text-sm font-semibold text-neutral-800">{{if $ja}}文章トーン＆スタイル{{else}}Writing style{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}AIによる推敲・下書き・タイトル提案・翻訳時に適用する文章の語調や文体プリセットです。{{else}}A preset for tone and style applied when the AI polishes, drafts, suggests titles, or translates.{{end}}</span></span></div>
+        <select id="ai-writing-style" name="writing_style" class="mt-1.5 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none">
+          <option value="standard"{{if eq $d.Form.WritingStyle "standard"}} selected{{end}}>{{if $ja}}標準（明快・丁寧・ニュートラルな企業・ブログ向け）{{else}}Standard (clear, polite, neutral; for businesses and blogs){{end}}</option>
+          <option value="academic"{{if eq $d.Form.WritingStyle "academic"}} selected{{end}}>{{if $ja}}学術エディトリアル（客観的事実・論文・研究広報向け）{{else}}Academic editorial (objective facts; for papers and research communication){{end}}</option>
+          <option value="business"{{if eq $d.Form.WritingStyle "business"}} selected{{end}}>{{if $ja}}ビジネス（提案型・説得力・洗練されたビジネス文）{{else}}Business (persuasive, polished business writing){{end}}</option>
+          <option value="creative"{{if eq $d.Form.WritingStyle "creative"}} selected{{end}}>{{if $ja}}クリエイティブ（感情豊か・エッセイ・ストーリーテリング）{{else}}Creative (expressive; essays and storytelling){{end}}</option>
+        </select>
+        <input type="hidden" id="ai-academic-style-fallback" name="academic_style" value="{{if eq $d.Form.WritingStyle "academic"}}1{{else}}0{{end}}">
+      </div>
+
+      <p class="mb-2 flex items-center text-xs text-neutral-600">{{if $ja}}画像の解析・代替テキストについて{{else}}About image analysis and alt text{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}メディアライブラリの画像自動解析や代替テキスト生成には Gemini（Google AI Studio）が使用されます。Gemini をメインAIまたはAPIキーで有効にしておくと自動的に利用可能になります。{{else}}Gemini (Google AI Studio) is used for automatic image analysis and alt text generation in the media library. It becomes available automatically when Gemini is enabled as the main AI or with an API key.{{end}}</span></span></p>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 pt-4">
+      {{if $d.IsAdmin}}
+      <div></div>
+      <button type="submit" id="ai-save-button" class="btn btn-primary btn-md">{{if $ja}}保存する{{else}}Save{{end}}</button>
+      {{else}}
+      <div></div>
+      <button type="submit" id="ai-save-button" class="btn btn-primary btn-md">{{if $ja}}スタイル設定を保存する{{else}}Save style settings{{end}}</button>
+      {{end}}
+    </div>
+    {{if $d.IsAdmin}}
+    <div id="ai-test-result" class="rounded-lg border px-4 py-3 text-sm" role="status" aria-live="polite" hidden>
+      <p id="ai-test-status" class="font-semibold"></p>
+      <p id="ai-test-message" class="mt-1"></p>
+      <ul id="ai-test-titles" class="mt-2 list-disc pl-5 text-neutral-700"></ul>
+    </div>
+    {{end}}
+  </form>
+
+  {{if and $d.IsAdmin $d.HasSaved}}
+  <form id="ai-reset-form" method="post" action="/admin/settings/ai/reset" class="mt-4 text-right" data-confirm="{{if $ja}}この画面で保存したAIの設定を消し、環境変数の設定に戻しますか？{{else}}Delete the AI settings saved on this page and go back to the environment variable settings?{{end}}">
+    <input type="hidden" name="_csrf" value="{{$csrf}}">
+    <button type="submit" class="text-sm text-neutral-500 underline hover:text-neutral-800">{{if $ja}}この画面の設定を消して、環境変数の設定に戻す{{else}}Delete these settings and go back to environment variables{{end}}</button>
+  </form>
+  {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "scripts"}}{{$ja := ne .Lang "en"}}
+<script>
+(function () {
+  var form = document.getElementById('ai-settings-form');
+  if (!form) return;
+
+  var writingStyleSelect = document.getElementById('ai-writing-style');
+  var academicFallback = document.getElementById('ai-academic-style-fallback');
+  if (writingStyleSelect && academicFallback) {
+    writingStyleSelect.addEventListener('change', function () {
+      academicFallback.value = (writingStyleSelect.value === 'academic') ? '1' : '0';
+    });
+  }
+
+  // メインAIを選び直したら、そのプロバイダーのカードを開いてキーを入力しやすくする。
+  var mainSelect = document.getElementById('ai-main-provider');
+  if (mainSelect) {
+    mainSelect.addEventListener('change', function () {
+      var card = document.getElementById('ai-provider-' + mainSelect.value);
+      if (card) card.open = true;
+    });
+  }
+
+  // 接続テスト。各カードのボタンが、入力中のフォーム全体と test_provider（テストするプロバイダーのキー）を送る。
+  // 結果（AI の応答・エラーの文）は textContent で表示し、HTML として解釈しない。
+  var box = document.getElementById('ai-test-result');
+  var statusEl = document.getElementById('ai-test-status');
+  var messageEl = document.getElementById('ai-test-message');
+  var titlesEl = document.getElementById('ai-test-titles');
+  function show(ok, status, message, titles) {
+    if (!box || !statusEl || !messageEl || !titlesEl) return;
+    box.hidden = false;
+    box.className = 'notice ' + (ok ? 'notice-success' : 'notice-error');
+    statusEl.textContent = status;
+    messageEl.textContent = message || '';
+    titlesEl.textContent = '';
+    (titles || []).forEach(function (t) {
+      var li = document.createElement('li');
+      li.textContent = t;
+      titlesEl.appendChild(li);
+    });
+  }
+  var buttons = form.querySelectorAll('[data-ai-test]');
+  buttons.forEach(function (button) {
+    button.addEventListener('click', function () {
+      var key = button.getAttribute('data-ai-test');
+      var body = new FormData(form);
+      body.set('test_provider', key);
+      buttons.forEach(function (b) { b.disabled = true; });
+      show(true, '{{if $ja}}接続を確かめています...{{else}}Checking connection...{{end}}', '', []);
+      if (box) box.scrollIntoView({ block: 'nearest' });
+      fetch('/admin/settings/ai/test', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': window.cmsCSRFToken ? window.cmsCSRFToken() : '' },
+        body: body,
+        credentials: 'same-origin'
+      }).then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      }).then(function (data) {
+        var seconds = ((data.elapsed_ms || 0) / 1000).toFixed(1);
+        if (data.ok) {
+          var label = (key === 'deepl' || (data.provider && data.provider.indexOf('DeepL') !== -1)) ? '{{if $ja}}翻訳テスト結果:{{else}}Translation test result:{{end}}' : '{{if $ja}}タイトル案:{{else}}Title suggestions:{{end}}';
+          show(true, '{{if $ja}}接続できました（' + (data.provider || '') + '・応答まで ' + seconds + ' 秒）{{else}}Connected (' + (data.provider || '') + ', response in ' + seconds + ' s){{end}}', label, data.titles);
+        } else {
+          show(false, '{{if $ja}}接続できませんでした{{else}}Could not connect{{end}}', data.message || '', []);
+        }
+      }).catch(function () {
+        show(false, '{{if $ja}}接続できませんでした{{else}}Could not connect{{end}}', '{{if $ja}}接続テストに失敗しました。画面を読み込み直してから、もう一度お試しください。{{else}}The connection test failed. Reload the page and try again.{{end}}', []);
+      }).finally(function () { buttons.forEach(function (b) { b.disabled = false; }); });
+    });
+  });
+})();
+</script>
+{{end}}

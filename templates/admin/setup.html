@@ -1,0 +1,158 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}
+<div class="flex min-h-screen items-center justify-center px-4 py-10">
+  <div class="w-full max-w-md">
+    <div class="mb-6 text-center">
+      <h1 class="text-2xl font-bold">{{if $ja}}はじめに{{else}}Getting started{{end}}</h1>
+      {{if not $d.Done}}<p class="mt-2 text-sm text-neutral-500">{{if $ja}}2つのことを決めると、すぐに記事を書き始められます。どれもあとで変えられます。{{else}}Decide two things and you can start writing right away. You can change both later.{{end}}</p>
+      {{if $d.CanRestore}}<p class="mt-1 text-sm"><a href="#setup-restore" class="text-neutral-600 underline hover:text-neutral-900">{{if $ja}}前の PC のバックアップがあるときは、こちらから始められます{{else}}If you have a backup from your previous PC, you can start from it here{{end}}</a></p>{{end}}{{end}}
+    </div>
+    {{if $d.Done}}
+    <div id="setup-done" class="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm" role="alert">
+      <p class="text-sm text-neutral-700">{{if $ja}}はじめの設定はすでに済んでいます。登録したユーザー名とパスワードでログインしてください。{{else}}Initial setup is already done. Log in with the user name and password you registered.{{end}}</p>
+      <a href="/admin/login" class="btn btn-primary btn-md">{{if $ja}}ログイン画面へ{{else}}Go to login{{end}}</a>
+    </div>
+    {{else}}
+    <form id="setup-form" method="post" action="/admin/setup" class="space-y-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm"
+          onsubmit="this.querySelector('button[type=submit]').disabled = true">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      {{with $d.Errors}}
+      <div id="setup-errors" class="rounded-lg border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-800" role="alert">
+        <p class="font-medium">{{if $ja}}入力を確かめてください{{else}}Please check your input{{end}}</p>
+        <ul class="mt-1 list-disc space-y-0.5 pl-5">{{range .}}<li>{{.}}</li>{{end}}</ul>
+      </div>
+      {{end}}
+
+      <fieldset class="space-y-4">
+        <legend class="text-sm font-bold text-neutral-900">{{if $ja}}1. あなたの名前とパスワード{{else}}1. Your name and password{{end}}</legend>
+        <div>
+          <label for="display_name" class="block text-sm font-medium">{{if $ja}}表示名{{else}}Display name{{end}}</label>
+          <input id="display_name" name="display_name" type="text" required maxlength="50" autocomplete="name" autofocus
+                 value="{{$d.DisplayName}}" placeholder="{{if $ja}}例: 山田 花子{{else}}e.g. Jane Smith{{end}}"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+          <p class="mt-1 text-xs text-neutral-500">{{if $ja}}あなたの名前です。記事の書き手として表示されます。{{else}}Your name. It is shown as the author of your articles.{{end}}</p>
+        </div>
+        <div>
+          <label for="username" class="block text-sm font-medium">{{if $ja}}ユーザー名{{else}}User name{{end}}</label>
+          <input id="username" name="username" type="text" required minlength="3" maxlength="32" pattern="[A-Za-z0-9_\-]{3,32}"
+                 autocomplete="username" autocapitalize="off" spellcheck="false" value="{{$d.Username}}" placeholder="{{if $ja}}例: hanako{{else}}e.g. jane{{end}}"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+          <p class="mt-1 text-xs text-neutral-500">{{if $ja}}ログインに使います。半角の英字・数字と「-」「_」で3〜32文字。{{else}}Used to log in. 3–32 characters: letters, digits, "-" and "_".{{end}}</p>
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-medium">{{if $ja}}パスワード{{else}}Password{{end}}</label>
+          <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+          <p class="mt-1 text-xs text-neutral-500">{{if $ja}}8文字以上。忘れないように控えておいてください。{{else}}8 or more characters. Keep a note so you do not forget it.{{end}}</p>
+        </div>
+        <div>
+          <label for="password_confirm" class="block text-sm font-medium">{{if $ja}}パスワード（確認のためもう一度）{{else}}Password (again to confirm){{end}}</label>
+          <input id="password_confirm" name="password_confirm" type="password" required minlength="8" autocomplete="new-password"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend class="text-sm font-bold text-neutral-900">{{if $ja}}2. サイト名{{else}}2. Site name{{end}}</legend>
+        <label for="site_name" class="sr-only">{{if $ja}}サイト名{{else}}Site name{{end}}</label>
+        <input id="site_name" name="site_name" type="text" required maxlength="100" value="{{$d.SiteName}}" placeholder="{{if $ja}}サイトの名前（あとで変えられます）{{else}}Site name (you can change it later){{end}}"
+               class="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+        <p class="mt-1 text-xs text-neutral-500">{{if $ja}}あとで「サイト基本設定」から変えられます。{{else}}You can change it later in General settings.{{end}}</p>
+      </fieldset>
+
+      <button type="submit" class="btn btn-primary btn-md w-full">{{if $ja}}はじめる{{else}}Get started{{end}}</button>
+    </form>
+
+    {{/* 別の PC からの引っ越し: アカウントを作る前にバックアップを復元する（handlers_setup.go の handleSetupRestore）。
+         ユーザーが1人もいないときだけ出す（古い版の取り込みで作られたユーザーと記事を置き換えない）。 */}}
+    {{if $d.CanRestore}}
+    <section id="setup-restore" class="mt-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="setup-restore-title">
+      <h2 id="setup-restore-title" class="text-sm font-bold text-neutral-900">{{if $ja}}バックアップから始める{{else}}Start from a backup{{end}}</h2>
+      <p class="mt-1 text-sm text-neutral-600">{{if $ja}}前に使っていた PC の sorus のバックアップ（sorus_backup_ で始まる .zip ファイル）があれば、記事・画像・設定をそのまま引き継げます。上の入力はいりません。{{else}}If you have an sorus backup from your previous PC (a .zip file starting with sorus_backup_), you can carry over your articles, images, and settings as they are. You do not need to fill in the form above.{{end}}</p>
+      <form id="setup-restore-form" method="post" action="/admin/setup/restore" enctype="multipart/form-data" class="mt-3" data-max-bytes="{{$d.MaxRestoreBytes}}">
+        <label for="setup-restore-file" class="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 px-4 py-5 text-center hover:bg-neutral-100">
+          <span class="text-sm font-semibold text-neutral-800">{{if $ja}}バックアップファイルを選ぶ{{else}}Choose a backup file{{end}}</span>
+          <span class="text-xs text-neutral-500">{{if $ja}}{{$d.MaxRestoreSize}} まで{{else}}Up to {{$d.MaxRestoreSize}}{{end}}</span>
+          <span id="setup-restore-name" class="mt-1 break-all font-mono text-xs text-neutral-800"></span>
+        </label>
+        <input id="setup-restore-file" name="backup" type="file" accept=".zip,application/zip" class="sr-only">
+        <p id="setup-restore-status" class="mt-2 text-sm text-neutral-600" aria-live="polite"></p>
+        <button type="submit" id="setup-restore-submit" disabled class="btn btn-secondary btn-md mt-3 w-full">{{if $ja}}このバックアップから始める{{else}}Start from this backup{{end}}</button>
+      </form>
+    </section>
+    {{end}}
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "scripts"}}{{$ja := ne .Lang "en"}}{{if .Data.CanRestore}}
+<script>
+(function () {
+  'use strict';
+  var form = document.getElementById('setup-restore-form');
+  if (!form) return;
+  var input = document.getElementById('setup-restore-file');
+  var nameEl = document.getElementById('setup-restore-name');
+  var status = document.getElementById('setup-restore-status');
+  var submit = document.getElementById('setup-restore-submit');
+  var maxBytes = Number(form.getAttribute('data-max-bytes')) || 0;
+  var file = null;
+  input.addEventListener('change', function () {
+    file = input.files && input.files[0];
+    nameEl.textContent = '';
+    status.textContent = '';
+    submit.disabled = true;
+    if (!file) return;
+    if (!/\.zip$/i.test(file.name)) {
+      status.textContent = '{{if $ja}}sorus のバックアップ（.zip ファイル）を選んでください。{{else}}Choose an sorus backup (.zip file).{{end}}';
+      file = null;
+      return;
+    }
+    if (maxBytes && file.size > maxBytes) {
+      status.textContent = '{{if $ja}}ファイルが大きすぎます。{{else}}The file is too large.{{end}}';
+      file = null;
+      return;
+    }
+    nameEl.textContent = file.name;
+    submit.disabled = false;
+  });
+  // 本文はヘッダーの CSRF トークンを確かめてから読ませる（設定画面の復元と同じ）。
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!file) return;
+    var data = new FormData();
+    data.append('backup', file, file.name);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', form.action);
+    xhr.setRequestHeader('X-CSRF-Token', window.cmsCSRFToken ? window.cmsCSRFToken() : '');
+    xhr.setRequestHeader('Accept', 'application/json');
+    submit.disabled = true;
+    input.disabled = true;
+    status.textContent = '{{if $ja}}バックアップを読み込んでいます。画面を閉じずにお待ちください...{{else}}Loading the backup. Please wait without closing this page...{{end}}';
+    xhr.upload.onprogress = function (ev) {
+      if (ev.lengthComputable) status.textContent = '{{if $ja}}バックアップを読み込んでいます... {{else}}Loading the backup... {{end}}' + Math.round(ev.loaded / ev.total * 100) + '%';
+    };
+    xhr.upload.onload = function () { status.textContent = '{{if $ja}}バックアップを確かめて、復元しています...{{else}}Checking and restoring the backup...{{end}}'; };
+    xhr.onload = function () {
+      var res = {};
+      try { res = JSON.parse(xhr.responseText); } catch (err) { res = {}; }
+      if (xhr.status === 200) {
+        status.textContent = res.message || '';
+        var next = typeof res.redirect === 'string' && res.redirect.indexOf('/admin') === 0 ? res.redirect : '/admin/login';
+        setTimeout(function () { window.location.href = next; }, 1200);
+        return;
+      }
+      status.textContent = res.message || '{{if $ja}}復元できませんでした。もう一度試してください。{{else}}Could not restore. Please try again.{{end}}';
+      input.disabled = false;
+      submit.disabled = false;
+    };
+    xhr.onerror = function () {
+      status.textContent = '{{if $ja}}読み込みに失敗しました。もう一度試してください。{{else}}Loading failed. Please try again.{{end}}';
+      input.disabled = false;
+      submit.disabled = false;
+    };
+    xhr.send(data);
+  });
+})();
+</script>
+{{end}}{{end}}

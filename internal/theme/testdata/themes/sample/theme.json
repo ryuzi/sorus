@@ -1,0 +1,6 @@
+{
+  "name": { "ja": "サンプル", "en": "Sample" },
+  "description": { "ja": "テーマを1か所で追加できることを確かめるテーマ", "en": "Proves a theme is added in one place" },
+  "color_scheme": "dark",
+  "order": 20
+}

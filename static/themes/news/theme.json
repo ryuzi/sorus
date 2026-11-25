@@ -1,0 +1,6 @@
+{
+  "name": { "ja": "ニュース", "en": "News" },
+  "description": { "ja": "明朝体の見出しと紙面のようなレイアウト", "en": "Serif headlines and an editorial layout" },
+  "color_scheme": "light dark",
+  "order": 30
+}

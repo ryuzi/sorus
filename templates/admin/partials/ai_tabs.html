@@ -1,0 +1,95 @@
+{{define "ai_tabs"}}{{$ja := ne .Lang "en"}}{{$sw := .AISwitch}}
+{{/* AI の3画面（/admin/settings/ai-integrations・/admin/settings/ai・/admin/settings/mcp）の共通の先頭。左メニューの「AI」1項目から開く。
+     見出し「AI」の下に「AI機能を使う」のスイッチ（管理者だけ。.AISwitch は handlers_ai_integrations.go の layoutAISwitch が入れる）、
+     その下に「使う AI」「外部の AI アプリとつなぐ」のタブを置く。URL は以前のまま3本で、タブは通常のリンク。 */}}
+<div class="mb-5">
+  <h1 id="ai-section-title" class="text-xl font-bold text-neutral-900">{{.T "settings_nav_ai_section"}}</h1>
+</div>
+{{with $sw}}
+<form id="ai-integrations-form" method="post" action="/admin/settings/ai-integrations" class="rounded-xl border border-neutral-200 bg-white px-6 py-4 shadow-sm"
+      data-ai-was-on="{{.AIEnabledSetting}}">
+  <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <fieldset class="min-w-0">
+      <legend class="sr-only">{{$.T "settings_ai_enabled"}}</legend>
+      {{/* 画面には「AI機能を使う」と、効く範囲（この PC と公開サーバー）の1行だけを出し、止まるものと消えないものは ? にまとめる。 */}}
+      <div class="flex items-center">
+      {{if $.AIForcedOffByEnv}}
+      <label for="ai-int-enabled" class="flex cursor-not-allowed items-center gap-3">
+        <input id="ai-int-enabled" type="checkbox" disabled class="h-5 w-5 rounded border-neutral-300 opacity-60">
+        <span class="text-base font-semibold text-neutral-500">{{$.T "settings_ai_enabled"}}</span>
+      </label>
+      {{else}}
+      <input type="hidden" name="ai_enabled" value="0">
+      <label for="ai-int-enabled" class="flex cursor-pointer items-center gap-3">
+        <input id="ai-int-enabled" type="checkbox" name="ai_enabled" value="1"{{if .AIEnabledSetting}} checked{{end}} aria-describedby="ai-int-desc"
+               class="h-5 w-5 rounded border-neutral-300 text-zinc-800 focus:ring-zinc-500">
+        <span class="text-base font-semibold text-neutral-900">{{$.T "settings_ai_enabled"}}</span>
+      </label>
+      {{end}}
+      <span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$.T "help_show"}}">?</button><span class="help-tip-pop" id="ai-int-desc" hidden><span>{{$.T "ai_int_toggle_desc"}}</span><span>{{$.T "settings_ai_enabled_keep"}}</span></span></span>
+      </div>
+      <p class="mt-1 pl-8 text-sm text-neutral-600">{{$.T "ai_int_toggle_scope"}}</p>
+    </fieldset>
+    {{if not $.AIForcedOffByEnv}}
+    <button type="submit" id="ai-int-save" class="btn btn-primary btn-md" data-confirm="{{$.T "ai_int_off_confirm"}}" data-confirm-title="{{$.T "ai_int_off_title"}}" data-confirm-ok="{{$.T "ai_int_save"}}">{{$.T "ai_int_save"}}</button>
+    {{end}}
+  </div>
+  {{if $.AIForcedOffByEnv}}<p id="ai-int-forced" class="notice notice-warn mt-3">{{$.T "settings_ai_forced_off"}}</p>{{end}}
+  {{if not $.AIForcedOffByEnv}}
+  {{/* OFF にするときだけ意味を持つ（スクリプトが ON の間は隠す）。AI 機能を OFF にすると外部の AI アプリとつなぐ画面が無くなり、
+       後から解除する入口が無くなるため、ここで選ばせる。 */}}
+  <div id="ai-int-revoke" class="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+    <div class="flex items-start">
+      <label for="ai-int-revoke-input" class="flex items-start gap-2.5 text-sm font-medium text-neutral-900">
+        <input id="ai-int-revoke-input" type="checkbox" name="revoke_integrations" value="1" checked class="mt-0.5 h-4 w-4 rounded border-neutral-300" aria-describedby="ai-int-revoke-desc">
+        <span>{{$.T "ai_int_revoke_label"}}</span>
+      </label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$.T "help_show"}}">?</button><span class="help-tip-pop" id="ai-int-revoke-desc" hidden>{{$.T "ai_int_revoke_desc"}}</span></span>
+    </div>
+    <p id="ai-int-local-counts" class="mt-1 pl-6 text-xs text-neutral-500">{{$.T "ai_int_local_counts" .LocalApps .LocalTokens}}</p>
+  </div>
+  {{end}}
+</form>
+{{if $.AtPath "/admin/settings/ai-integrations"}}
+<section id="ai-int-remote" class="mt-4 rounded-xl border border-neutral-200 bg-white px-6 py-4 shadow-sm" aria-labelledby="ai-int-remote-title">
+  <h2 id="ai-int-remote-title" class="text-sm font-semibold text-neutral-900">{{$.T "ai_int_remote_title"}}{{if .RemoteConnected}} <span class="ml-1 break-all text-xs font-normal text-neutral-500">{{.RemoteHost}}</span>{{end}}</h2>
+  {{if not .RemoteConnected}}
+  <p id="ai-int-remote-state" data-remote-ai="none" class="mt-1 text-sm text-neutral-600">{{$.T "ai_int_remote_none"}}</p>
+  {{else if .RemoteMatches}}
+  <p id="ai-int-remote-state" data-remote-ai="synced" class="notice notice-success mt-2">{{if .RemoteState.Enabled}}{{$.T "ai_int_remote_synced_on"}}{{else if .RemoteState.ForcedOff}}{{$.T "ai_int_remote_forced"}}{{else}}{{$.T "ai_int_remote_synced_off"}}{{end}}</p>
+  {{else if and (not .RemoteState) (not .RemoteDirty) (not .RevokePending)}}
+  <p id="ai-int-remote-state" data-remote-ai="unknown" class="notice notice-info mt-2">{{$.T "ai_int_remote_unknown"}}</p>
+  {{else if and .RemoteState .RemoteState.Old (not .RemoteDirty)}}
+  <p id="ai-int-remote-state" data-remote-ai="old" class="notice notice-warn mt-2">{{$.T "ai_int_remote_old"}}</p>
+  {{else}}
+  <p id="ai-int-remote-state" data-remote-ai="pending" class="notice notice-warn mt-2">{{if .RemoteCanPush}}{{$.T "ai_int_remote_pending"}}{{else}}{{$.T "ai_int_remote_no_push"}}{{end}}</p>
+  {{end}}
+</section>
+{{end}}
+<script>
+// OFF にするときだけ確かめ（data-confirm）、連携の解除の選択は OFF にするときだけ出す。
+(function () {
+  var form = document.getElementById('ai-integrations-form');
+  var toggle = document.getElementById('ai-int-enabled');
+  var save = document.getElementById('ai-int-save');
+  var revoke = document.getElementById('ai-int-revoke');
+  if (!form || !toggle || !save) return;
+  var confirmText = save.getAttribute('data-confirm');
+  function sync() {
+    var turningOff = !toggle.checked;
+    if (revoke) revoke.hidden = toggle.checked;
+    if (turningOff && confirmText) save.setAttribute('data-confirm', confirmText);
+    else save.removeAttribute('data-confirm');
+  }
+  toggle.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{{end}}
+{{if .AIEnabled}}
+<nav id="ai-tabs" class="publish-tabs {{if $sw}}mt-6{{end}} mb-6" aria-label="{{.T "ai_tabs_label"}}">
+  <a href="/admin/settings/ai" id="ai-tab-ai" class="publish-tab{{if .AtPath "/admin/settings/ai"}} is-current{{end}}"{{if .AtPath "/admin/settings/ai"}} aria-current="page"{{end}}>{{if .User.HasRole "admin"}}{{.T "ai_tab_use"}}{{else}}{{.T "ai_tab_style"}}{{end}}</a>
+  <a href="/admin/settings/mcp" id="ai-tab-mcp" class="publish-tab{{if .AtPath "/admin/settings/mcp"}} is-current{{end}}"{{if .AtPath "/admin/settings/mcp"}} aria-current="page"{{end}}>{{.T "ai_tab_connect"}}</a>
+</nav>
+{{end}}
+{{end}}

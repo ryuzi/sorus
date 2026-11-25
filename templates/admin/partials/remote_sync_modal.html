@@ -1,0 +1,111 @@
+{{/* 公開サーバーの部品。static/js/remote_sync.js が data-remote-* の要素を探して動かす。 */}}
+
+{{/* remote_sync_submit_button は外部ライター向けの下書き提出ボタン。引数は記事 ID と表示言語（remoteSubmitButton。新規作成中は ID が空）。 */}}
+{{define "remote_sync_submit_button"}}{{if .ArticleID}}{{$ja := ne .Lang "en"}}
+<button type="button" id="remote-submit-button" data-remote-submit="{{.ArticleID}}"
+        data-confirm-message="{{if $ja}}保存済みの記事を公開サーバーへ下書きとして提出します。未保存の変更は先に保存してください。提出しますか？{{else}}Submit the saved article to the publish server as a draft? Save any unsaved changes first.{{end}}"
+        class="btn btn-secondary btn-md">
+  {{if $ja}}原稿を下書きとして提出{{else}}Submit manuscript as draft{{end}}
+</button>
+{{/* 提出したときに、公開サーバーの記事が PC で取得した後に変わっていた（409・code: conflict）ときの差分の画面。
+     中身（差分の行）は remote_sync.js が応答から入れる。「サーバー版を取り込む」は /admin/remote/pending/:id/pull-latest、
+     「この PC の内容で上書き提出」は応答の server_updated_at を base_updated_at に付けて提出し直す。 */}}
+<dialog id="remote-conflict-modal" data-remote-conflict="{{.ArticleID}}" class="ai-modal w-[min(56rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="remote-conflict-title"
+        data-label-local="{{if $ja}}この PC{{else}}This PC{{end}}" data-label-server="{{if $ja}}公開サーバー{{else}}Publish server{{end}}"
+        data-label-same="{{if $ja}}（同じ行 %s 行）{{else}}(%s unchanged lines){{end}}"
+        data-pull-confirm="{{if $ja}}この PC の内容は公開サーバーの版に置き換わります（今の内容は履歴に残ります）。取り込みますか？{{else}}Replace this PC's content with the publish server's version? The current content stays in the history.{{end}}">
+  <div class="border-b border-neutral-200 px-5 py-3">
+    <h2 id="remote-conflict-title" class="font-semibold text-neutral-900">{{if $ja}}公開サーバー側が新しく更新されています{{else}}The publish server has a newer version{{end}}</h2>
+    <p class="mt-0.5 text-xs text-neutral-500" data-remote-conflict-meta></p>
+  </div>
+  <div class="max-h-[60vh] overflow-y-auto px-5 py-3">
+    <table class="w-full table-fixed border-collapse text-xs">
+      <thead><tr><th class="px-2 py-1 text-left font-semibold text-neutral-500" data-remote-conflict-left></th><th class="px-2 py-1 text-left font-semibold text-neutral-500" data-remote-conflict-right></th></tr></thead>
+      <tbody class="divide-y divide-neutral-100 font-mono" data-remote-conflict-rows></tbody>
+    </table>
+  </div>
+  <div class="flex flex-wrap justify-end gap-2 border-t border-neutral-200 px-5 py-3">
+    <button type="button" class="btn btn-secondary btn-md" data-remote-conflict-close>{{if $ja}}やめる{{else}}Cancel{{end}}</button>
+    <button type="button" class="btn btn-secondary btn-md" data-remote-conflict-pull>{{if $ja}}サーバー版を取り込む{{else}}Use the server version{{end}}</button>
+    <button type="button" class="btn btn-primary btn-md" data-remote-conflict-overwrite>{{if $ja}}この PC の内容で上書き提出{{else}}Overwrite with this PC's version{{end}}</button>
+  </div>
+</dialog>
+{{end}}{{end}}
+
+{{/* remote_pending_panel は編集者向けの「校閲待ち・公開待ち（公開サーバー）」。ダッシュボードに置く唯一の公開サーバーの
+     一覧で、ここで中身を確かめて承認・公開・予約でき、差分を見てこの PC に受け取る「届いた原稿」の画面への入口も持つ。
+     公開サーバーで予約中の記事も、公開日時と「予約を取り消す」ボタンつきで並べる。引数はページ（page）。 */}}
+{{define "remote_pending_panel"}}{{$ja := ne .Lang "en"}}
+<section id="remote-pending" data-remote-pending class="rounded-xl border border-neutral-200 bg-white p-4" aria-labelledby="remote-pending-title"
+         data-schedule-confirm="{{.T "remote_schedule_confirm"}}" data-unschedule-label="{{.T "remote_unschedule"}}">
+  <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
+    <div class="min-w-0">
+      <h2 id="remote-pending-title" class="text-sm font-semibold text-neutral-800">
+        {{if $ja}}校閲待ち・公開待ち（公開サーバー・<span data-remote-pending-count>-</span>件）{{else}}Awaiting review and publishing (publish server, <span data-remote-pending-count>-</span>){{end}}
+      </h2>
+      <p class="mt-0.5 text-xs text-neutral-500">{{if $ja}}公開サーバーに届いた原稿です。中身を見て承認・公開できます。差分を確かめてこの PC で推敲するときは「届いた原稿」を開きます。{{else}}Manuscripts sent to the publish server. Preview them to approve and publish. To check differences and polish them on this PC, open Received Manuscripts.{{end}}</p>
+    </div>
+    <div class="flex shrink-0 flex-wrap gap-2">
+      <a href="/admin/manuscripts" id="manuscript-inbox-link" class="btn btn-secondary btn-sm">{{if $ja}}届いた原稿を開く{{else}}Open received manuscripts{{end}}</a>
+      <button type="button" data-remote-pending-refresh
+            class="btn btn-secondary btn-sm">{{if $ja}}再読み込み{{else}}Reload{{end}}</button>
+    </div>
+  </div>
+  <p data-remote-pending-status class="mb-2 text-xs text-neutral-500" role="status">{{if $ja}}読み込み中...{{else}}Loading...{{end}}</p>
+  <ul data-remote-pending-list class="flex flex-col divide-y divide-neutral-100"></ul>
+  <p data-remote-schedule-note class="mt-2 text-xs text-neutral-500" hidden></p>
+  <div data-remote-scheduled class="mt-4 border-t border-neutral-100 pt-3" hidden>
+    <h3 class="text-sm font-semibold text-neutral-800">{{.T "remote_scheduled_heading"}}{{if $ja}}（<span data-remote-scheduled-count>0</span>）{{else}} (<span data-remote-scheduled-count>0</span>){{end}}</h3>
+    <ul data-remote-scheduled-list class="mt-1 flex flex-col divide-y divide-neutral-100"></ul>
+  </div>
+  {{/* 校閲待ちの各記事に複製する「日時を決めて予約」。記事 ID・日時の初期値は remote_sync.js が入れる。 */}}
+  <template data-remote-schedule-template>{{template "remote_schedule_picker" (.SchedulePicker "" "" "" "" false)}}</template>
+</section>
+{{template "remote_sync_modal" .}}
+{{end}}
+
+{{/* remote_schedule_picker は公開サーバーの記事を「日時を決めて予約」する入力欄（日本時間）。引数は remoteSchedulePicker。
+     送信は remote_sync.js が受け持ち、/admin/remote/pending/:id/schedule に CSRF トークン付きで送る。 */}}
+{{define "remote_schedule_picker"}}
+<details class="relative" data-remote-schedule-box>
+  <summary class="btn btn-secondary btn-sm">{{.Page.T "remote_schedule"}}</summary>
+  <form class="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-neutral-200 bg-white p-3 shadow-sm" data-remote-schedule-form="{{.ID}}"{{if .Reload}} data-reload{{end}}
+        data-confirm-message="{{if .Title}}{{.Page.T "remote_schedule_confirm" .Title}}{{end}}">
+    <label class="flex flex-col gap-1 text-xs font-medium text-neutral-600">{{.Page.T "remote_schedule_at"}}
+      <input type="datetime-local" name="publish_at" value="{{.Default}}" min="{{.Min}}" required
+             class="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-900 focus:border-zinc-500 focus:outline-none">
+    </label>
+    <button type="submit" class="btn btn-primary btn-sm">{{.Page.T "remote_schedule_submit"}}</button>
+  </form>
+</details>
+{{end}}
+
+{{/* remote_sync_modal は校閲待ち記事のプレビューと、取り込み・承認公開・予約の操作を行うダイアログ。引数はページ（page）。 */}}
+{{define "remote_sync_modal"}}{{$ja := ne .Lang "en"}}
+<dialog id="remote-sync-modal" class="ai-modal w-[min(56rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="remote-sync-modal-title">
+  <div class="flex items-start justify-between gap-3 border-b border-neutral-200 px-5 py-3">
+    <div>
+      <h2 id="remote-sync-modal-title" class="font-semibold text-neutral-800"></h2>
+      <p id="remote-sync-modal-meta" class="mt-0.5 text-xs text-neutral-500"></p>
+    </div>
+    <button type="button" data-remote-modal-close class="btn btn-ghost btn-sm" aria-label="{{.T "close"}}">{{.T "close"}}</button>
+  </div>
+  <div class="max-h-[65vh] overflow-y-auto px-5 py-4">
+    <p id="remote-sync-modal-excerpt" class="mb-4 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-600" hidden></p>
+    <div id="remote-sync-modal-body" class="prose-preview text-sm"></div>
+  </div>
+  <div class="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-5 py-3">
+    <p id="remote-sync-modal-note" class="text-xs text-neutral-500">{{if $ja}}ローカルに取り込むと、エディタで推敲してから公開サーバーへ提出し直せます。{{else}}Importing it locally lets you polish it in the editor and resubmit it to the publish server.{{end}}</p>
+    <div class="flex flex-wrap items-start gap-2">
+      <button type="button" data-remote-modal-close class="btn btn-secondary btn-md">{{.T "close"}}</button>
+      <button type="button" id="remote-sync-modal-import" class="btn btn-secondary btn-md">{{if $ja}}ローカルに取り込む{{else}}Import locally{{end}}</button>
+      <button type="button" id="remote-sync-modal-publish" class="btn btn-primary btn-md">{{if $ja}}承認して本番公開{{else}}Approve and publish live{{end}}</button>
+      {{/* 公開サーバーが予約に対応しているときだけ remote_sync.js が出す。 */}}
+      <div id="remote-sync-modal-schedule" class="btn-group-md" hidden>{{template "remote_schedule_picker" (.SchedulePicker "" "" "" "" false)}}</div>
+    </div>
+  </div>
+</dialog>
+{{end}}
+
+{{/* remote_sync_assets は公開サーバーのスクリプト。ページの "scripts" ブロックに置く。 */}}
+{{define "remote_sync_assets"}}<script src="{{asset "js/remote_sync.js"}}"></script>{{end}}

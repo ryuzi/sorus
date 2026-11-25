@@ -1,0 +1,138 @@
+{{define "content"}}{{$d := .Data}}{{$s := $d.Summary}}
+{{/* WordPress の取り込みの確認（ドライラン）と、取り込み後の結果（handlers_import.go）。 */}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  <p class="mb-4 text-sm text-neutral-500">{{.T "settings"}} / {{.T "import_title"}}</p>
+  {{if $d.Preview}}
+  <h1 id="import-preview-title" class="text-xl font-bold text-neutral-900">{{.T "import_preview_title"}}</h1>
+  <p class="mt-1 text-sm text-neutral-600">{{.T "import_preview_desc"}}</p>
+  {{else}}
+  <h1 id="import-done-title" class="text-xl font-bold text-neutral-900">{{.T "import_done_title"}}</h1>
+  <p class="mt-1 text-sm text-neutral-600">{{.T "import_done_desc"}}</p>
+  {{end}}
+
+  <dl class="mt-4 grid gap-x-4 gap-y-1 text-sm text-neutral-700 sm:grid-cols-[auto_1fr]">
+    <dt class="text-neutral-500">{{.T "import_source"}}</dt><dd id="import-filename" class="break-all font-mono">{{$d.Filename}}</dd>
+    {{with $d.SiteURL}}<dt class="text-neutral-500">{{$.T "import_site"}}</dt><dd class="break-all">{{.}}</dd>{{end}}
+    <dt class="text-neutral-500">{{.T "import_options"}}</dt>
+    <dd>
+      {{if $d.Form.DownloadImages}}{{.T "import_summary_images_on"}}{{else}}{{.T "import_summary_images_off"}}{{end}} ·
+      {{if $d.Form.SkipPages}}{{.T "import_summary_pages_off"}}{{else}}{{.T "import_summary_pages_on"}}{{end}}
+      · {{if eq $d.Form.AccountMode "authors"}}{{.T "import_summary_account_authors"}}{{else}}{{.T "import_summary_account_current"}}{{end}}
+    </dd>
+  </dl>
+
+  {{if $d.IndexFailed}}<p id="import-index-failed" role="alert" class="notice notice-warn mt-4 p-3">{{.T "import_index_failed"}}</p>{{end}}
+
+  <ul id="import-stats" class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <li class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <p class="text-xs text-neutral-500">{{.T "import_stat_articles"}}</p>
+      <p id="import-stat-articles" class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{$s.Articles}}</p>
+      <p class="mt-1 text-xs text-neutral-600">{{.T "import_stat_articles_detail" $s.Published $s.Drafts}}</p>
+    </li>
+    <li class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <p class="text-xs text-neutral-500">{{.T "import_stat_pages"}}</p>
+      <p id="import-stat-pages" class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{$s.Pages}}</p>
+      {{if $s.PageSlugsRenamed}}<p class="mt-1 text-xs text-neutral-600">{{.T "import_pages_renamed" $s.PageSlugsRenamed}}</p>{{end}}
+    </li>
+    <li class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <p class="text-xs text-neutral-500">{{.T "import_stat_skipped"}}</p>
+      <p id="import-stat-skipped" class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{$s.Skipped}}</p>
+      <p class="mt-1 text-xs text-neutral-600">{{.T "import_stat_skipped_hint"}}</p>
+    </li>
+    <li class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <p class="text-xs text-neutral-500">{{.T "import_stat_categories"}}</p>
+      <p id="import-stat-categories" class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{$s.CategoriesCreated}}</p>
+    </li>
+    <li class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      {{if $s.AccountName}}
+      <p class="text-xs text-neutral-500">{{.T "import_stat_author"}}</p>
+      <p id="import-stat-author" class="mt-1 text-base font-semibold text-neutral-900">{{$s.AccountName}}</p>
+      <p class="mt-1 text-xs text-neutral-600">{{.T "import_stat_author_hint"}}</p>
+      {{else}}
+      <p class="text-xs text-neutral-500">{{.T "import_stat_users"}}</p>
+      <p id="import-stat-users" class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{$s.UsersCreated}}</p>
+      {{if $s.UsersCreated}}<p class="mt-1 text-xs text-neutral-600">{{.T "import_stat_users_hint"}}</p>{{end}}
+      {{end}}
+    </li>
+    <li class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <p class="text-xs text-neutral-500">{{.T "import_stat_redirects"}}</p>
+      <p id="import-stat-redirects" class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{$s.Redirects}}</p>
+      <p class="mt-1 text-xs text-neutral-600">{{.T "import_stat_redirects_hint"}}</p>
+    </li>
+    <li class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <p class="text-xs text-neutral-500">{{.T "import_stat_images"}}</p>
+      {{if not $d.Form.DownloadImages}}
+      <p class="mt-1 text-sm text-neutral-700">{{.T "import_summary_images_off"}}</p>
+      {{else if $d.Preview}}
+      <p class="mt-1 text-sm text-neutral-700">{{.T "import_stat_images_preview"}}</p>
+      {{else}}
+      <p id="import-stat-images" class="mt-1 text-base font-semibold tabular-nums text-neutral-900">{{.T "import_stat_images_value" $s.ImagesSucceeded $s.ImagesFailed}}</p>
+      {{if $s.ImagesFailed}}<p class="mt-1 text-xs text-neutral-600">{{.T "import_stat_images_failed_hint"}}</p>{{end}}
+      {{end}}
+    </li>
+    {{if not $d.Preview}}
+    <li class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <p class="text-xs text-neutral-500">{{.T "import_stat_indexed"}}</p>
+      <p id="import-stat-indexed" class="mt-1 text-xl font-bold tabular-nums text-neutral-900">{{$s.Indexed}}</p>
+      <p class="mt-1 text-xs text-neutral-600">{{.T "import_stat_duration" $d.Duration}}</p>
+    </li>
+    {{end}}
+  </ul>
+
+  <section class="mt-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="import-warnings-title">
+    <h2 id="import-warnings-title" class="text-base font-semibold text-neutral-900">{{.T "import_warnings" (len $s.Warnings)}}</h2>
+    {{if $d.Warnings}}
+    <ul id="import-warnings" class="mt-2 max-h-96 list-disc space-y-1 overflow-y-auto pl-5 text-sm text-neutral-700">
+      {{range $d.Warnings}}<li class="break-words">{{.}}</li>
+      {{end}}
+    </ul>
+    {{if $d.MoreWarnings}}<p class="mt-2 text-xs text-neutral-500">{{.T "import_warnings_more" $d.MoreWarnings}}</p>{{end}}
+    {{else}}
+    <p class="mt-2 text-sm text-neutral-600">{{.T "import_no_warnings"}}</p>
+    {{end}}
+  </section>
+
+  {{if $d.Preview}}
+  <form id="import-run-form" method="post" action="/admin/import/run" class="mt-6 flex flex-wrap items-center gap-3">
+    <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+    <input type="hidden" name="token" value="{{$d.Token}}">
+    {{if $s.Articles}}
+    <button type="submit" id="import-run" class="btn btn-primary btn-md">{{.T "import_run_button"}}</button>
+    {{else}}
+    <p id="import-nothing" class="text-sm text-neutral-700">{{.T "import_nothing"}}</p>
+    {{end}}
+    <a href="/admin/import" class="btn btn-secondary btn-md">{{.T "import_back"}}</a>
+  </form>
+  {{if $s.Articles}}
+  <p class="mt-2 text-xs text-neutral-500">{{.T "import_expires_hint"}}</p>
+  <p id="import-status" class="mt-3 hidden text-sm text-neutral-700" aria-live="polite">{{.T "import_working"}}</p>
+  {{end}}
+  {{else}}
+  <div class="mt-6 flex flex-wrap items-center gap-3">
+    <a href="/admin/articles" id="import-to-articles" class="btn btn-primary btn-md">{{.T "import_to_articles"}}</a>
+    <a href="/admin/import" class="btn btn-secondary btn-md">{{.T "import_again"}}</a>
+  </div>
+  {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+(function () {
+  'use strict';
+  var form = document.getElementById('import-run-form');
+  var button = document.getElementById('import-run');
+  if (!form || !button) return;
+  form.addEventListener('submit', function () {
+    document.getElementById('import-status').classList.remove('hidden');
+    // 送信を止めないよう、ボタンは送信が始まってから無効にする（二重送信を防ぐ）。
+    setTimeout(function () { button.disabled = true; }, 0);
+  });
+})();
+</script>
+{{end}}

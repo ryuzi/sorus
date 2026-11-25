@@ -1,0 +1,352 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  <div class="mb-5">
+    <div class="flex flex-wrap items-baseline justify-between gap-3">
+      <h1 class="text-xl font-bold text-neutral-900">{{$.T "settings_nav_appearance"}}</h1>
+      <a href="/" target="_blank" rel="noopener" class="text-sm font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900">{{$.T "structure_open_site"}}<span class="sr-only">{{$.T "theme_new_tab"}}</span></a>
+    </div>
+  </div>
+  {{template "appearance_tabs" $}}
+  <p class="-mt-2 mb-5 text-sm text-neutral-600">{{$.T "structure_description"}}</p>
+
+  {{with $d.Warnings}}
+  <div id="structure-warnings" class="notice notice-warn mt-4" role="alert">
+    <p class="font-semibold">{{$.T "structure_warnings_title"}}</p>
+    <ul class="mt-1 list-disc space-y-1 pl-5">{{range .}}<li>{{.}}</li>{{end}}</ul>
+  </div>
+  {{end}}
+  {{if $d.Unsaved}}<p id="structure-unsaved" class="mt-4 rounded-lg border border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-800" role="status">{{$.T "structure_unsaved"}}</p>{{end}}
+
+  <form method="post" action="/admin/settings/structure" class="mt-6 space-y-6" id="structure-form">
+    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+    {{/* Enter キーで送信したときに行の「上へ」などではなく保存になるよう、最初の送信ボタンを保存にする。 */}}
+    <button type="submit" name="op" value="save" class="sr-only" tabindex="-1" aria-hidden="true">{{$.T "structure_save"}}</button>
+
+    <fieldset class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+      <legend class="flex items-center px-1 text-base font-semibold text-neutral-900">{{$.T "structure_menu_title"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{$.T "structure_menu_desc" $d.MaxMenuItems}}</span><span id="structure-label-hint">{{$.T "structure_label_hint"}}</span><span id="structure-url-hint">{{$.T "structure_url_hint"}}</span></span></span></legend>
+      {{if not $d.Rows}}<p id="structure-menu-empty" class="mt-4 text-sm text-neutral-500">{{$.T "structure_menu_empty"}}</p>{{end}}
+      {{/* 欄の説明は見出しの「?」に1回だけ入れ、各行の欄から aria-describedby（structure-label-hint・structure-url-hint）で参照する。 */}}
+      {{template "structure_menu_editor" $d.Menu}}
+      <div class="mt-4">
+        {{if $d.CanAddRow}}
+        <button type="submit" name="op" value="add" id="structure-add-row" class="btn btn-secondary btn-sm">{{if $ja}}＋{{else}}+{{end}} {{$.T "structure_add"}}</button>
+        {{else}}
+        <p class="text-sm text-neutral-500">{{$.T "structure_menu_full" $d.MaxMenuItems}}</p>
+        {{end}}
+      </div>
+      <p class="mt-3 text-xs text-neutral-500">{{$.T "structure_children_hint" $d.MaxMenuChildren}}</p>
+    </fieldset>
+
+    {{/* フッターのサイトマップ: 最上位の行が列の見出し、その子項目が列のリンク。メニューと同じ部品で編集する。 */}}
+    <fieldset id="structure-footer" class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+      <legend class="flex items-center px-1 text-base font-semibold text-neutral-900">{{$.T "structure_footer_title"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "structure_footer_desc" $d.MaxFooterColumns $d.MaxMenuChildren}}</span></span></legend>
+      {{if not $d.Footer.Rows}}<p id="structure-footer-empty" class="mt-4 text-sm text-neutral-500">{{$.T "structure_footer_empty"}}</p>{{end}}
+      {{template "structure_menu_editor" $d.Footer}}
+      <div class="mt-4">
+        {{if $d.Footer.CanAdd}}
+        <button type="submit" name="op" value="footer-add" id="structure-footer-add-row" class="btn btn-secondary btn-sm">{{if $ja}}＋{{else}}+{{end}} {{$.T "structure_footer_add"}}</button>
+        {{else}}
+        <p class="text-sm text-neutral-500">{{$.T "structure_footer_full" $d.MaxFooterColumns}}</p>
+        {{end}}
+      </div>
+    </fieldset>
+
+    <fieldset class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+      <legend class="flex items-center px-1 text-base font-semibold text-neutral-900">{{$.T "structure_front_title"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "structure_front_desc"}}</span></span></legend>
+      <label for="front-page" class="mt-4 block text-sm font-medium text-neutral-800">{{$.T "structure_front_page"}}</label>
+      <select id="front-page" name="front_page" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm sm:w-2/3">
+        <option value="">{{$.T "structure_front_default"}}</option>
+        {{range $d.Pages}}<option value="{{.Slug}}"{{if eq .Slug $d.FrontPage.Value}} selected{{end}}>{{.Title}}{{if $ja}}（/{{.Slug}}）{{else}} (/{{.Slug}}){{end}}</option>{{end}}
+        {{with $d.FrontPage.Missing}}<option value="{{.}}" selected>{{$.T "structure_missing_option" .}}</option>{{end}}
+      </select>
+
+      <h2 class="mt-6 flex items-center text-sm font-semibold text-neutral-800">{{$.T "structure_cards_title" $d.MaxFrontCards}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "structure_cards_desc"}}</span></span></h2>
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        {{range $card := $d.FrontCards}}
+        <div>
+          <label for="front-card-{{$card.Number}}" class="text-xs font-medium text-neutral-600">{{$.T "structure_card_n" $card.Number}}</label>
+          <select id="front-card-{{$card.Number}}" name="front_card" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+            <option value="">{{$.T "structure_none"}}</option>
+            {{range $d.Pages}}<option value="{{.Slug}}"{{if eq .Slug $card.Value}} selected{{end}}>{{.Title}}{{if $ja}}（/{{.Slug}}）{{else}} (/{{.Slug}}){{end}}</option>{{end}}
+            {{with $card.Missing}}<option value="{{.}}" selected>{{$.T "structure_missing_option" .}}</option>{{end}}
+          </select>
+        </div>
+        {{end}}
+      </div>
+    </fieldset>
+
+    <fieldset class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+      <legend class="flex items-center px-1 text-base font-semibold text-neutral-900">{{$.T "structure_gallery_title"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "structure_gallery_desc"}}</span></span></legend>
+      <label for="top-gallery-tag" class="mt-4 block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_tag"}}</label>
+      <input id="top-gallery-tag" name="top_gallery_tag" type="text" maxlength="100" list="top-gallery-tags" value="{{$d.TopGalleryTag}}" aria-describedby="top-gallery-status" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm sm:w-2/3">
+      <datalist id="top-gallery-tags">{{range $d.GalleryTags}}<option value="{{.}}">{{end}}</datalist>
+      {{/* メディアで使っているタグを、押すだけで選べるボタンで並べる（datalist は候補があることに気付きにくいため）。 */}}
+      {{if $d.GalleryTags}}
+      <p id="top-gallery-suggest-label" class="mt-3 text-xs text-neutral-600">{{$.T "structure_gallery_suggest"}}</p>
+      <div id="top-gallery-chips" class="mt-1.5 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto" role="group" aria-labelledby="top-gallery-suggest-label">
+        {{range $d.GalleryTags}}<button type="button" class="tag-chip" data-gallery-tag-chip="{{.}}" aria-pressed="{{if eq . $d.TopGalleryTag}}true{{else}}false{{end}}">{{.}}</button>{{end}}
+      </div>
+      {{else}}
+      <p id="top-gallery-no-tags" class="mt-3 text-sm text-neutral-600">{{$.T "structure_gallery_no_tags"}}</p>
+      {{end}}
+      {{/* 選んだタグの写真の枚数と、トップページに出る写真（新しい順に表示枚数まで）。入力に合わせて下のスクリプトが
+           GET /admin/api/media?tag= で書き換える。 */}}
+      <div id="top-gallery-preview" class="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3"
+           data-text-count="{{$.T "structure_gallery_count"}}" data-text-empty="{{$.T "structure_gallery_empty"}}"
+           data-text-off="{{$.T "structure_gallery_off"}}" data-text-loading="{{$.T "structure_gallery_loading"}}"
+           data-text-error="{{$.T "structure_gallery_load_error"}}">
+        <p id="top-gallery-status" class="text-sm text-neutral-800" aria-live="polite" data-count="{{$d.TopGalleryCount}}">{{$d.TopGalleryStatus}}</p>
+        <p id="top-gallery-thumbs-label" class="mt-2 text-xs text-neutral-500" hidden>{{$.T "structure_gallery_preview"}}</p>
+        <ul id="top-gallery-thumbs" class="mt-1.5 grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:grid-cols-8" aria-labelledby="top-gallery-thumbs-label" hidden></ul>
+        <a id="top-gallery-media-link" href="/admin/media{{with $d.TopGalleryTag}}?tag={{.}}{{end}}" class="mt-2 inline-block text-sm font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900">{{$.T "structure_gallery_open_media"}}</a>
+      </div>
+      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="top-gallery-limit" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_limit"}}</label>
+          <select id="top-gallery-limit" name="top_gallery_limit" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+            {{range $d.TopGalleryLimitOptions}}<option value="{{.}}"{{if eq . $d.TopGalleryLimit}} selected{{end}}>{{.}}</option>{{end}}
+          </select>
+        </div>
+        <div>
+          <label for="top-gallery-heading" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_heading"}}</label>
+          <input id="top-gallery-heading" name="top_gallery_title" type="text" maxlength="100" value="{{$d.TopGalleryTitle}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+        </div>
+      </div>
+      {{/* 並べ方（justified が既定・おすすめ）。どれも写真を切り抜かず、元の縦横比のまま並べる。 */}}
+      <fieldset id="top-gallery-layout" class="mt-5">
+        <legend class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_layout"}}</legend>
+        <div class="mt-1.5 grid gap-2 sm:grid-cols-3">
+          {{range $d.TopGalleryLayouts}}
+          <label class="flex cursor-pointer items-start gap-2 rounded-lg border border-neutral-200 p-3 hover:bg-neutral-50 has-[:checked]:border-zinc-800 has-[:checked]:bg-zinc-50">
+            <input type="radio" name="top_gallery_layout" value="{{.}}"{{if eq . $d.TopGalleryLayout}} checked{{end}} class="mt-0.5 text-zinc-800 focus:ring-zinc-600">
+            <span class="min-w-0">
+              <span class="block text-sm font-medium text-neutral-900">{{$.T (printf "structure_gallery_layout_%s" .)}}</span>
+              <span class="mt-0.5 block text-xs text-neutral-600">{{$.T (printf "structure_gallery_layout_%s_desc" .)}}</span>
+            </span>
+          </label>
+          {{end}}
+        </div>
+      </fieldset>
+      {{/* ギャラリーの下に出す「すべて見る」リンク（任意）。行き先が空ならリンクを出さない。 */}}
+      <div class="mt-5 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="top-gallery-link-url" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_link_url"}}</label>
+          <input id="top-gallery-link-url" name="top_gallery_link_url" type="text" inputmode="url" maxlength="2000" value="{{$d.TopGalleryLinkURL}}" placeholder="/articles" aria-describedby="top-gallery-link-help" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+        </div>
+        <div>
+          <label for="top-gallery-link-label" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_link_label"}}</label>
+          <input id="top-gallery-link-label" name="top_gallery_link_label" type="text" maxlength="{{$d.MaxGalleryLinkLabelRunes}}" value="{{$d.TopGalleryLinkLabel}}" placeholder="{{$.T "structure_gallery_link_label_default"}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+        </div>
+      </div>
+      <p id="top-gallery-link-help" class="mt-1.5 flex items-center text-xs text-neutral-600">{{$.T "structure_gallery_link_help"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "structure_gallery_link_format"}}</span></span></p>
+    </fieldset>
+
+    <div class="flex justify-end">
+      <button type="submit" name="op" value="save" id="structure-save" class="btn btn-primary btn-md">{{$.T "structure_save"}}</button>
+    </div>
+  </form>
+
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{/* メニュー・フッターのサイトマップの編集欄（structureMenuEditor）。最上位の行の下に子項目の行を字下げして並べる。
+     JavaScript なしでも、行の操作のボタン（送信）で追加・並べ替え・削除・入れ子にできる。 */}}
+{{define "structure_menu_editor"}}{{$e := .}}{{$ja := ne .Lang "en"}}
+      {{/* 768px 以上は1項目を1行にし、欄の名前は見出し行に1回だけ出す（各行のラベルは読み上げ用に残す）。 */}}
+      {{if $e.Rows}}
+      <div class="mt-4 hidden gap-2 border-b border-neutral-200 pb-2 text-xs font-medium text-neutral-600 md:grid md:grid-cols-[1.5rem_7rem_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_12rem] lg:grid-cols-[1.5rem_10rem_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_12rem]" aria-hidden="true">
+        <span>#</span><span>{{$e.T "structure_col_type"}}</span><span>{{$e.T "structure_col_target"}}</span><span>{{$e.T "structure_col_label"}}</span><span>{{if $ja}}表示名（英語）{{else}}Label (English){{end}}</span><span></span>
+      </div>
+      {{end}}
+      <ol class="mt-4 space-y-3 md:mt-0 md:space-y-0" data-structure-list="{{$e.Prefix}}">
+        {{range $r := $e.Rows}}
+        <li class="rounded-lg border border-neutral-200 md:rounded-none md:border-0 md:border-b md:border-neutral-100" data-structure-item>
+          {{template "structure_menu_row" $r}}
+          {{if or $r.Rows $r.CanAddChild}}
+          <div class="mx-4 mb-4 border-l-2 border-neutral-200 pl-3 md:mx-0 md:mb-2 md:ml-6">
+            {{if $r.Rows}}
+            <ol class="space-y-3 md:space-y-0" aria-label="{{if $e.Footer}}{{$e.T "structure_footer_row" $r.Number}}{{else}}{{$e.T "structure_row" $r.Number}}{{end}}">
+              {{range $c := $r.Rows}}<li class="rounded-lg border border-neutral-100 md:rounded-none md:border-0">{{template "structure_menu_row" $c}}</li>{{end}}
+            </ol>
+            {{end}}
+            {{if $r.CanAddChild}}
+            <button type="submit" name="op" value="{{$e.OpPrefix}}child:{{$r.Index}}" class="mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-neutral-700 underline-offset-2 hover:bg-neutral-100 hover:underline" data-structure-add-child>{{if $ja}}＋{{else}}+{{end}} {{if $e.Footer}}{{$e.T "structure_footer_add_child"}}{{else}}{{$e.T "structure_add_child"}}{{end}}</button>
+            {{end}}
+          </div>
+          {{end}}
+        </li>
+        {{end}}
+      </ol>
+{{end}}
+
+{{/* 編集欄の1行（structureRow）。子項目の行は depth=1 を送り、保存時に直前の最上位の行の子項目になる。 */}}
+{{define "structure_menu_row"}}{{$r := .}}{{$e := $r.E}}{{$ja := ne .Lang "en"}}
+          <div class="grid gap-3 p-4 md:items-center md:gap-2 md:px-0 md:py-2 md:grid-cols-[1.5rem_7rem_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_12rem] lg:grid-cols-[1.5rem_10rem_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_12rem]"
+               data-structure-row role="group" aria-labelledby="{{$e.Prefix}}-row-{{$r.Index}}">
+            <input type="hidden" name="{{$e.Prefix}}_depth" value="{{if $r.IsChild}}1{{else}}0{{end}}">
+            <div>
+              <span id="{{$e.Prefix}}-row-{{$r.Index}}" class="text-sm font-semibold text-neutral-800 md:sr-only">{{if $e.Footer}}{{if $r.IsChild}}{{$e.T "structure_footer_child_row" $r.Number $r.Child}}{{else}}{{$e.T "structure_footer_row" $r.Number}}{{end}}{{else}}{{if $r.IsChild}}{{$e.T "structure_child_row" $r.Number $r.Child}}{{else}}{{$e.T "structure_row" $r.Number}}{{end}}{{end}}</span>
+              <span class="hidden text-sm tabular-nums text-neutral-500 md:block" aria-hidden="true">{{if $r.IsChild}}<span class="text-neutral-400">↳</span>{{else}}{{$r.Number}}{{end}}</span>
+            </div>
+            <div>
+              <label for="{{$e.Prefix}}-type-{{$r.Index}}" class="text-xs font-medium text-neutral-600 md:sr-only">{{$e.T "structure_col_type"}}</label>
+              <select id="{{$e.Prefix}}-type-{{$r.Index}}" name="{{$e.Prefix}}_type" data-structure-type class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm md:mt-0">
+                {{if $r.IsChild}}{{range $e.ChildTypes}}<option value="{{.}}"{{if eq . $r.Type}} selected{{end}}>{{$e.T .LabelKey}}</option>{{end}}{{if eq $r.Type "group"}}<option value="group" selected>{{$e.T "structure_type_group"}}</option>{{end}}
+                {{else}}{{range $e.Types}}<option value="{{.}}"{{if eq . $r.Type}} selected{{end}}>{{$e.T .LabelKey}}</option>{{end}}{{end}}
+              </select>
+            </div>
+            {{/* JavaScript なしでは3つの欄を全部出す（保存には種類に合う欄だけを使う）。 */}}
+            <div class="min-w-0 space-y-2">
+              <div data-show-for="page">
+                <label for="{{$e.Prefix}}-page-{{$r.Index}}" class="text-xs font-medium text-neutral-600 md:sr-only">{{$e.T "structure_target_page"}}</label>
+                <select id="{{$e.Prefix}}-page-{{$r.Index}}" name="{{$e.Prefix}}_page" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm md:mt-0">
+                  <option value="">{{$e.T "structure_choose"}}</option>
+                  {{range $e.Pages}}<option value="{{.Slug}}"{{if and (eq $r.Type "page") (eq .Slug $r.Target)}} selected{{end}}>{{.Title}}{{if $ja}}（/{{.Slug}}）{{else}} (/{{.Slug}}){{end}}</option>{{end}}
+                  {{if and (eq $r.Type "page") $r.Missing}}<option value="{{$r.Missing}}" selected>{{$e.T "structure_missing_option" $r.Missing}}</option>{{end}}
+                </select>
+              </div>
+              <div data-show-for="category">
+                <label for="{{$e.Prefix}}-category-{{$r.Index}}" class="text-xs font-medium text-neutral-600 md:sr-only">{{$e.T "structure_target_category"}}</label>
+                <select id="{{$e.Prefix}}-category-{{$r.Index}}" name="{{$e.Prefix}}_category" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm md:mt-0">
+                  <option value="">{{$e.T "structure_choose"}}</option>
+                  {{range $e.Categories}}<option value="{{.Slug}}"{{if and (eq $r.Type "category") (eq .Slug $r.Target)}} selected{{end}}>{{.Title}}</option>{{end}}
+                  {{if and (eq $r.Type "category") $r.Missing}}<option value="{{$r.Missing}}" selected>{{$e.T "structure_missing_option" $r.Missing}}</option>{{end}}
+                </select>
+              </div>
+              <div data-show-for="url">
+                <label for="{{$e.Prefix}}-url-{{$r.Index}}" class="text-xs font-medium text-neutral-600 md:sr-only">{{$e.T "structure_target_url"}}</label>
+                <input id="{{$e.Prefix}}-url-{{$r.Index}}" name="{{$e.Prefix}}_url" type="text" inputmode="url" value="{{if eq $r.Type "url"}}{{$r.Target}}{{end}}"
+                       placeholder="https://" aria-describedby="structure-url-hint" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm md:mt-0">
+              </div>
+            </div>
+            <div class="min-w-0">
+              <label for="{{$e.Prefix}}-label-{{$r.Index}}" class="text-xs font-medium text-neutral-600 md:sr-only">{{$e.T "structure_col_label"}}</label>
+              <input id="{{$e.Prefix}}-label-{{$r.Index}}" name="{{$e.Prefix}}_label" type="text" maxlength="{{$e.MaxLabelRunes}}" value="{{$r.Label}}" placeholder="{{if $ja}}表示名（日本語）{{else}}Label (Japanese){{end}}"
+                     aria-describedby="structure-label-hint" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm md:mt-0">
+            </div>
+            <div class="min-w-0">
+              <label for="{{$e.Prefix}}-label-en-{{$r.Index}}" class="text-xs font-medium text-neutral-600 md:sr-only">{{if $ja}}表示名（英語）{{else}}Label (English){{end}}</label>
+              <input id="{{$e.Prefix}}-label-en-{{$r.Index}}" name="{{$e.Prefix}}_label_en" type="text" maxlength="{{$e.MaxLabelRunes}}" value="{{$r.LabelEn}}" placeholder="{{if $ja}}英語（任意）{{else}}English (optional){{end}}"
+                     class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm md:mt-0">
+            </div>
+            <div class="flex flex-wrap justify-end gap-1 text-sm">
+              <button type="submit" name="op" value="{{$e.OpPrefix}}up:{{$r.Index}}" {{if $r.First}}disabled{{end}}
+                      class="btn btn-secondary btn-sm">{{$e.T "structure_move_up"}}</button>
+              <button type="submit" name="op" value="{{$e.OpPrefix}}down:{{$r.Index}}" {{if $r.Last}}disabled{{end}}
+                      class="btn btn-secondary btn-sm">{{$e.T "structure_move_down"}}</button>
+              {{if $r.CanIndent}}<button type="submit" name="op" value="{{$e.OpPrefix}}indent:{{$r.Index}}" class="btn btn-secondary btn-sm">{{$e.T "structure_indent"}}</button>{{end}}
+              {{if and $r.IsChild $r.CanOutdent}}<button type="submit" name="op" value="{{$e.OpPrefix}}outdent:{{$r.Index}}" class="btn btn-secondary btn-sm">{{$e.T "structure_outdent"}}</button>{{end}}
+              <button type="submit" name="op" value="{{$e.OpPrefix}}delete:{{$r.Index}}"
+                      class="btn btn-danger btn-sm">{{$e.T "structure_delete"}}</button>
+            </div>
+          </div>
+{{end}}
+
+{{define "scripts"}}<script>
+(function () {
+  'use strict';
+  // 行の種類に合わせて、使わないリンク先の欄を隠す。JavaScript なしでは全部の欄を出し、種類に合う欄だけを保存に使う。
+  document.querySelectorAll('[data-structure-row]').forEach(function (row) {
+    var type = row.querySelector('[data-structure-type]');
+    function sync() {
+      row.querySelectorAll('[data-show-for]').forEach(function (el) {
+        el.hidden = el.getAttribute('data-show-for') !== type.value;
+      });
+    }
+    type.addEventListener('change', sync);
+    sync();
+  });
+
+  // トップページのフォトギャラリー: 候補のタグを押すと入力欄に入れ、入力したタグの写真の枚数と、トップページに出る
+  // 写真（新しい順に表示枚数まで）を GET /admin/api/media?tag= で確かめて見せる。
+  var tagInput = document.getElementById('top-gallery-tag');
+  var limitSelect = document.getElementById('top-gallery-limit');
+  var preview = document.getElementById('top-gallery-preview');
+  if (!tagInput || !limitSelect || !preview) return;
+  var statusEl = document.getElementById('top-gallery-status');
+  var thumbs = document.getElementById('top-gallery-thumbs');
+  var thumbsLabel = document.getElementById('top-gallery-thumbs-label');
+  var mediaLink = document.getElementById('top-gallery-media-link');
+  var chips = Array.prototype.slice.call(document.querySelectorAll('[data-gallery-tag-chip]'));
+  function text(name, n, m) {
+    return (preview.getAttribute('data-text-' + name) || '').replace('{n}', String(n)).replace('{m}', String(m));
+  }
+  function syncChips() {
+    var tag = tagInput.value.trim();
+    chips.forEach(function (chip) {
+      chip.setAttribute('aria-pressed', chip.getAttribute('data-gallery-tag-chip') === tag ? 'true' : 'false');
+    });
+  }
+  function clearThumbs() {
+    thumbs.textContent = '';
+    thumbs.hidden = true;
+    thumbsLabel.hidden = true;
+  }
+  var seq = 0;
+  var timer = null;
+  function refresh() {
+    var tag = tagInput.value.trim();
+    var limit = parseInt(limitSelect.value, 10) || 0;
+    var mine = ++seq;
+    syncChips();
+    mediaLink.href = '/admin/media' + (tag ? '?tag=' + encodeURIComponent(tag) : '');
+    if (!tag) {
+      statusEl.textContent = text('off');
+      clearThumbs();
+      return;
+    }
+    statusEl.textContent = text('loading');
+    fetch('/admin/api/media?tag=' + encodeURIComponent(tag) + '&per_page=' + encodeURIComponent(String(limit)), {
+      headers: { 'Accept': 'application/json' }, credentials: 'same-origin'
+    }).then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function (data) {
+      if (mine !== seq) return;
+      var total = data && data.total ? data.total : 0;
+      statusEl.textContent = total > 0 ? text('count', total, limit) : text('empty');
+      statusEl.setAttribute('data-count', String(total));
+      thumbs.textContent = '';
+      (data && data.items ? data.items : []).slice(0, limit).forEach(function (item) {
+        var src = item.thumbnail_url || item.url;
+        if (!src) return;
+        var li = document.createElement('li');
+        li.className = 'aspect-square overflow-hidden rounded-md bg-neutral-200';
+        var img = document.createElement('img');
+        img.src = src;
+        img.alt = item.alt || '';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.className = 'h-full w-full object-cover';
+        li.appendChild(img);
+        thumbs.appendChild(li);
+      });
+      thumbs.hidden = thumbs.children.length === 0;
+      thumbsLabel.hidden = thumbs.hidden;
+    }).catch(function () {
+      if (mine !== seq) return;
+      statusEl.textContent = text('error');
+      clearThumbs();
+    });
+  }
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      tagInput.value = chip.getAttribute('data-gallery-tag-chip');
+      refresh();
+      tagInput.focus();
+    });
+  });
+  tagInput.addEventListener('input', function () {
+    syncChips();
+    clearTimeout(timer);
+    timer = setTimeout(refresh, 300);
+  });
+  limitSelect.addEventListener('change', refresh);
+  refresh();
+})();
+</script>{{end}}

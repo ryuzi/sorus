@@ -1,0 +1,51 @@
+# Binaries and DB
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+database.db
+database.db-journal
+database.db-wal
+database.db-shm
+*.bak
+*.bak.*
+*_export.xml
+
+# Env and Navigator
+.env
+.env.*
+# scripts/dev.sh が deploy/environments/dev.env.example から作る、手元の開発用の設定
+deploy/environments/dev.env
+.navigator/evidence/
+
+# OS and Editor
+.DS_Store
+Thumbs.db
+
+# Runtime data
+uploads/
+search_index/
+attachments/
+backups/
+certs/
+dist/
+local_dev.db*
+
+# Capability token signing key and secret sync API path (sorus token create / --public-only)
+capability.key
+sync_path.txt
+
+# Release archives (scripts/release.sh)
+dist-release/
+
+# Local AI agent workflows, skills, and working artifacts (kept locally, excluded from OSS repo)
+CLAUDE.local.md
+.agents/
+.claude/
+.github/prompts/
+.navigator/plans/
+.navigator/reviews/
+.navigator/research/
+docs/specs/

@@ -1,0 +1,131 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}
+<div class="mx-auto max-w-7xl px-4 py-6" data-manuscript-inbox>
+  <div class="mb-5">
+    <h1 class="text-xl font-bold text-neutral-900">{{$.T "nav_manuscripts"}}</h1>
+    <p class="mt-1 text-sm text-neutral-600">{{if $ja}}書き手が公開サーバーに提出した原稿を、中身と差分を確かめてからこの PC に受け取り、校閲して公開します。{{else}}Check the content and differences of manuscripts that writers submitted to the publish server, receive them on this PC, then review and publish them.{{end}}</p>
+  </div>
+
+  {{if not $d.RemoteConnected}}
+  {{/* 公開サーバーに参加していないときは、参加の案内だけを出す。 */}}
+  <section id="manuscript-join-guide" class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="manuscript-join-guide-title">
+    <h2 id="manuscript-join-guide-title" class="text-base font-semibold text-neutral-900">{{if $ja}}公開サーバーに参加すると、ここに原稿が届きます{{else}}Join a publish server to receive manuscripts here{{end}}</h2>
+    <p class="mt-2 flex items-center text-sm text-neutral-600">{{if $ja}}公開サーバーの管理者から招待コードを受け取って参加すると、書き手が提出した原稿がここに並びます。{{else}}Join with an invite code from the publish server administrator, and manuscripts that writers submit will be listed here.{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{if $ja}}説明を表示{{else}}Show help{{end}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}編集者の招待コードを受け取ったら、sorus の「設定」→「公開先」で「公開サーバーに接続する」を開き、貼り付けて参加します。{{else}}After you get an editor invite code, open "Settings" → "Publishing" → "Connect to a publish server" in sorus and paste it to join.{{end}}</span></span></p>
+    {{if $.User.HasRole "admin"}}<a href="/admin/settings/remote" id="manuscript-join-link" class="btn btn-primary btn-md mt-4">{{if $ja}}公開サーバーの設定を開く{{else}}Open publish server settings{{end}}</a>{{end}}
+  </section>
+  {{else}}
+  <div id="manuscript-previews" data-manuscript-previews class="mb-6 flex flex-col gap-4 empty:hidden" aria-live="polite"></div>
+
+  <section id="manuscript-inbox-list" class="rounded-xl border border-neutral-200 bg-white shadow-sm p-4" aria-labelledby="manuscript-inbox-title">
+    <h2 id="manuscript-inbox-title" class="text-sm font-semibold text-neutral-800">{{if $ja}}校閲を待っている記事（{{len $d.Items}}件）{{else}}Awaiting review ({{len $d.Items}}){{end}}</h2>
+    {{with $d.RemoteError}}<p id="manuscript-remote-error" class="notice notice-warn mt-2" role="alert">{{.}}</p>{{end}}
+    {{if $d.Items}}
+    <ul class="mt-3 flex flex-col divide-y divide-neutral-100">
+      {{range $d.Items}}{{template "manuscript_inbox_item" ($.ManuscriptRow .)}}{{end}}
+    </ul>
+    {{else}}
+    <p id="manuscript-inbox-empty" class="py-8 text-center text-sm text-neutral-400">{{if $ja}}いま校閲を待っている原稿はありません。{{else}}No manuscripts are awaiting review.{{end}}</p>
+    {{end}}
+    {{with $d.Schedule.Note}}<p id="manuscript-schedule-note" class="mt-3 text-xs text-neutral-500" data-remote-schedule-note>{{.}}</p>{{end}}
+  </section>
+
+  {{if $d.Drafts}}
+  {{/* 公開サーバーで作成中の下書き。この PC に取り込んで続きを書ける（取り込むと公開サーバーに「編集中」の印が付く）。 */}}
+  <section id="manuscript-drafts" class="mt-6 rounded-xl border border-neutral-200 bg-white shadow-sm p-4" aria-labelledby="manuscript-drafts-title">
+    <h2 id="manuscript-drafts-title" class="text-sm font-semibold text-neutral-800">{{if $ja}}作成中の下書き（{{len $d.Drafts}}件）{{else}}Drafts in progress ({{len $d.Drafts}}){{end}}</h2>
+    <ul class="mt-3 flex flex-col divide-y divide-neutral-100">
+      {{range $d.Drafts}}{{template "manuscript_inbox_item" ($.ManuscriptRow .)}}{{end}}
+    </ul>
+  </section>
+  {{end}}
+
+  {{if $d.Scheduled}}
+  {{/* 公開サーバーで予約中の記事。時刻が来ると公開サーバーが読者に見せ始めるため、この PC の sorus を閉じていてもよい。 */}}
+  <section id="manuscript-scheduled" class="mt-6 rounded-xl border border-neutral-200 bg-white shadow-sm p-4" aria-labelledby="manuscript-scheduled-title">
+    <h2 id="manuscript-scheduled-title" class="text-sm font-semibold text-neutral-800">{{$.T "remote_scheduled_heading"}}{{if $ja}}（{{len $d.Scheduled}}）{{else}} ({{len $d.Scheduled}}){{end}}</h2>
+    <ul class="mt-3 flex flex-col divide-y divide-neutral-100">
+      {{range $d.Scheduled}}
+      <li class="flex flex-wrap items-center justify-between gap-3 py-3" data-remote-scheduled-item data-id="{{.ID}}">
+        <div class="min-w-0">
+          <p class="flex flex-wrap items-center gap-2">
+            <span class="status-scheduled rounded-full px-2 py-0.5 text-xs font-medium" data-remote-scheduled-label>{{.Label}}</span>
+            <span class="font-medium text-neutral-900">{{.Title}}</span>
+          </p>
+          {{with .AuthorName}}{{if $ja}}<p class="mt-1 text-xs text-neutral-500">{{.}} さん</p>{{else}}<p class="mt-1 text-xs text-neutral-500">{{.}}</p>{{end}}{{end}}
+        </div>
+        {{if $d.CanRemotePublish}}
+        <button type="button" data-remote-unschedule="{{.ID}}" data-reload data-confirm-message="{{.UnscheduleConfirm}}"
+                class="btn btn-secondary btn-sm">{{$.T "remote_unschedule"}}</button>
+        {{end}}
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+  {{end}}
+</div>
+{{end}}
+
+{{define "scripts"}}{{if .Data.RemoteConnected}}<script src="{{asset "js/manuscript.js"}}"></script>{{template "remote_sync_assets"}}{{end}}{{end}}
+
+{{/* manuscript_inbox_item は「届いた原稿」の1件（校閲待ち・下書き共通）。引数は manuscriptRow（page.ManuscriptRow）。
+     状態は短いピル（下書き・この PC で編集中／別PCで編集中・変更案あり）で示し、操作は1〜2語のボタンにする。 */}}
+{{define "manuscript_inbox_item"}}{{$ja := ne .Lang "en"}}{{$it := .Item}}{{$p := .Page}}{{$d := .Data}}
+<li class="flex flex-col gap-2 py-3" data-inbox-item data-id="{{$it.ID}}" data-status="{{if $it.IsDraft}}draft{{else}}review{{end}}">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="min-w-0">
+      <p class="flex flex-wrap items-center gap-1.5">
+        <span class="font-medium text-neutral-900">{{$it.Title}}</span>
+        {{if $it.IsDraft}}<span class="badge bg-neutral-100 text-neutral-700" data-pill="draft">{{if $ja}}下書き{{else}}Draft{{end}}</span>{{end}}
+        {{if $it.CheckedOutHere}}<span class="badge bg-emerald-50 text-emerald-800" data-pill="checked-out" data-checkout="here">{{if $ja}}この PC で編集中{{else}}Editing on this PC{{end}}</span>
+        {{else if $it.CheckedOutElsewhere}}<span class="badge bg-amber-50 text-amber-800" data-pill="checked-out" data-checkout="elsewhere">{{if $it.CheckedOutBySelf}}{{if $ja}}別PCで編集中{{else}}Editing on another PC{{end}}{{else}}{{if $ja}}{{$it.CheckedOutBy}}さんが別PCで編集中{{else}}{{$it.CheckedOutBy}} is editing on another PC{{end}}{{end}}</span>{{end}}
+        {{if $it.Proposal}}<span class="badge bg-sky-50 text-sky-800" data-pill="proposal">{{if $ja}}変更案あり{{else}}Suggested edits{{end}}</span>{{end}}
+      </p>
+      <p class="mt-1 text-xs text-neutral-500">{{if $ja}}{{with $it.AuthorName}}{{.}} さん・{{end}}{{if $it.IsDraft}}更新{{else}}提出{{end}} {{formatTime $it.ArrivedAt}}{{if $it.LocalStatus}}・この PC に取り込み済み（{{statusLabel $it.LocalStatus}}）{{end}}{{else}}{{with $it.AuthorName}}{{.}} · {{end}}{{if $it.IsDraft}}Updated{{else}}Submitted{{end}} {{formatTime $it.ArrivedAt}}{{if $it.LocalStatus}} · Already on this PC ({{statusLabelFor $it.LocalStatus "en"}}){{end}}{{end}}</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      {{if $it.Proposal}}<button type="button" data-proposal-open="{{$it.ID}}" class="btn btn-secondary btn-sm">{{if $ja}}差分を見て反映{{else}}Review changes{{end}}</button>{{end}}
+      {{if $it.EditURL}}<a href="{{$it.EditURL}}" data-inbox-edit class="btn btn-primary btn-sm">{{if $it.IsDraft}}{{if $ja}}この PC で続きを書く{{else}}Continue on this PC{{end}}{{else}}{{if $ja}}開いて校閲する{{else}}Open and review{{end}}{{end}}</a>{{end}}
+      {{if or (not $it.LocalStatus) (eq $it.LocalStatus "draft") (eq $it.LocalStatus "review")}}
+      {{if $it.CheckedOutElsewhere}}
+      <button type="button" data-remote-inbox-import="{{$it.ID}}" data-force="1"{{if $it.IsDraft}} data-draft{{end}}
+              data-confirm-message="{{if $it.CheckedOutBySelf}}{{if $ja}}別の PC での編集を引き継ぎます。よろしいですか？{{else}}Take over the editing on your other PC?{{end}}{{else}}{{if $ja}}{{$it.CheckedOutBy}}さんの編集を引き継ぎます。よろしいですか？{{else}}Take over from {{$it.CheckedOutBy}}?{{end}}{{end}}"
+              class="btn btn-secondary btn-sm">{{if $ja}}引き継ぐ{{else}}Take over{{end}}</button>
+      {{else if not $it.EditURL}}
+      <button type="button" data-remote-inbox-import="{{$it.ID}}"{{if $it.IsDraft}} data-draft{{end}} class="btn btn-primary btn-sm">{{if $it.IsDraft}}{{if $ja}}この PC で続きを書く{{else}}Continue on this PC{{end}}{{else}}{{if $ja}}受け取る{{else}}Receive{{end}}{{end}}</button>
+      {{else}}
+      <button type="button" data-remote-inbox-import="{{$it.ID}}"{{if $it.IsDraft}} data-draft{{end}} class="btn btn-secondary btn-sm">{{if $ja}}受け取る{{else}}Receive{{end}}</button>
+      {{end}}
+      {{end}}
+      {{if and $d.CanRemotePublish (not $it.IsDraft)}}
+      <button type="button" data-remote-inbox-publish="{{$it.ID}}" data-confirm-message="{{if $ja}}「{{$it.Title}}」を公開サーバーで公開します。よろしいですか？{{else}}Publish “{{$it.Title}}” on the publish server?{{end}}"
+              class="btn btn-secondary btn-sm">{{if $ja}}公開サーバーで公開する{{else}}Publish on the publish server{{end}}</button>
+      {{if $d.Schedule.Available}}{{template "remote_schedule_picker" ($p.SchedulePicker $it.ID $it.Title $d.Schedule.Default $d.Schedule.Min true)}}{{end}}
+      {{end}}
+    </div>
+  </div>
+  {{with $it.Proposal}}
+  {{/* 「差分を見て反映」で #manuscript-previews に複製する、変更案の差分と反映・破棄のボタン。 */}}
+  <template data-proposal-template="{{$it.ID}}">
+    <article class="rounded-xl border border-sky-200 bg-white p-4 shadow-sm" data-proposal-card="{{$it.ID}}">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 class="font-semibold text-neutral-900">{{$it.Title}}</h3>
+        <span class="badge bg-sky-50 text-sky-800">{{if $ja}}{{with .ProposedBy}}{{.}}さんの{{end}}変更案{{else}}Suggested edits{{with .ProposedBy}} by {{.}}{{end}}{{end}}</span>
+      </div>
+      <table class="mt-3 w-full table-fixed border-collapse text-xs" data-proposal-diff>
+        <thead><tr><th class="px-2 py-1 text-left font-semibold text-neutral-500">{{if $ja}}今{{else}}Current{{end}}</th><th class="px-2 py-1 text-left font-semibold text-neutral-500">{{if $ja}}変更案{{else}}Suggested{{end}}</th></tr></thead>
+        <tbody class="divide-y divide-neutral-100 font-mono">
+          {{with .TitleRow}}<tr data-diff-op="change" data-diff-field="title"><td class="whitespace-pre-wrap break-words bg-rose-50 px-2 py-0.5 font-semibold text-rose-900">{{.Left}}</td><td class="whitespace-pre-wrap break-words bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-900">{{.Right}}</td></tr>{{end}}
+          {{with .ExcerptRow}}<tr data-diff-op="change" data-diff-field="excerpt"><td class="whitespace-pre-wrap break-words bg-rose-50 px-2 py-0.5 text-rose-900">{{.Left}}</td><td class="whitespace-pre-wrap break-words bg-emerald-50 px-2 py-0.5 text-emerald-900">{{.Right}}</td></tr>{{end}}
+          {{range .Lines}}{{if .Skipped}}<tr><td colspan="2" class="px-2 py-1 text-center text-neutral-400">{{if $ja}}（同じ行 {{.Skipped}} 行）{{else}}({{.Skipped}} unchanged lines){{end}}</td></tr>{{else}}<tr data-diff-op="{{.Op}}"><td class="whitespace-pre-wrap break-words px-2 py-0.5 align-top {{if or (eq .Op "del") (eq .Op "change")}}bg-rose-50 text-rose-900{{else if eq .Op "add"}}bg-neutral-50{{else}}text-neutral-600{{end}}">{{.Left}}</td><td class="whitespace-pre-wrap break-words px-2 py-0.5 align-top {{if or (eq .Op "add") (eq .Op "change")}}bg-emerald-50 text-emerald-900{{else if eq .Op "del"}}bg-neutral-50{{else}}text-neutral-600{{end}}">{{.Right}}</td></tr>{{end}}{{end}}
+        </tbody>
+      </table>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button type="button" data-proposal-resolve="accept" data-id="{{$it.ID}}" data-proposal-id="{{.ID}}" class="btn btn-primary btn-sm">{{if $ja}}反映する{{else}}Apply{{end}}</button>
+        <button type="button" data-proposal-resolve="discard" data-id="{{$it.ID}}" data-proposal-id="{{.ID}}" class="btn btn-secondary btn-sm">{{if $ja}}破棄する{{else}}Discard{{end}}</button>
+        <button type="button" data-proposal-close class="btn btn-secondary btn-sm">{{if $ja}}閉じる{{else}}Close{{end}}</button>
+      </div>
+    </article>
+  </template>
+  {{end}}
+</li>
+{{end}}

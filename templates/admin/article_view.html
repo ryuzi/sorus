@@ -1,0 +1,29 @@
+{{define "content"}}{{$d := .Data}}{{$a := $d.Article}}{{$ja := ne .Lang "en"}}
+{{/* 記事の読み取り専用ビュー（handleArticleView）。編集権限のない管理者が記事の中身を確かめるために使う。 */}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <div class="min-w-0">
+      <a href="/admin/articles" class="text-sm text-neutral-500 hover:text-neutral-800">&larr; {{.T "back_to_list"}}</a>
+      <div class="mt-1 flex flex-wrap items-center gap-2">
+        <h1 id="article-view-title" class="min-w-0 break-words text-xl font-bold text-neutral-900">{{$a.Title}}</h1>
+        <span class="status-badge shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium {{statusBadge $d.Status}}">{{statusLabelFor $d.Status $.Lang}}</span>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {{if $d.PublicURL}}<a href="{{$d.PublicURL}}" id="article-view-public" target="_blank" rel="noopener" class="btn btn-secondary btn-md">{{if $ja}}公開ページを確認{{else}}View public page{{end}}</a>{{end}}
+      {{if $d.CanEdit}}<a href="/admin/articles/{{$a.ID}}/edit" id="article-view-edit" class="btn btn-primary btn-md">{{if $ja}}編集する{{else}}Edit{{end}}</a>{{end}}
+    </div>
+  </div>
+
+  <dl class="mb-5 grid gap-x-6 gap-y-3 rounded-xl border border-neutral-200 bg-white p-4 text-sm shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+    <div><dt class="text-xs text-neutral-500">{{.T "label_slug"}}</dt><dd class="mt-1 break-all font-mono text-neutral-800">{{$a.Slug}}</dd></div>
+    <div><dt class="text-xs text-neutral-500">{{if $ja}}言語{{else}}Language{{end}}</dt><dd class="mt-1 text-neutral-800">{{if eq $a.Lang "en"}}English (EN){{else}}日本語 (JA){{end}}</dd></div>
+    <div><dt class="text-xs text-neutral-500">{{.T "col_author"}}</dt><dd class="mt-1 text-neutral-800">{{$d.AuthorName}}</dd></div>
+    <div><dt class="text-xs text-neutral-500">{{.T "col_updated"}}</dt><dd class="mt-1 text-neutral-800">{{formatTime $a.UpdatedAt}}</dd></div>
+  </dl>
+
+  <article id="article-view-body" class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <div class="prose-preview max-w-none">{{$d.ContentHTML}}</div>
+  </article>
+</div>
+{{end}}

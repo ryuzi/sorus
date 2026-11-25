@@ -1,0 +1,63 @@
+{{/* ダッシュボードの「サイトに反映」。/admin/publish/panel が返し、ダッシュボードのスクリプトが読み込んで差し込む。 */}}
+{{define "publish_panel"}}{{$d := .}}{{$ja := ne .Lang "en"}}
+{{if $d.Configured}}
+<section id="publish-dashboard" class="rounded-xl border border-zinc-300 bg-white p-4" aria-labelledby="publish-dashboard-title">
+  {{if $d.Overdue}}
+  <div id="publish-overdue" data-publish-overdue class="notice notice-warn mb-4 p-4" role="alert">
+    <p class="font-semibold">{{if $ja}}予約時刻を過ぎた記事が {{$d.Overdue}} 件あります。サイトに反映しますか？{{else}}{{$d.Overdue}} articles have passed their scheduled time. Update the site?{{end}}</p>
+    <p class="mt-1">{{if $ja}}sorus を閉じている間に予約時刻になった記事です。sorus の中では公開済みにしましたが、公開先にはまだ送っていません。{{else}}These articles reached their scheduled time while sorus was closed. They are marked as published in sorus but have not been sent to the destination yet.{{end}}</p>
+    <div class="mt-3 flex flex-wrap gap-2">
+      <form method="post" action="/admin/publish/reflect" data-publish-reflect-form>
+        <input type="hidden" name="_csrf" value="{{$d.CSRFToken}}">
+        <button type="submit" class="btn btn-primary btn-md">{{if $ja}}サイトに反映する{{else}}Update site{{end}}</button>
+      </form>
+      <button type="button" data-publish-later class="btn btn-secondary btn-md"{{if $ja}}>あとで</button>{{else}}>Later</button>{{end}}
+    </div>
+  </div>
+  {{end}}
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="min-w-0">
+      <h2 id="publish-dashboard-title" class="text-sm font-semibold text-neutral-800"{{if $ja}}>サイトに反映</h2>{{else}}>Update site</h2>{{end}}
+      <p class="mt-0.5 break-all text-xs text-neutral-500">{{if $ja}}公開先: {{$d.Label}}（<a href="/admin/publish" class="underline hover:text-neutral-800">変える</a>）{{else}}Destination: {{$d.Label}} (<a href="/admin/publish" class="underline hover:text-neutral-800">change</a>){{end}}</p>
+    </div>
+    <form method="post" action="/admin/publish/reflect" data-publish-reflect-form>
+      <input type="hidden" name="_csrf" value="{{$d.CSRFToken}}">
+      <button type="submit" id="publish-dashboard-reflect" data-publish-reflect{{if $d.Status.Running}} disabled{{end}}
+              class="btn btn-primary btn-md"{{if $ja}}>サイトに反映</button>{{else}}>Update site</button>{{end}}
+    </form>
+  </div>
+  <div class="mt-3" data-publish-status data-publish-running="{{$d.Status.Running}}" aria-live="polite">
+    {{if $d.Status.Running}}<p class="text-sm font-medium text-neutral-800">{{$d.Status.Message}}</p>
+    {{else}}{{template "publish_last" $d}}{{end}}
+  </div>
+</section>
+{{else}}
+<section id="publish-dashboard" class="rounded-xl border border-zinc-300 bg-white p-4" aria-labelledby="publish-dashboard-title">
+  <h2 id="publish-dashboard-title" class="text-sm font-semibold text-neutral-800">{{if $ja}}サイトを公開するには{{else}}To publish your site{{end}}</h2>
+  <p class="mt-1 text-sm text-neutral-600">{{if $ja}}はじめに、記事を公開する場所（公開先）を1つ選びます。そのあとは「サイトに反映」を押すだけで公開できます。{{else}}First, choose one place (destination) to publish your articles. After that, just press "Update site" to publish.{{end}}</p>
+  <a href="/admin/publish" id="publish-dashboard-setup" class="btn btn-primary btn-md mt-3">{{if $ja}}公開先を設定する{{else}}Set up a destination{{end}}</a>
+</section>
+{{end}}
+{{end}}
+
+{{/* publish_last は前回の反映の結果の1文。引数は publishPanelData。 */}}
+{{define "publish_last"}}{{$ja := ne .Lang "en"}}{{with .Status.Last}}<p class="text-xs text-neutral-500">{{if $ja}}前回の反映: {{.FinishedText}}（{{if .OK}}できました{{else if .ReplaceSite}}今あるサイトを置き換えるかの確認を待っています。<a href="/admin/publish" class="underline">確かめる</a>{{else if .FixSiteURL}}公開サイトのURLを入れるまで反映できません。<a href="{{.FixSiteURL}}" class="underline">入力する</a>{{else}}できませんでした。<a href="/admin/publish" class="underline">くわしく見る</a>{{end}}）{{else}}Last update: {{.FinishedText}} ({{if .OK}}succeeded{{else if .ReplaceSite}}waiting for confirmation to replace the existing site. <a href="/admin/publish" class="underline">Check</a>{{else if .FixSiteURL}}cannot update until the public site URL is entered. <a href="{{.FixSiteURL}}" class="underline">Enter it</a>{{else}}failed. <a href="/admin/publish" class="underline">See details</a>{{end}}){{end}}</p>{{end}}{{end}}
+
+{{/* publish_panel_compact はダッシュボード下段の「サイトに反映」（公開先が設定済みで、正常に動いているとき）。
+     公開先・前回の反映を1行にまとめ、右に「サイトに反映」のボタンを置く。 */}}
+{{define "publish_panel_compact"}}{{$d := .}}{{$ja := ne .Lang "en"}}
+<section id="publish-dashboard" data-publish-compact class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5" aria-labelledby="publish-dashboard-title">
+  <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+    <h2 id="publish-dashboard-title" class="text-sm font-semibold text-neutral-800"{{if $ja}}>サイトに反映</h2>{{else}}>Update site</h2>{{end}}
+    <p class="min-w-0 break-all text-xs text-neutral-500">{{if $ja}}公開先: {{$d.Label}}（<a href="/admin/publish" class="underline hover:text-neutral-800">変える</a>）{{else}}Destination: {{$d.Label}} (<a href="/admin/publish" class="underline hover:text-neutral-800">change</a>){{end}}</p>
+    <div class="min-w-0 basis-full sm:basis-auto" data-publish-status data-publish-running="{{$d.Status.Running}}" aria-live="polite">
+      {{if $d.Status.Running}}<p class="text-xs font-medium text-neutral-800">{{$d.Status.Message}}</p>{{else}}{{template "publish_last" $d}}{{end}}
+    </div>
+  </div>
+  <form method="post" action="/admin/publish/reflect" data-publish-reflect-form>
+    <input type="hidden" name="_csrf" value="{{$d.CSRFToken}}">
+    <button type="submit" id="publish-dashboard-reflect" data-publish-reflect{{if $d.Status.Running}} disabled{{end}}
+            class="btn btn-primary btn-sm"{{if $ja}}>サイトに反映</button>{{else}}>Update site</button>{{end}}
+  </form>
+</section>
+{{end}}

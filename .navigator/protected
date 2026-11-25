@@ -1,0 +1,9 @@
+# エージェントが編集してはいけないパス（リポジトリルートからの glob。1行1パターン）
+.env
+.env.*
+.navigator/protected
+.navigator/verify.sh
+AGENTS.md
+docs/development_spec.md
+*.db
+*.db-*

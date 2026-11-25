@@ -1,0 +1,6 @@
+{
+  "name": { "ja": "モダン", "en": "Modern" },
+  "description": { "ja": "テスト用の既定テーマ", "en": "Default theme for tests" },
+  "color_scheme": "light dark",
+  "order": 10
+}

@@ -1,0 +1,6 @@
+{
+  "name": { "ja": "テック", "en": "Tech" },
+  "description": { "ja": "コード表示と等幅書体を重視した技術ブログ向け", "en": "Dense layout focused on code and readability" },
+  "color_scheme": "light dark",
+  "order": 20
+}

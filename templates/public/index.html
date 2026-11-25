@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1 class="page-title">{{if eq $.Lang "en"}}Latest Articles{{else}}新着記事{{end}}</h1>
+
+{{template "front_gallery" $}}{{with .Data}}
+{{if .Articles}}
+<div class="card-grid">
+  {{range .Articles}}{{template "article_card" .}}{{end}}
+</div>
+{{template "pagination" .Pagination}}
+{{else}}
+<p class="empty">{{if eq $.Lang "en"}}No articles published yet.{{else}}まだ公開された記事はありません。{{end}}</p>
+{{end}}
+{{end}}
+{{end}}

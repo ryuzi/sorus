@@ -1,0 +1,148 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}{{$csrf := .CSRFToken}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+    {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  <div class="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-xl font-bold text-neutral-900">{{$.T "users"}}</h1>
+      <p class="mt-1 text-sm text-neutral-600">
+        {{if $ja}}ライター、編集者、管理者のアカウント追加・権限管理を行います。{{else}}Add accounts for writers, editors, and administrators, and manage their permissions.{{end}}
+      </p>
+    </div>
+    <button type="button" id="add-user-open" onclick="document.getElementById('add-user-modal').showModal()" class="btn btn-primary btn-md shrink-0">{{if $ja}}＋ 新規ユーザーを登録{{else}}+ Add user{{end}}</button>
+  </div>
+
+  {{if $d.Error}}
+  <div class="notice notice-error mb-5" role="alert">
+    {{$d.Error}}
+  </div>
+  {{end}}
+
+  <section class="w-full rounded-xl border border-neutral-200 bg-white shadow-sm" aria-labelledby="user-list-title">
+      <h2 id="user-list-title" class="border-b border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-800">
+        {{if $ja}}登録ユーザー一覧（{{len $d.Users}}名）{{else}}Users ({{len $d.Users}}){{end}}
+      </h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-neutral-50 text-xs text-neutral-500">
+            <tr>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}ユーザー名{{else}}User name{{end}}</th>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}表示名{{else}}Display name{{end}}</th>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}権限 (ロール){{else}}Role{{end}}</th>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}作成日{{else}}Created{{end}}</th>
+              <th class="whitespace-nowrap px-4 py-2 text-right"><span class="sr-only">{{if $ja}}操作{{else}}Actions{{end}}</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100">
+            {{range $d.Users}}
+            <tr class="hover:bg-neutral-50/50">
+              <td class="whitespace-nowrap px-4 py-3 font-mono font-medium text-neutral-900">
+                {{.Username}}
+                {{if eq .ID $d.CurrentUser.ID}}<span class="ml-1 whitespace-nowrap rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-700">{{if $ja}}あなた{{else}}You{{end}}</span>{{end}}
+              </td>
+              <td class="max-w-[16rem] truncate whitespace-nowrap px-4 py-3 text-neutral-700" title="{{.DisplayName}}">{{if .DisplayName}}{{.DisplayName}}{{else}}-{{end}}</td>
+              <td class="whitespace-nowrap px-4 py-3">
+                <form method="post" action="/admin/users/{{.ID}}/edit" class="flex items-center gap-2">
+                  <input type="hidden" name="_csrf" value="{{$csrf}}">
+                  <input type="hidden" name="display_name" value="{{.DisplayName}}">
+                  <select name="role" onchange="this.form.submit()" class="rounded border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-800 focus:border-zinc-500 focus:outline-none">
+                    <option value="writer"{{if eq .Role "writer"}} selected{{end}}>{{if $ja}}ライター (Writer){{else}}Writer{{end}}</option>
+                    <option value="editor"{{if eq .Role "editor"}} selected{{end}}>{{if $ja}}編集者 (Editor){{else}}Editor{{end}}</option>
+                    <option value="admin"{{if eq .Role "admin"}} selected{{end}}>{{if $ja}}管理者 (Admin){{else}}Admin{{end}}</option>
+                  </select>
+                </form>
+              </td>
+              <td class="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{{formatTime .CreatedAt}}</td>
+              <td class="whitespace-nowrap px-4 py-3 text-right">
+                <div class="flex flex-nowrap items-center justify-end gap-2">
+                  <button type="button" onclick="document.getElementById('password-modal-{{.ID}}').showModal()" class="btn btn-secondary btn-sm">{{if $ja}}パスワード変更{{else}}Change password{{end}}</button>
+                  <dialog id="password-modal-{{.ID}}" class="ai-modal w-[min(28rem,calc(100vw-2rem))] whitespace-normal rounded-xl p-5 shadow-2xl" aria-labelledby="password-modal-title-{{.ID}}">
+                    <div class="flex items-center justify-between border-b border-neutral-200 pb-3">
+                      <h3 id="password-modal-title-{{.ID}}" class="text-base font-semibold text-neutral-900">{{if $ja}}パスワード変更: {{.Username}}{{else}}Change password: {{.Username}}{{end}}</h3>
+                      <button type="button" onclick="this.closest('dialog').close()" class="btn btn-ghost btn-sm" aria-label="{{if $ja}}閉じる{{else}}Close{{end}}">
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <form method="post" action="/admin/users/{{.ID}}/password" class="mt-4 flex flex-col gap-4 text-left">
+                      <input type="hidden" name="_csrf" value="{{$csrf}}">
+                      <label class="text-xs font-medium text-neutral-700">{{if $ja}}新しいパスワード (8文字以上){{else}}New password (8+ characters){{end}}
+                        <input type="password" name="password" required minlength="8" autofocus class="mt-1.5 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+                      </label>
+                      <div class="flex items-center justify-end gap-2 border-t border-neutral-100 pt-3">
+                        <button type="button" onclick="this.closest('dialog').close()" class="btn btn-secondary btn-md">{{if $ja}}キャンセル{{else}}Cancel{{end}}</button>
+                        <button type="submit" class="btn btn-primary btn-md">{{if $ja}}更新する{{else}}Update{{end}}</button>
+                      </div>
+                    </form>
+                  </dialog>
+                  {{if ne .ID $d.CurrentUser.ID}}
+                  <form method="post" action="/admin/users/{{.ID}}/delete" data-confirm="{{if $ja}}ユーザー「{{.Username}}」を削除しますか？{{else}}Delete the user “{{.Username}}”?{{end}}">
+                    <input type="hidden" name="_csrf" value="{{$csrf}}">
+                    <button type="submit" class="btn btn-danger btn-sm">{{if $ja}}削除{{else}}Delete{{end}}</button>
+                  </form>
+                  {{end}}
+                </div>
+              </td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+  </section>
+
+  {{/* 新規ユーザーの登録は、上の「＋ 新規ユーザーを登録」から開くモーダルで行う（admin_ux_redesign_spec.md §2-10）。 */}}
+  <dialog id="add-user-modal" class="ai-modal w-[min(28rem,calc(100vw-2rem))] rounded-xl p-5 shadow-2xl" aria-labelledby="add-user-title">
+    <div class="flex items-center justify-between border-b border-neutral-200 pb-3">
+      <h2 id="add-user-title" class="text-base font-semibold text-neutral-900">{{if $ja}}新規ユーザー登録{{else}}Add user{{end}}</h2>
+      <button type="button" onclick="this.closest('dialog').close()" class="btn btn-ghost btn-sm" aria-label="{{if $ja}}閉じる{{else}}Close{{end}}">
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+        </svg>
+      </button>
+    </div>
+    <form method="post" action="/admin/users" id="add-user-form" class="mt-4 flex flex-col gap-3">
+      <input type="hidden" name="_csrf" value="{{$csrf}}">
+      <label class="text-xs font-medium text-neutral-600">{{if $ja}}ユーザー名 (半角英数字3〜32字){{else}}User name (3–32 letters, digits, - or _){{end}}
+        <input name="username" type="text" required pattern="[a-zA-Z0-9_-]{3,32}" placeholder="{{if $ja}}例: yamada{{else}}e.g. jsmith{{end}}"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+      </label>
+      <label class="text-xs font-medium text-neutral-600">{{if $ja}}表示名 (任意){{else}}Display name (optional){{end}}
+        <input name="display_name" type="text" placeholder="{{if $ja}}例: 山田 太郎{{else}}e.g. John Smith{{end}}"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+      </label>
+      <label class="text-xs font-medium text-neutral-600">{{if $ja}}初期パスワード (8文字以上){{else}}Initial password (8+ characters){{end}}
+        <input name="password" type="password" required minlength="8"
+               class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+      </label>
+      <div>
+        <div class="flex items-center"><label for="add-user-role" class="text-xs font-medium text-neutral-600">{{if $ja}}権限 (ロール){{else}}Role{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}<strong>ライター</strong>: 記事を書いて下書き保存・校閲に回せます。{{else}}<strong>Writer</strong>: writes articles, saves drafts and sends them for review.{{end}}</span><span>{{if $ja}}<strong>編集者</strong>: すべての記事を校閲・公開・管理できます。{{else}}<strong>Editor</strong>: reviews, publishes and manages all articles.{{end}}</span><span>{{if $ja}}<strong>管理者</strong>: サイトの設定とユーザーの管理を行います。{{else}}<strong>Admin</strong>: manages site settings and users.{{end}}</span></span></span></div>
+        <select id="add-user-role" name="role" class="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+          <option value="writer" selected>{{if $ja}}ライター (Writer: 執筆・下書きのみ){{else}}Writer (writing and drafts only){{end}}</option>
+          <option value="editor">{{if $ja}}編集者 (Editor: 校閲・公開・全記事管理){{else}}Editor (review, publish, manage all articles){{end}}</option>
+          <option value="admin">{{if $ja}}管理者 (Admin: 設定・ユーザー管理のみ){{else}}Admin (settings and user management only){{end}}</option>
+        </select>
+      </div>
+      <div class="mt-2 flex items-center justify-end gap-2 border-t border-neutral-100 pt-3">
+        <button type="button" onclick="this.closest('dialog').close()" class="btn btn-secondary btn-md">{{if $ja}}キャンセル{{else}}Cancel{{end}}</button>
+        <button type="submit" class="btn btn-primary btn-md">{{if $ja}}アカウント作成{{else}}Create account{{end}}</button>
+      </div>
+    </form>
+  </dialog>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+(function() {
+  document.querySelectorAll('dialog[id^="password-modal-"], #add-user-modal').forEach(function(d) {
+    d.addEventListener('click', function(e) {
+      if (e.target === d) d.close();
+    });
+  });
+})();
+</script>
+{{end}}

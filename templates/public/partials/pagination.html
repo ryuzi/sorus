@@ -1,0 +1,16 @@
+{{/* ページ送り。受け取る値（pagination）: Page・TotalPages・PrevURL・NextURL・Lang・Pages（ページ番号の並び）。
+     「前へ」・ページ番号（先頭・末尾・現在のページの前後。離れた所は … で省略）・「次へ」・現在位置（.page-status「6 / 47」）の順に出す。
+     現在のページの番号はリンクにせず aria-current="page" を付ける（テーマは .pagination [aria-current="page"] で塗る）。
+     既定の public.css は、狭い画面では番号を隠し「← 前へ 6 / 47 次へ →」にする。 */}}
+{{define "pagination"}}
+{{if gt .TotalPages 1}}{{$en := eq .Lang "en"}}
+<nav class="pagination" aria-label="{{if $en}}Pagination{{else}}ページ送り{{end}}">
+  {{if .PrevURL}}<a class="page-prev" href="{{.PrevURL}}" rel="prev">← {{if $en}}Previous{{else}}前へ{{end}}</a>{{else}}<span class="disabled page-prev">← {{if $en}}Previous{{else}}前へ{{end}}</span>{{end}}
+  {{range .Pages}}{{if .Gap}}<span class="page-ellipsis" aria-hidden="true">…</span>
+  {{else if .Current}}<span class="page-number" aria-current="page">{{.Num}}</span>
+  {{else}}<a class="page-number" href="{{.URL}}" aria-label="{{if $en}}Page {{.Num}}{{else}}{{.Num}}ページ目{{end}}">{{.Num}}</a>
+  {{end}}{{end}}{{if .NextURL}}<a class="page-next" href="{{.NextURL}}" rel="next">{{if $en}}Next{{else}}次へ{{end}} →</a>{{else}}<span class="disabled page-next">{{if $en}}Next{{else}}次へ{{end}} →</span>{{end}}
+  <span class="page-status">{{.Page}} / {{.TotalPages}}</span>
+</nav>
+{{end}}
+{{end}}

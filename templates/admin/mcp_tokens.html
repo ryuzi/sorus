@@ -1,0 +1,553 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$csrf := .CSRFToken}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+    {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  {{template "ai_tabs" $}}
+  {{/* 見出しは共通の「AI」（partials/ai_tabs.html）。この画面は「外部の AI アプリとつなぐ」のタブ。紹介は下の1文だけにし、
+       権限の説明は ? に入れる（同じ趣旨の紹介を何度も出さない）。 */}}
+  <p id="mcp-description" class="mb-5 text-sm text-neutral-600">
+    {{$.T "mcp_description"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}AI アプリは、連携を許可した（APIトークンを発行した）あなたの権限（<strong>{{$.T (roleKey $d.Role)}}</strong>）で動作します。{{else}}AI apps act with the permissions of you, the person who allowed the connection or issued the API token (<strong>{{$.T (roleKey $d.Role)}}</strong>).{{end}}</span><span>{{if $ja}}MCP（Model Context Protocol）は、AI アプリが外部のサービスを使うための共通の仕組みです。{{else}}MCP (Model Context Protocol) is a common way for AI apps to use external services.{{end}}</span></span></span>
+  </p>
+
+  {{/* 上段: 専門知識のない人向けの案内（admin_ux_polish_and_mcp_spec.md §2-6）。接続URL・公式サイトへのリンク・2つの接続方法を並べ、
+       細かい説明は「?」に入れる。クライアントごとの設定例は下の「高度な設定」の折りたたみにまとめる。 */}}
+  <section id="mcp-intro" class="mb-6 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm" aria-labelledby="mcp-intro-title">
+    <h2 id="mcp-intro-title" class="text-sm font-semibold text-neutral-800">{{if $ja}}つなぎ方{{else}}How to connect{{end}}</h2>
+
+    {{/* 2つの接続URL（admin_ux_and_desktop_polish_spec.md §1-4）。PC 版（127.0.0.1）の URL は同じ PC の AI ツール専用、
+         公開サーバー（--public-only）に接続していれば、その URL はどこからでも使える。公開サーバーが無い（静的な公開先など）
+         ときは、公開サーバーの URL は出さない。 */}}
+    {{$remoteURL := ""}}{{with $d.Remote}}{{$remoteURL = .Endpoint}}{{end}}
+    <div class="mt-4 grid gap-4{{if $remoteURL}} lg:grid-cols-2{{end}}">
+      <div id="mcp-endpoint-local">
+        <div class="flex items-center"><label for="mcp-endpoint" class="text-sm font-semibold text-neutral-800">{{if $d.EndpointLocal}}{{if $ja}}この PC 専用の接続URL（ローカル）{{else}}URL for this PC only (local){{end}}{{else}}{{if $ja}}接続URL{{else}}Connection URL{{end}}{{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}AI アプリの「コネクタ」や「MCP サーバー」の追加画面に貼り付ける、この sorus の MCP サーバーの URL です。{{else}}The URL of this sorus's MCP server. Paste it where your AI app adds a "connector" or "MCP server".{{end}}</span>{{if $d.EndpointLocal}}<span>{{if $ja}}この PC の中だけで使えるアドレス（<code>127.0.0.1</code>）です。ほかの PC・スマホや、Web 版の AI（ChatGPT・Claude など）からは届きません。{{else}}This address (<code>127.0.0.1</code>) works only inside this PC. Other PCs, phones, and web-based AI apps (ChatGPT, Claude, etc.) cannot reach it.{{end}}</span><span>{{if $remoteURL}}{{if $ja}}外出先やスマホ、Web 版の AI からつなぐときは、「どこからでも使える接続URL（公開サーバー）」を使ってください。{{else}}To connect from elsewhere, a phone, or a web-based AI app, use the "URL that works from anywhere (public server)".{{end}}{{else}}{{if $ja}}独自ドメインで動かしている sorus につなぐときは、<code>https://あなたのドメイン{{$d.EndpointPath}}</code> に読み替えてください。{{else}}For an sorus running on your own domain, use <code>https://your-domain{{$d.EndpointPath}}</code> instead.{{end}}{{end}}</span>{{else}}<span>{{if $ja}}この画面を開いているアドレスから作っています。ほかの PC やインターネットの AI アプリから使うときは、その場所から開けるアドレス（公開サーバーなら <code>https://</code> で始まる独自ドメイン）で管理画面を開いてからコピーしてください。{{else}}It is built from the address you used to open this page. To use it from another PC or an AI app on the internet, open the admin screen at an address reachable from there (for a public server, your own domain starting with <code>https://</code>) and copy it again.{{end}}</span>{{end}}</span></span></div>
+        {{if $d.EndpointLocal}}<p class="mt-0.5 text-xs text-neutral-600">{{if $ja}}同じ PC で動く AI ツール（Claude Desktop・Claude Code・VS Code など）からつなぐとき{{else}}For AI tools running on this same PC (Claude Desktop, Claude Code, VS Code, etc.){{end}}</p>{{end}}
+        <div class="mt-1.5 flex flex-col gap-2 sm:flex-row">
+          <input id="mcp-endpoint" type="text" readonly value="{{$d.Endpoint}}" spellcheck="false"
+                 class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 font-mono text-sm text-neutral-800">
+          <button type="button" data-copy-target="#mcp-endpoint" class="btn btn-secondary btn-md">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+        </div>
+      </div>
+      {{if $remoteURL}}
+      <div id="mcp-endpoint-anywhere">
+        <div class="flex items-center"><label for="mcp-endpoint-remote" class="text-sm font-semibold text-neutral-800">{{if $ja}}どこからでも使える接続URL（公開サーバー）{{else}}URL that works from anywhere (public server){{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}接続中の公開サーバーの MCP サーバーの URL です。インターネットにつながっていれば、外出先の PC・スマホ・Web 版の AI（ChatGPT・Claude など）から使えます。{{else}}The MCP server URL of the connected public server. It works from any PC, phone, or web-based AI app (ChatGPT, Claude, etc.) with an internet connection.{{end}}</span><span>{{if $ja}}公開サーバーの確認コード・連携中のアプリ・APIトークンは、下の「公開サーバーの MCP 連携」で管理します。{{else}}Manage the public server's confirmation code, connected apps, and API tokens under "Public server MCP integration" below.{{end}}</span></span></span></div>
+        <p class="mt-0.5 text-xs text-neutral-600">{{if $ja}}外出先・スマホ・Web 版の AI アプリからつなぐとき{{else}}For connecting from elsewhere, a phone, or web-based AI apps{{end}}</p>
+        <div class="mt-1.5 flex flex-col gap-2 sm:flex-row">
+          <input id="mcp-endpoint-remote" type="text" readonly value="{{$remoteURL}}" spellcheck="false"
+                 class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 font-mono text-sm text-neutral-800">
+          <button type="button" data-copy-target="#mcp-endpoint-remote" class="btn btn-secondary btn-md">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+        </div>
+      </div>
+      {{end}}
+    </div>
+
+    <div class="mt-5 grid gap-4 lg:grid-cols-2">
+      <div id="mcp-connect-oauth" class="flex flex-col rounded-lg border border-neutral-200 p-4">
+        <h3 class="flex items-center text-sm font-semibold text-neutral-800">{{if $ja}}Web・スマホの AI アプリでつなぐ（おすすめ）{{else}}Connect from web and mobile AI apps (recommended){{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}OAuth 2.1 という仕組みで、sorus にログインして「許可」するだけでつながります。APIトークンのコピーは要りません。{{else}}With OAuth 2.1, you just sign in to sorus and press "Allow". No API token copying is needed.{{end}}</span><span>{{if $ja}}使えるのは、インターネットから <code>https://</code> で開ける公開サーバー（独自ドメイン）で sorus を動かしているときです。PC 版（<code>127.0.0.1</code>）や社内 LAN だけで動かしているサーバーには、クラウドの AI サービスからは届きません。その場合は右の「PC の AI ツールでつなぐ」を使ってください。{{else}}This works when sorus runs on a public server reachable from the internet over <code>https://</code> (your own domain). Cloud AI services cannot reach the desktop version (<code>127.0.0.1</code>) or a server used only inside your office LAN; use "Connect from AI tools on a PC" instead.{{end}}</span><span>{{if $ja}}メニューの名前（「コネクタ」「カスタムコネクタ」「MCP」など）や、使えるプランはアプリごとに違います。各アプリの案内も確認してください。{{else}}Menu names ("Connectors", "Custom connector", "MCP", etc.) and supported plans differ between apps. Check each app's guide as well.{{end}}</span></span></span></h3>
+        <p class="mt-1 text-xs text-neutral-600">ChatGPT / Claude / Gemini / Perplexity{{if $ja}} など{{else}}, etc.{{end}}</p>
+        <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-neutral-700">
+          {{if $remoteURL}}
+          <li>{{if $ja}}AI アプリの設定で「コネクタを追加」を開き、上の「どこからでも使える接続URL（公開サーバー）」を貼り付けます。{{else}}In the AI app's settings, open "Add connector" and paste the "URL that works from anywhere (public server)" above.{{end}}</li>
+          <li>{{if $ja}}公開サーバーの同意画面が開いたら、下の「公開サーバーの MCP 連携」の「確認コードを表示」で出たコードを入力し、「許可」を押します。{{else}}When the public server's consent screen opens, enter the code from "Show confirmation code" under "Public server MCP integration" below, then press "Allow".{{end}}</li>
+          <li>{{if $ja}}つないだアプリは下の「公開サーバーの連携中のアプリ」に出て、いつでも取り消せます。{{else}}Connected apps appear under "Connected apps on public server" below, and you can revoke them at any time.{{end}}</li>
+          {{else}}
+          <li>{{if $ja}}AI アプリの設定で「コネクタを追加」を開き、上の接続URLを貼り付けます。{{else}}In the AI app's settings, open "Add connector" and paste the connection URL above.{{end}}</li>
+          <li>{{if $ja}}sorus のログイン画面が開いたらログインし、「許可」を押します。{{else}}When the sorus sign-in page opens, sign in and press "Allow".{{end}}</li>
+          <li>{{if $ja}}つないだアプリは下の「連携中のアプリ」に出て、いつでも取り消せます。{{else}}Connected apps appear under "Connected apps" below, and you can revoke them at any time.{{end}}</li>
+          {{end}}
+        </ol>
+        <div class="mt-auto flex flex-wrap gap-2 pt-4">
+          <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" id="mcp-link-chatgpt" class="btn btn-secondary btn-sm">{{if $ja}}ChatGPT を開く{{else}}Open ChatGPT{{end}}<span class="sr-only">{{if $ja}}（新しいタブ）{{else}} (new tab){{end}}</span></a>
+          <a href="https://claude.ai/" target="_blank" rel="noopener noreferrer" id="mcp-link-claude" class="btn btn-secondary btn-sm">{{if $ja}}Claude を開く{{else}}Open Claude{{end}}<span class="sr-only">{{if $ja}}（新しいタブ）{{else}} (new tab){{end}}</span></a>
+        </div>
+      </div>
+      <div id="mcp-connect-local" class="flex flex-col rounded-lg border border-neutral-200 p-4">
+        <h3 class="flex items-center text-sm font-semibold text-neutral-800">{{if $ja}}PC の AI ツールでつなぐ（APIトークン）{{else}}Connect from AI tools on a PC (API token){{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}PC 版の sorus（接続URLが <code>127.0.0.1</code> で始まる）は、同じ PC で動く AI ツールからつなぎます。{{else}}The desktop version of sorus (connection URL starting with <code>127.0.0.1</code>) is connected from AI tools running on the same PC.{{end}}</span><span>{{if $ja}}社内 LAN で動かしているサーバーは、同じネットワークにある PC の AI ツールからつなげます。{{else}}A server running on your office LAN can be connected from AI tools on PCs in the same network.{{end}}</span><span>{{if $ja}}sorus の MCP 連携は Bearer トークン方式にも対応しています。AI ツールに「カスタムヘッダー（Authorization）」を設定できれば、どのツールでも使えます。{{else}}sorus's MCP integration also supports the Bearer token method. Any tool that lets you set a "custom header (Authorization)" can use it.{{end}}</span></span></span></h3>
+        <p class="mt-1 text-xs text-neutral-600">Claude Desktop / Claude Code / VS Code / Cursor / GitHub Copilot CLI{{if $ja}} など{{else}}, etc.{{end}}</p>
+        <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-neutral-700">
+          <li>{{if $ja}}下の「新しいAPIトークンを発行」で、使うツールの名前を付けて発行します。{{else}}Under "Issue a new API token" below, issue a token named after the tool you will use.{{end}}</li>
+          <li>{{if $ja}}いちばん下の「高度な設定」から、ツールに合う設定例をコピーして貼り付けます。{{else}}Copy the matching settings example from "Advanced settings" at the bottom and paste it into the tool.{{end}}</li>
+          <li>{{if $ja}}使わなくなったトークンは「失効」を押すと、すぐに使えなくなります。{{else}}Press "Revoke" on a token you no longer use to disable it immediately.{{end}}</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  {{if $d.NewToken}}
+  <section id="new-token" class="mb-6 rounded-xl border border-neutral-300 bg-neutral-50 p-4 text-neutral-950" aria-labelledby="new-token-title">
+    <h2 id="new-token-title" class="font-semibold">{{$.T "mcp_token_issued"}}</h2>
+    <p class="mt-1 text-sm">{{$.T "mcp_token_notice"}}</p>
+    <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+      <label for="new-token-value" class="sr-only">{{if $ja}}APIトークン{{else}}API token{{end}}</label>
+      <input id="new-token-value" type="text" readonly value="{{$d.NewToken}}" spellcheck="false"
+             class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 font-mono text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-400">
+      <button type="button" data-copy-target="#new-token-value"
+              class="btn btn-primary btn-md">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+    </div>
+  </section>
+  {{end}}
+
+  {{/* OAuth 2.1 で連携を許可したアプリ（Task 1 の mcpTokensData.OAuthApps）。取り消すと、そのアプリのアクセストークンは使えなくなる。 */}}
+  <section id="oauth-apps" class="mb-6 rounded-xl border border-neutral-200 bg-white shadow-sm" aria-labelledby="oauth-apps-title">
+    <h2 id="oauth-apps-title" class="flex items-center border-b border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-800">{{if $ja}}{{if $d.ShowOwner}}連携中のアプリ（全員分）{{else}}連携中のアプリ{{end}}{{else}}{{if $d.ShowOwner}}Connected apps (everyone){{else}}Connected apps{{end}}{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}Web・スマホの AI アプリで「許可」したものです。心当たりのないアプリや使わなくなったアプリは「取り消す」を押すと、すぐに接続できなくなります。{{else}}Apps you allowed from web and mobile AI apps. Press "Revoke" on an app you do not recognize or no longer use to disconnect it immediately.{{end}}</span></span></h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-neutral-50 text-xs text-neutral-500">
+          <tr>
+            <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}アプリ{{else}}App{{end}}</th>
+            {{if $d.ShowOwner}}<th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}許可した人{{else}}Allowed by{{end}}</th>{{end}}
+            <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}許可した日{{else}}Allowed{{end}}</th>
+            <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}最終使用{{else}}Last used{{end}}</th>
+            <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}有効期限{{else}}Expires{{end}}</th>
+            <th class="px-4 py-2"><span class="sr-only">{{if $ja}}操作{{else}}Actions{{end}}</span></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-neutral-100">
+          {{range $d.OAuthApps}}
+          <tr class="oauth-app-row" data-oauth-app-id="{{.ID}}">
+            <td class="px-4 py-2.5 font-medium text-neutral-900">{{.ClientName}}</td>
+            {{if $d.ShowOwner}}<td class="px-4 py-2.5 text-neutral-600">{{.OwnerName}}</td>{{end}}
+            <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{formatTime .CreatedAt}}</td>
+            <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{with .LastUsedAt}}{{formatTimePtr .}}{{else}}<span class="text-neutral-400">{{if $ja}}未使用{{else}}Never used{{end}}</span>{{end}}</td>
+            <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{formatTime .ExpiresAt}}</td>
+            <td class="whitespace-nowrap px-4 py-2.5 text-right">
+              <form method="post" action="/admin/settings/mcp/oauth/{{.ID}}/revoke" data-confirm="{{if $ja}}「{{.ClientName}}」との連携を取り消しますか？このアプリは接続できなくなります。{{else}}Revoke the connection with “{{.ClientName}}”? This app will no longer be able to connect.{{end}}">
+                <input type="hidden" name="_csrf" value="{{$csrf}}">
+                <button type="submit" class="btn btn-danger btn-sm">{{if $ja}}取り消す{{else}}Revoke{{end}}</button>
+              </form>
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="{{if $d.ShowOwner}}6{{else}}5{{end}}" class="px-4 py-6 text-center text-neutral-400">{{if $ja}}連携中のアプリはありません。{{else}}No connected apps.{{end}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+    <section id="token-list" class="rounded-xl border border-neutral-200 bg-white shadow-sm" aria-labelledby="token-list-title">
+      <h2 id="token-list-title" class="border-b border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-800">
+        {{if $ja}}{{if $d.ShowOwner}}発行済みのAPIトークン（全員分）{{else}}あなたのAPIトークン{{end}}{{else}}{{if $d.ShowOwner}}Issued API tokens (everyone){{else}}Your API tokens{{end}}{{end}}
+      </h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-neutral-50 text-xs text-neutral-500">
+            <tr>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}名前{{else}}Name{{end}}</th>
+              {{if $d.ShowOwner}}<th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}発行者{{else}}Issued by{{end}}</th>{{end}}
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}作成{{else}}Created{{end}}</th>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}最終使用{{else}}Last used{{end}}</th>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}有効期限{{else}}Expires{{end}}</th>
+              <th class="px-4 py-2"><span class="sr-only">{{if $ja}}操作{{else}}Actions{{end}}</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100">
+            {{range $d.Tokens}}
+            <tr class="token-row" data-token-id="{{.ID}}">
+              <td class="px-4 py-2.5 font-medium text-neutral-900">{{.Name}}</td>
+              {{if $d.ShowOwner}}<td class="px-4 py-2.5 text-neutral-600">{{.OwnerName}}</td>{{end}}
+              <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{formatTime .CreatedAt}}</td>
+              <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{with .LastUsedAt}}{{formatTimePtr .}}{{else}}<span class="text-neutral-400">{{if $ja}}未使用{{else}}Never used{{end}}</span>{{end}}</td>
+              <td class="whitespace-nowrap px-4 py-2.5">
+                {{if .Expired}}<span class="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-800">{{if $ja}}期限切れ{{else}}Expired{{end}}</span>
+                {{else if .ExpiresAt}}<span class="text-neutral-500">{{formatTimePtr .ExpiresAt}}</span>
+                {{else}}<span class="text-neutral-500">{{if $ja}}無期限{{else}}No expiry{{end}}</span>{{end}}
+              </td>
+              <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                <form method="post" action="/admin/settings/mcp/{{.ID}}/revoke" data-confirm="{{if $ja}}APIトークン「{{.Name}}」を失効させますか？このトークンを使っている AI ツールは接続できなくなります。{{else}}Revoke the API token “{{.Name}}”? AI tools using this token will no longer be able to connect.{{end}}">
+                  <input type="hidden" name="_csrf" value="{{$csrf}}">
+                  <button type="submit" class="btn btn-danger btn-sm">{{if $ja}}失効{{else}}Revoke{{end}}</button>
+                </form>
+              </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="{{if $d.ShowOwner}}6{{else}}5{{end}}" class="px-4 py-10 text-center text-neutral-400">{{if $ja}}まだAPIトークンがありません。右のフォームから発行してください。{{else}}No API tokens yet. Issue one with the form on the right.{{end}}</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="token-form-section" class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm" aria-labelledby="token-form-title">
+      <h2 id="token-form-title" class="mb-3 flex items-center text-sm font-semibold text-neutral-800">{{if $ja}}新しいAPIトークンを発行{{else}}Issue a new API token{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}PC の AI ツール用です。トークンはパスワードと同じように扱ってください。CMS にはハッシュ値だけを保存し、発行したときに1回だけ表示します。{{else}}For AI tools on a PC. Treat tokens like passwords. The CMS stores only their hash and shows the token only once, when it is issued.{{end}}</span></span></h2>
+      <form id="token-form" method="post" action="/admin/settings/mcp" class="flex flex-col gap-3">
+        <input type="hidden" name="_csrf" value="{{$csrf}}">
+        <label class="text-xs font-medium text-neutral-600">{{if $ja}}名前（使うツールや端末）{{else}}Name (tool or device you will use){{end}}
+          <input name="name" type="text" required maxlength="100" value="{{$d.FormName}}" placeholder="{{if $ja}}使うツールや端末の名前{{else}}Name of the tool or device{{end}}"
+                 class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+        </label>
+        <label class="text-xs font-medium text-neutral-600">{{if $ja}}有効期限{{else}}Expires{{end}}
+          <select name="expires" class="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+            {{range $d.Expiries}}<option value="{{.Value}}"{{if eq .Value $d.FormExpiry}} selected{{end}}>{{if $ja}}{{.Label}}{{else if eq .Value "never"}}No expiry{{else if eq .Value "365"}}1 year{{else}}{{.Days}} days{{end}}</option>{{end}}
+          </select>
+        </label>
+        <button type="submit" class="btn btn-primary btn-md">{{if $ja}}発行する{{else}}Issue{{end}}</button>
+
+      </form>
+    </section>
+  </div>
+
+  {{/* 接続中の公開サーバー（--public-only）の MCP 連携（handlers_remote_mcp.go の mcpTokensData.Remote）。
+       公開サーバーが設定済みで、ローカルの管理者のときだけ表示する。 */}}
+  {{if $d.Remote}}{{$r := $d.Remote}}
+  <section id="remote-mcp" class="mt-6 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm" aria-labelledby="remote-mcp-title"
+           data-remote-mcp
+           data-err-generic="{{if $ja}}公開サーバーとの通信に失敗しました{{else}}Failed to communicate with the public server{{end}}">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="remote-mcp-title" class="flex items-center text-base font-semibold text-neutral-900">{{if $ja}}公開サーバーの MCP 連携{{else}}Public server MCP integration{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}接続中の公開サーバー（<code>{{$r.ServerURL}}</code>）には管理画面が無いため、公開サーバーの秘匿 MCP URL・本人確認コード・連携中のアプリ・APIトークンをこの画面から管理します。{{else}}Because the connected public server (<code>{{$r.ServerURL}}</code>) has no admin screen, manage its secret MCP URL, confirmation code, connected apps, and API tokens from here.{{end}}</span><span>{{if $ja}}AI アプリは、公開サーバーへの接続に使っている招待の権限（<strong>{{$.T (roleKey $r.Role)}}</strong>）で動作します。{{else}}AI apps act with the permissions of the invite used to connect to the public server (<strong>{{$.T (roleKey $r.Role)}}</strong>).{{end}}</span></span></span></h2>
+      <p class="text-xs text-neutral-500">
+        <span class="font-mono">{{$r.ServerURL}}</span>{{if $r.Subject}} · {{$r.Subject}}{{if $ja}}（{{$.T (roleKey $r.Role)}}）{{else}} ({{$.T (roleKey $r.Role)}}){{end}}{{end}}
+      </p>
+    </div>
+
+    <p id="remote-mcp-error" class="notice notice-error mt-3" role="alert"{{if not $r.Error}} hidden{{end}}>{{$r.Error}}</p>
+
+    {{if $r.Endpoint}}
+    <div class="mt-4">
+      <div class="flex items-center"><label for="remote-mcp-endpoint" class="text-sm font-semibold text-neutral-800">{{if $ja}}どこからでも使える接続URL（公開サーバー）{{else}}URL that works from anywhere (public server){{end}}</label><span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}第三者に推測されない秘匿パス（<code>/api/mcp-...</code>）を含んだ URL です。外出先の PC・スマホ・Web 版の AI アプリ（ChatGPT・Claude など）に貼り付けてください。{{else}}A URL with an unguessable secret path (<code>/api/mcp-...</code>). Paste it into AI apps on any PC, phone, or the web (ChatGPT, Claude, etc.).{{end}}</span><span>{{if $ja}}PC の AI ツールで公開サーバーにつなぐときは、下で発行する公開サーバーの APIトークンを使います（この PC の APIトークンは公開サーバーでは使えません）。{{else}}When connecting a PC AI tool to the public server, use a public server API token issued below (this PC's API tokens do not work on the public server).{{end}}</span></span></span></div>
+      <div class="mt-1.5 flex flex-col gap-2 sm:flex-row">
+        <input id="remote-mcp-endpoint" type="text" readonly value="{{$r.Endpoint}}" spellcheck="false"
+               class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 font-mono text-sm text-neutral-800">
+        <button type="button" data-copy-target="#remote-mcp-endpoint" class="btn btn-secondary btn-md">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+      </div>
+    </div>
+
+    {{if $r.OAuth}}
+    <div id="remote-mcp-login-code" class="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="flex items-center text-sm font-semibold text-neutral-800">{{if $ja}}同意画面の本人確認コード{{else}}Confirmation code for the consent screen{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}公開サーバーにはログイン画面が無いため、AI アプリ（ChatGPT・Claude など）をつなぐときは、この PC で表示した8文字の確認コードを同意画面に入力して本人確認を行います（10分間・1回限り有効）。{{else}}Because the public server has no sign-in page, when connecting an AI app (ChatGPT, Claude, etc.), enter the 8-character confirmation code shown on this PC into the consent screen (valid for 10 minutes, once).{{end}}</span></span></span></h3>
+          <p class="mt-0.5 text-xs text-neutral-600">{{if $ja}}AI アプリが公開サーバーの同意画面を開いたら、下のボタンを押して表示されたコードを入力してください。{{else}}When the AI app opens the public server's consent screen, press the button below and enter the code shown.{{end}}</p>
+        </div>
+        <button type="button" id="remote-mcp-login-code-btn" class="btn btn-primary btn-sm">{{if $ja}}確認コードを表示{{else}}Show confirmation code{{end}}</button>
+      </div>
+      <div id="remote-mcp-login-code-box" class="mt-3 flex flex-wrap items-center gap-2" hidden>
+        <label for="remote-mcp-login-code-value" class="sr-only">{{if $ja}}確認コード{{else}}Confirmation code{{end}}</label>
+        <input id="remote-mcp-login-code-value" type="text" readonly value="" spellcheck="false"
+               class="w-40 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-center font-mono text-base font-bold tracking-widest text-neutral-900">
+        <button type="button" data-copy-target="#remote-mcp-login-code-value" class="btn btn-secondary btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+      </div>
+    </div>
+    {{end}}
+
+    <div id="remote-new-token" class="mt-4 rounded-xl border border-neutral-300 bg-neutral-50 p-4 text-neutral-950" hidden>
+      <p class="text-sm font-semibold">{{$.T "mcp_token_issued"}}</p>
+      <p class="mt-1 text-xs">{{$.T "mcp_token_notice"}}</p>
+      <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+        <label for="remote-new-token-value" class="sr-only">{{if $ja}}公開サーバーのAPIトークン{{else}}Public server API token{{end}}</label>
+        <input id="remote-new-token-value" type="text" readonly value="" spellcheck="false"
+               class="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 font-mono text-sm text-neutral-900">
+        <button type="button" data-copy-target="#remote-new-token-value" class="btn btn-primary btn-md">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+      </div>
+    </div>
+
+    <div id="remote-oauth-apps" class="mt-5 rounded-xl border border-neutral-200 bg-white">
+      <h3 class="border-b border-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-800">{{if $ja}}{{if $r.ShowOwner}}公開サーバーの連携中のアプリ（全員分）{{else}}公開サーバーの連携中のアプリ{{end}}{{else}}{{if $r.ShowOwner}}Connected apps on public server (everyone){{else}}Connected apps on public server{{end}}{{end}}</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-neutral-50 text-xs text-neutral-500">
+            <tr>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}アプリ{{else}}App{{end}}</th>
+              {{if $r.ShowOwner}}<th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}許可した人{{else}}Allowed by{{end}}</th>{{end}}
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}許可した日{{else}}Allowed{{end}}</th>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}最終使用{{else}}Last used{{end}}</th>
+              <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}有効期限{{else}}Expires{{end}}</th>
+              <th class="px-4 py-2"><span class="sr-only">{{if $ja}}操作{{else}}Actions{{end}}</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100">
+            {{range $r.OAuthApps}}
+            <tr class="remote-oauth-app-row" data-remote-oauth-app-id="{{.ID}}">
+              <td class="px-4 py-2.5 font-medium text-neutral-900">{{.ClientName}}</td>
+              {{if $r.ShowOwner}}<td class="px-4 py-2.5 text-neutral-600">{{.OwnerName}}</td>{{end}}
+              <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{formatTime .CreatedAt}}</td>
+              <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{with .LastUsedAt}}{{formatTimePtr .}}{{else}}<span class="text-neutral-400">{{if $ja}}未使用{{else}}Never used{{end}}</span>{{end}}</td>
+              <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{formatTime .ExpiresAt}}</td>
+              <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                <button type="button" class="btn btn-danger btn-sm" data-remote-oauth-revoke="{{.ID}}"
+                        data-confirm="{{if $ja}}公開サーバーの「{{.ClientName}}」との連携を取り消しますか？{{else}}Revoke the connection with “{{.ClientName}}” on the public server?{{end}}">{{if $ja}}取り消す{{else}}Revoke{{end}}</button>
+              </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="{{if $r.ShowOwner}}6{{else}}5{{end}}" class="px-4 py-5 text-center text-neutral-400">{{if $ja}}公開サーバーで連携中のアプリはありません。{{else}}No connected apps on the public server.{{end}}</td></tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div id="remote-token-list" class="rounded-xl border border-neutral-200 bg-white">
+        <h3 class="border-b border-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-800">{{if $ja}}{{if $r.ShowOwner}}公開サーバーのAPIトークン（全員分）{{else}}公開サーバーのAPIトークン{{end}}{{else}}{{if $r.ShowOwner}}Public server API tokens (everyone){{else}}Public server API tokens{{end}}{{end}}</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-neutral-50 text-xs text-neutral-500">
+              <tr>
+                <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}名前{{else}}Name{{end}}</th>
+                {{if $r.ShowOwner}}<th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}発行者{{else}}Issued by{{end}}</th>{{end}}
+                <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}作成{{else}}Created{{end}}</th>
+                <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}最終使用{{else}}Last used{{end}}</th>
+                <th class="whitespace-nowrap px-4 py-2 font-medium">{{if $ja}}有効期限{{else}}Expires{{end}}</th>
+                <th class="px-4 py-2"><span class="sr-only">{{if $ja}}操作{{else}}Actions{{end}}</span></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-neutral-100">
+              {{range $r.Tokens}}
+              <tr class="remote-token-row" data-remote-token-id="{{.ID}}">
+                <td class="px-4 py-2.5 font-medium text-neutral-900">{{.Name}}</td>
+                {{if $r.ShowOwner}}<td class="px-4 py-2.5 text-neutral-600">{{.OwnerName}}</td>{{end}}
+                <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{formatTime .CreatedAt}}</td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{{with .LastUsedAt}}{{formatTimePtr .}}{{else}}<span class="text-neutral-400">{{if $ja}}未使用{{else}}Never used{{end}}</span>{{end}}</td>
+                <td class="whitespace-nowrap px-4 py-2.5">
+                  {{if .Expired}}<span class="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-800">{{if $ja}}期限切れ{{else}}Expired{{end}}</span>
+                  {{else if .ExpiresAt}}<span class="text-neutral-500">{{formatTimePtr .ExpiresAt}}</span>
+                  {{else}}<span class="text-neutral-500">{{if $ja}}無期限{{else}}No expiry{{end}}</span>{{end}}
+                </td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                  <button type="button" class="btn btn-danger btn-sm" data-remote-token-revoke="{{.ID}}"
+                          data-confirm="{{if $ja}}公開サーバーのAPIトークン「{{.Name}}」を失効させますか？{{else}}Revoke the API token “{{.Name}}” on the public server?{{end}}">{{if $ja}}失効{{else}}Revoke{{end}}</button>
+                </td>
+              </tr>
+              {{else}}
+              <tr><td colspan="{{if $r.ShowOwner}}6{{else}}5{{end}}" class="px-4 py-6 text-center text-neutral-400">{{if $ja}}公開サーバーのAPIトークンはありません。{{else}}No API tokens on the public server.{{end}}</td></tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-neutral-200 bg-white p-4">
+        <h3 class="mb-3 text-sm font-semibold text-neutral-800">{{if $ja}}公開サーバーのAPIトークンを発行{{else}}Issue a public server API token{{end}}</h3>
+        <form id="remote-token-form" method="post" action="/admin/settings/mcp/remote/tokens" class="flex flex-col gap-3">
+          <input type="hidden" name="_csrf" value="{{$csrf}}">
+          <label class="text-xs font-medium text-neutral-600">{{if $ja}}名前（使うツールや端末）{{else}}Name (tool or device you will use){{end}}
+            <input name="name" type="text" required maxlength="100" placeholder="{{if $ja}}使うツールや端末の名前{{else}}Name of the tool or device{{end}}"
+                   class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+          </label>
+          <label class="text-xs font-medium text-neutral-600">{{if $ja}}有効期限{{else}}Expires{{end}}
+            <select name="expires" class="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:border-zinc-500 focus:outline-none">
+              {{range $d.Expiries}}<option value="{{.Value}}"{{if eq .Value $d.FormExpiry}} selected{{end}}>{{if $ja}}{{.Label}}{{else if eq .Value "never"}}No expiry{{else if eq .Value "365"}}1 year{{else}}{{.Days}} days{{end}}</option>{{end}}
+            </select>
+          </label>
+          <button type="submit" class="btn btn-primary btn-md">{{if $ja}}公開サーバーで発行する{{else}}Issue on public server{{end}}</button>
+        </form>
+      </div>
+    </div>
+    {{end}}
+  </section>
+  <script>
+  (function () {
+    'use strict';
+    var root = document.querySelector('[data-remote-mcp]');
+    if (!root) return;
+    var errBox = document.getElementById('remote-mcp-error');
+    var errGeneric = root.getAttribute('data-err-generic') || 'Error';
+    function csrf() {
+      return window.cmsCSRFToken ? window.cmsCSRFToken() : '';
+    }
+    function showError(msg) {
+      if (!errBox) return;
+      errBox.textContent = msg || errGeneric;
+      errBox.hidden = !msg;
+    }
+    function post(url, body) {
+      showError('');
+      return fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json', 'X-CSRF-Token': csrf() },
+        body: body || null
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (!r.ok) throw new Error(d.message || errGeneric);
+          return d;
+        });
+      });
+    }
+    var codeBtn = document.getElementById('remote-mcp-login-code-btn');
+    var codeBox = document.getElementById('remote-mcp-login-code-box');
+    var codeVal = document.getElementById('remote-mcp-login-code-value');
+    if (codeBtn && codeBox && codeVal) {
+      codeBtn.addEventListener('click', function () {
+        codeBtn.disabled = true;
+        post('/admin/settings/mcp/remote/login-code').then(function (d) {
+          codeVal.value = d.code || '';
+          codeBox.hidden = false;
+        }).catch(function (e) {
+          showError(e.message);
+        }).then(function () {
+          codeBtn.disabled = false;
+        });
+      });
+    }
+    var tokenForm = document.getElementById('remote-token-form');
+    var newTokBox = document.getElementById('remote-new-token');
+    var newTokVal = document.getElementById('remote-new-token-value');
+    if (tokenForm && newTokBox && newTokVal) {
+      tokenForm.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        var body = new URLSearchParams(new FormData(tokenForm));
+        post(tokenForm.action, body).then(function (d) {
+          newTokVal.value = d.token || '';
+          newTokBox.hidden = false;
+          tokenForm.reset();
+          // 「高度な設定」の公開サーバー向けの設定例にも、発行したトークンを入れる。
+          var sw = document.querySelector('[data-mcp-url-switch]');
+          if (sw && d.token) {
+            sw.setAttribute('data-remote-token', d.token);
+            sw.dispatchEvent(new Event('change'));
+          }
+        }).catch(function (e) {
+          showError(e.message);
+        });
+      });
+    }
+    root.addEventListener('click', function (ev) {
+      var btn = ev.target.closest && ev.target.closest('[data-remote-token-revoke],[data-remote-oauth-revoke]');
+      if (!btn) return;
+      if (btn.disabled) return;
+      var confirmMsg = btn.getAttribute('data-confirm');
+      var confirmed = confirmMsg ? window.sorusConfirm({ message: confirmMsg, danger: true }) : Promise.resolve(true);
+      confirmed.then(function (ok) {
+        if (!ok || btn.disabled) return;
+        var tokID = btn.getAttribute('data-remote-token-revoke');
+        var appID = btn.getAttribute('data-remote-oauth-revoke');
+        var url = tokID
+          ? '/admin/settings/mcp/remote/tokens/' + encodeURIComponent(tokID) + '/revoke'
+          : '/admin/settings/mcp/remote/oauth/' + encodeURIComponent(appID) + '/revoke';
+        btn.disabled = true;
+        post(url).then(function () {
+          var row = btn.closest('tr');
+          if (row) row.remove();
+        }).catch(function (e) {
+          btn.disabled = false;
+          showError(e.message);
+        });
+      });
+    });
+  })();
+  </script>
+  {{end}}
+
+  {{/* 下段: 高度な設定（通信方式・クライアントごとの設定例）。トークンを発行した直後は、設定例にトークンが入るので開いておく。 */}}
+  <details id="mcp-developer" class="mt-6 rounded-xl border border-neutral-200 bg-white shadow-sm"{{if $d.NewToken}} open{{end}}>
+  <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-neutral-700">{{if $ja}}高度な設定（接続URL・クライアント設定例）{{else}}Advanced settings (connection URL and client examples){{end}}</summary>
+  <section id="mcp-setup" class="border-t border-neutral-200 p-4" aria-labelledby="mcp-setup-title">
+    <h2 id="mcp-setup-title" class="flex items-center text-sm font-semibold text-neutral-800">{{if $ja}}AI ツールごとの設定例{{else}}Settings examples for each AI tool{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{if $ja}}接続URLは Streamable HTTP 方式です。旧仕様の SSE にしか対応しないツールは、末尾に <code>/sse</code> を付けた URL を使います。{{else}}The connection URL uses Streamable HTTP. For tools that support only the older SSE transport, add <code>/sse</code> to the end of the URL.{{end}}</span><span>{{if $ja}}VS Code / Cursor / Claude Code などで使える例です。{{else}}Examples for VS Code / Cursor / Claude Code and more.{{end}}</span></span></span></h2>
+    <p class="mt-1 text-xs text-neutral-500">VS Code / Cursor / Claude Code / GitHub Copilot CLI</p>
+    {{if not $d.NewToken}}<p class="mt-2 text-xs text-neutral-500">{{if $ja}}設定例の <code>&lt;APIトークン&gt;</code> は、発行したトークンに置き換えてください。{{else}}Replace <code>&lt;API token&gt;</code> in the examples with the token you issued.{{end}}</p>{{end}}
+
+    {{/* 設定例の接続先（admin_ux_and_desktop_polish_spec.md §1-4）。公開サーバーの接続URLがあれば、ローカル・公開サーバーの
+         どちらの URL の例にするかを選べる（data-local-url・data-remote-url を設定例の data-mcp-url に、トークンを data-mcp-auth の中で入れ替える）。
+         公開サーバーでは、この PC の APIトークンは使えないため、トークンも公開サーバー用に入れ替える。 */}}
+    {{if $remoteURL}}
+    <fieldset id="mcp-snippet-target" class="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2"
+              data-mcp-url-switch data-local-url="{{$d.Endpoint}}" data-remote-url="{{$remoteURL}}"
+              data-local-token="{{if or $ja $d.NewToken}}{{$d.TokenOrPlaceholder}}{{else}}<API token>{{end}}"
+              data-remote-token="{{if $ja}}<公開サーバーのAPIトークン>{{else}}<public server API token>{{end}}">
+      <legend class="sr-only">{{if $ja}}設定例の接続先{{else}}Connection target for the examples{{end}}</legend>
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-700">
+        <span class="text-xs font-semibold text-neutral-700" aria-hidden="true">{{if $ja}}設定例の接続先:{{else}}Examples connect to:{{end}}</span>
+        <label class="inline-flex cursor-pointer items-center gap-1.5"><input type="radio" name="mcp-snippet-target" value="local" checked class="h-4 w-4 border-neutral-300 text-zinc-800 focus:ring-zinc-500">{{if $ja}}この PC（ローカル）{{else}}This PC (local){{end}}</label>
+        <label class="inline-flex cursor-pointer items-center gap-1.5"><input type="radio" name="mcp-snippet-target" value="remote" class="h-4 w-4 border-neutral-300 text-zinc-800 focus:ring-zinc-500">{{if $ja}}どこからでも（公開サーバー）{{else}}Anywhere (public server){{end}}</label>
+      </div>
+      <p class="mt-1 text-xs text-neutral-500" data-mcp-target-note="remote" hidden>{{if $ja}}公開サーバーにつなぐときは、上の「公開サーバーの MCP 連携」で発行した公開サーバーの APIトークンを使ってください。{{else}}To connect to the public server, use a public server API token issued under "Public server MCP integration" above.{{end}}</p>
+    </fieldset>
+    {{else}}
+    <p id="mcp-snippet-domain-note" class="mt-2 text-xs text-neutral-500">{{if $ja}}設定例の URL は、いま管理画面を開いているアドレスです。独自ドメインで動かしている sorus につなぐときは <code>https://あなたのドメイン{{$d.EndpointPath}}</code> に読み替えてください。{{else}}The URL in the examples is the address you opened this admin screen with. For an sorus running on your own domain, replace it with <code>https://your-domain{{$d.EndpointPath}}</code>.{{end}}</p>
+    {{end}}
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+      <div class="setup-snippet">
+        <div class="mb-1 flex items-center justify-between gap-2">
+          <h3 class="text-xs font-semibold text-neutral-700">Claude Code{{if $ja}}（ターミナルで実行）{{else}} (run in a terminal){{end}}</h3>
+          <button type="button" data-copy-target="#snippet-claude" class="btn btn-ghost btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+        </div>
+        <pre id="snippet-claude" class="snippet">claude mcp add --transport http sorus <span data-mcp-url>{{$d.Endpoint}}</span> --header "<span data-mcp-auth>Authorization: Bearer {{if or $ja $d.NewToken}}{{$d.TokenOrPlaceholder}}{{else}}<API token>{{end}}</span>"</pre>
+      </div>
+      <div class="setup-snippet">
+        <div class="mb-1 flex items-center justify-between gap-2">
+          <h3 class="text-xs font-semibold text-neutral-700">GitHub Copilot CLI{{if $ja}}（~/.copilot/mcp-config.json）{{else}} (~/.copilot/mcp-config.json){{end}}</h3>
+          <button type="button" data-copy-target="#snippet-copilot" class="btn btn-ghost btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+        </div>
+        <pre id="snippet-copilot" class="snippet">{
+  "mcpServers": {
+    "sorus": {
+      "type": "http",
+      "url": "<span data-mcp-url>{{$d.Endpoint}}</span>",
+      "headers": { <span data-mcp-auth>"Authorization": "Bearer {{if or $ja $d.NewToken}}{{$d.TokenOrPlaceholder}}{{else}}<API token>{{end}}"</span> },
+      "tools": ["*"]
+    }
+  }
+}</pre>
+      </div>
+      <div class="setup-snippet">
+        <div class="mb-1 flex items-center justify-between gap-2">
+          <h3 class="text-xs font-semibold text-neutral-700">VS Code{{if $ja}}（.vscode/mcp.json）{{else}} (.vscode/mcp.json){{end}}</h3>
+          <button type="button" data-copy-target="#snippet-vscode" class="btn btn-ghost btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+        </div>
+        <pre id="snippet-vscode" class="snippet">{
+  "servers": {
+    "sorus": {
+      "type": "http",
+      "url": "<span data-mcp-url>{{$d.Endpoint}}</span>",
+      "headers": { <span data-mcp-auth>"Authorization": "Bearer {{if or $ja $d.NewToken}}{{$d.TokenOrPlaceholder}}{{else}}<API token>{{end}}"</span> }
+    }
+  }
+}</pre>
+      </div>
+      <div class="setup-snippet">
+        <div class="mb-1 flex items-center justify-between gap-2">
+          <h3 class="text-xs font-semibold text-neutral-700">Cursor{{if $ja}}（~/.cursor/mcp.json）{{else}} (~/.cursor/mcp.json){{end}}</h3>
+          <button type="button" data-copy-target="#snippet-cursor" class="btn btn-ghost btn-sm">{{if $ja}}コピー{{else}}Copy{{end}}</button>
+        </div>
+        <pre id="snippet-cursor" class="snippet">{
+  "mcpServers": {
+    "sorus": {
+      "url": "<span data-mcp-url>{{$d.Endpoint}}</span>",
+      "headers": { <span data-mcp-auth>"Authorization": "Bearer {{if or $ja $d.NewToken}}{{$d.TokenOrPlaceholder}}{{else}}<API token>{{end}}"</span> }
+    }
+  }
+}</pre>
+      </div>
+    </div>
+    <details id="mcp-tools" class="mt-3 text-xs text-neutral-500">
+      <summary class="cursor-pointer select-none font-medium text-neutral-600">{{if $ja}}使えるツール{{else}}Available tools{{end}}</summary>
+      <p class="mt-1">{{if $ja}}<code>cms_list_articles</code>・<code>cms_get_article</code>・<code>cms_save_draft</code>・<code>cms_submit_for_review</code>・<code>cms_proofread</code>・<code>cms_search</code>（リソース: <code>cms://categories</code>・<code>cms://articles/{id}</code>）{{else}}<code>cms_list_articles</code>, <code>cms_get_article</code>, <code>cms_save_draft</code>, <code>cms_submit_for_review</code>, <code>cms_proofread</code>, <code>cms_search</code> (resources: <code>cms://categories</code>, <code>cms://articles/{id}</code>){{end}}</p>
+    </details>
+    {{if $remoteURL}}
+    <script>
+    (function () {
+      'use strict';
+      var sw = document.querySelector('[data-mcp-url-switch]');
+      if (!sw) return;
+      var setup = document.getElementById('mcp-setup');
+      // 設定例のトークンは、Authorization ヘッダーの「Bearer <今のトークン>」を入れ替える。
+      var current = sw.getAttribute('data-local-token') || '';
+      function apply() {
+        var picked = sw.querySelector('input[name="mcp-snippet-target"]:checked');
+        var remote = picked && picked.value === 'remote';
+        var url = sw.getAttribute(remote ? 'data-remote-url' : 'data-local-url') || '';
+        var token = sw.getAttribute(remote ? 'data-remote-token' : 'data-local-token') || '';
+        setup.querySelectorAll('[data-mcp-url]').forEach(function (el) { el.textContent = url; });
+        setup.querySelectorAll('[data-mcp-auth]').forEach(function (el) {
+          el.textContent = el.textContent.split('Bearer ' + current).join('Bearer ' + token);
+        });
+        current = token;
+        sw.querySelectorAll('[data-mcp-target-note]').forEach(function (el) {
+          el.hidden = el.getAttribute('data-mcp-target-note') !== (remote ? 'remote' : 'local');
+        });
+      }
+      sw.addEventListener('change', apply);
+      apply();
+    })();
+    </script>
+    {{end}}
+  </section>
+  </details>
+    </div>
+  </div>
+</div>
+{{end}}

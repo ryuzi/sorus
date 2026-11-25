@@ -1,0 +1,150 @@
+{{define "layout"}}<!doctype html>
+<html lang="{{if .Lang}}{{.Lang}}{{else}}ja{{end}}" data-theme="{{.Theme}}"{{with .Preview}} data-theme-preview="{{if .Frame}}frame{{else}}page{{end}}"{{end}}>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="{{.ColorScheme}}">
+  <link rel="icon"{{with .FaviconType}} type="{{.}}"{{end}} href="{{.FaviconURL}}">
+  <link rel="apple-touch-icon" href="{{.FaviconURL}}">
+  <title>{{with .Title}}{{.}} | {{end}}{{.SiteName}}</title>
+  {{with .Description}}<meta name="description" content="{{.}}">{{end}}
+  {{if .NoIndex}}<meta name="robots" content="noindex">{{end}}
+  {{with .Canonical}}<link rel="canonical" href="{{.}}">{{end}}{{range .Hreflangs}}
+  <link rel="alternate" hreflang="{{.Lang}}" href="{{.URL}}">{{end}}
+  <meta property="og:site_name" content="{{.SiteName}}">
+  <meta property="og:title" content="{{with .Title}}{{.}}{{else}}{{$.SiteName}}{{end}}">
+  {{with .Description}}<meta property="og:description" content="{{.}}">{{end}}
+  <meta property="og:type" content="{{.OGType}}">
+  {{with .Canonical}}<meta property="og:url" content="{{.}}">{{end}}
+  {{with .OGImage}}<meta property="og:image" content="{{.}}">{{end}}
+  <meta property="og:locale" content="{{if eq .Lang "en"}}en_US{{else}}ja_JP{{end}}">
+  <meta name="twitter:card" content="{{if .OGImage}}summary_large_image{{else}}summary{{end}}">
+  <link rel="alternate" type="application/rss+xml" title="{{.SiteName}}" href="/feed.xml">
+  <link rel="stylesheet" href="{{asset "css/public.css"}}">
+  <link rel="stylesheet" href="{{.ThemeStylesheet}}">
+  {{if .Preview}}<link rel="stylesheet" href="{{asset "css/theme_preview.css"}}">{{end}}
+  {{range .Meta}}<meta name="{{.Name}}" content="{{.Content}}">
+  {{end}}
+  {{range .JSONLD}}<script type="application/ld+json">{{.}}</script>
+  {{end}}
+  {{block "head" .}}{{end}}
+  {{with .AnalyticsTag}}{{.}}{{end}}
+</head>
+<body>
+  <a class="skip-link" href="#main">{{if eq .Lang "en"}}Skip to main content{{else}}本文へスキップ{{end}}</a>
+  {{with .Preview}}{{if not .Frame}}
+  <div class="theme-preview-bar" role="region" aria-label="{{.T "theme_preview_bar"}}" lang="{{.Lang}}">
+    <div class="theme-preview-inner">
+      <p class="theme-preview-title">{{.T "theme_previewing" .Label}}{{if .Applied}} <span class="theme-preview-badge">{{.T "theme_applied"}}</span>{{end}}</p>
+      <nav class="theme-preview-pages" aria-label="{{.T "theme_preview_pages"}}">
+        <a href="{{.URL "home"}}"{{if eq .Page "home"}} aria-current="page"{{end}}>{{.T "theme_preview_home"}}</a>
+        {{if .HasArticle}}<a href="{{.URL "article"}}"{{if eq .Page "article"}} aria-current="page"{{end}}>{{.T "theme_preview_article"}}</a>{{end}}
+      </nav>
+      <div class="theme-preview-actions">
+        {{if not .Applied}}
+        <form method="post" action="/admin/settings/theme">
+          <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+          <input type="hidden" name="theme" value="{{.Theme.ID}}">
+          <button type="submit">{{.T "theme_apply"}}</button>
+        </form>
+        {{end}}
+        <a href="/admin/settings/theme">{{.T "theme_preview_back"}}</a>
+      </div>
+    </div>
+  </div>
+  {{end}}{{end}}
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="{{if eq .Lang "en"}}/en/{{else}}/{{end}}" class="site-title">{{.SiteName}}</a>{{if .Translations}}
+      <div class="header-tools">
+        <form class="search-form" action="{{if eq .Lang "en"}}/en/search{{else}}/search{{end}}" method="get" role="search">
+          <label class="visually-hidden" for="site-search">{{if eq .Lang "en"}}Search{{else}}サイト内検索{{end}}</label>
+          <input id="site-search" type="search" name="q" value="{{.Query}}" placeholder="{{if eq .Lang "en"}}Search articles{{else}}記事を検索{{end}}" autocomplete="off"
+                 data-live-search="#search-results">
+          <button type="submit">{{if eq .Lang "en"}}Search{{else}}検索{{end}}</button>
+        </form>
+        <nav class="lang-switcher" aria-label="Language">
+          {{range .Translations}}
+            {{if eq .Lang $.Lang}}
+              <span class="lang-switcher-current" aria-current="true">{{upper .Lang}}</span>
+            {{else if .Available}}
+              <a href="{{.URL}}" class="lang-switcher-link" hreflang="{{.Lang}}" title="{{.Title}}">{{upper .Lang}}</a>
+            {{else}}
+              <span class="lang-switcher-disabled" title="Not available in {{upper .Lang}}">{{upper .Lang}}</span>
+            {{end}}
+          {{end}}
+        </nav>
+      </div>{{else}}
+      <form class="search-form" action="{{if eq .Lang "en"}}/en/search{{else}}/search{{end}}" method="get" role="search">
+        <label class="visually-hidden" for="site-search">{{if eq .Lang "en"}}Search{{else}}サイト内検索{{end}}</label>
+        <input id="site-search" type="search" name="q" value="{{.Query}}" placeholder="{{if eq .Lang "en"}}Search articles{{else}}記事を検索{{end}}" autocomplete="off"
+               data-live-search="#search-results">
+        <button type="submit">{{if eq .Lang "en"}}Search{{else}}検索{{end}}</button>
+      </form>{{end}}{{if .Menu}}
+      {{- /* スマートフォンでメニューと検索窓を開閉するボタン（static/js/public.js が hidden を外して使う。JavaScript なしでは
+             今までどおりメニューと検索窓をそのまま出す）。 */}}
+      <button type="button" class="nav-toggle" aria-expanded="false" hidden>
+        <span class="nav-toggle-icon" aria-hidden="true"></span>
+        <span class="nav-toggle-label">{{if eq .Lang "en"}}Menu{{else}}メニュー{{end}}</span>
+      </button>{{end}}
+    </div>
+    {{if .Menu}}
+    {{- /* 子項目のある項目はドロップダウン（public.js がボタンで開閉し、aria-expanded を切り替える）。リンクのある親は
+           リンクの横に開くボタンを、見出しのみの親は見出しそのものを開くボタンにする。 */}}
+    <nav class="category-nav" aria-label="{{if eq .Lang "en"}}Menu{{else}}メニュー{{end}}">
+      <ul class="container site-menu">
+        {{range .Menu}}{{if .Children}}<li class="has-submenu{{if .HasCurrent}} is-current-parent{{end}}">
+          {{- if .URL}}<a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a><button type="button" class="submenu-toggle" aria-expanded="false" aria-controls="{{.ID}}"><span class="submenu-caret" aria-hidden="true"></span><span class="visually-hidden">{{if eq $.Lang "en"}}Show submenu of {{.Label}}{{else}}「{{.Label}}」の項目を表示{{end}}</span></button>
+          {{- else}}<button type="button" class="submenu-toggle submenu-toggle-label" aria-expanded="false" aria-controls="{{.ID}}">{{.Label}}<span class="submenu-caret" aria-hidden="true"></span></button>{{end}}
+          <ul class="site-submenu" id="{{.ID}}">{{range .Children}}<li><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></li>{{end}}</ul>
+        </li>{{else}}<li><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></li>{{end}}{{end}}
+      </ul>
+    </nav>
+    {{else if .Categories}}
+    <nav class="category-nav" aria-label="{{if eq .Lang "en"}}Categories{{else}}カテゴリ{{end}}">
+      <ul class="container">
+        {{range .Categories}}<li><a href="{{.Path $.Lang}}"{{if .Current}} aria-current="page"{{end}}>{{.Name}}</a></li>{{end}}
+      </ul>
+    </nav>
+    {{end}}
+  </header>
+  <main id="main" class="container">{{template "content" .}}</main>
+  <footer class="site-footer">{{with .FooterMenu}}
+    {{- /* フッターのサイトマップ（サイト構成の site_footer_menu）。見出しごとの列にリンクを並べる。 */}}
+    <nav class="footer-sitemap" aria-label="{{if eq $.Lang "en"}}Sitemap{{else}}サイトマップ{{end}}">
+      <div class="footer-sitemap-inner">
+        {{range .}}<section class="footer-sitemap-col">
+          <h2 class="footer-sitemap-heading">{{if .URL}}<a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a>{{else}}{{.Label}}{{end}}</h2>
+          {{- with .Children}}
+          <ul class="footer-sitemap-links">{{range .}}<li><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></li>{{end}}</ul>{{end}}
+        </section>{{end}}
+      </div>
+    </nav>{{end}}
+    <div class="container">
+      <p>{{with .Copyright}}{{.}}{{else}}&copy; {{.SiteName}}{{end}}</p>
+      <p><a href="/feed.xml">RSS</a></p>
+    </div>
+    {{- /* 公開サイト共通の拡大表示（static/js/lightbox.js）。ギャラリー・本文の画像を同じ画面でめくる。 */}}
+    <dialog id="cms-lightbox" class="cms-lightbox" role="dialog" aria-modal="true" aria-label="{{if eq .Lang "en"}}Image lightbox{{else}}画像拡大表示{{end}}" data-trigger-label="{{if eq .Lang "en"}}Enlarge image{{else}}画像を拡大表示{{end}}">
+      <div class="cms-lightbox-toolbar">
+        <p class="cms-lightbox-counter" aria-live="polite" aria-atomic="true" hidden></p>
+        <button type="button" class="cms-lightbox-close" aria-label="{{if eq .Lang "en"}}Close{{else}}閉じる{{end}}">&times;</button>
+      </div>
+      <button type="button" class="cms-lightbox-nav cms-lightbox-prev" aria-label="{{if eq .Lang "en"}}Previous image{{else}}前の画像{{end}}" hidden>&#8249;</button>
+      <button type="button" class="cms-lightbox-nav cms-lightbox-next" aria-label="{{if eq .Lang "en"}}Next image{{else}}次の画像{{end}}" hidden>&#8250;</button>
+      <figure class="cms-lightbox-figure">
+        <div class="cms-lightbox-stage">
+          <img class="cms-lightbox-image" alt="" draggable="false">
+        </div>
+        <figcaption class="cms-lightbox-caption" hidden></figcaption>
+      </figure>
+    </dialog>
+  </footer>
+  <script src="{{asset "js/public.js"}}" defer></script>
+  {{- /* 行揃え（justified）のフォトギャラリーの行の幅を計算する（static/js/justified_gallery.js）。 */}}
+  <script src="{{asset "js/justified_gallery.js"}}" defer></script>
+  <script src="{{asset "js/lightbox.js"}}" defer></script>
+  {{- /* デスクトップモードでは、この画面を開いている画面として数えてもらう（静的な書き出しには出さない）。 */ -}}
+  {{- .WindowScript}}
+</body>
+</html>{{end}}

@@ -1,0 +1,15 @@
+{{define "content"}}
+{{with .Data}}
+<nav class="breadcrumb" aria-label="{{if eq $.Lang "en"}}Breadcrumb{{else}}パンくずリスト{{end}}"><ol><li><a href="{{if eq $.Lang "en"}}/en/{{else}}/{{end}}">{{if eq $.Lang "en"}}Home{{else}}ホーム{{end}}</a></li><li aria-current="page">{{.Category.Name}}</li></ol></nav>
+<h1 class="page-title">{{.Category.Name}}</h1>
+{{with .Category.Description}}<p class="lead">{{.}}</p>{{end}}
+{{if .Articles}}
+<div class="card-grid">
+  {{range .Articles}}{{template "article_card" .}}{{end}}
+</div>
+{{template "pagination" .Pagination}}
+{{else}}
+<p class="empty">{{if eq $.Lang "en"}}No articles in this category yet.{{else}}このカテゴリにはまだ記事がありません。{{end}}</p>
+{{end}}
+{{end}}
+{{end}}

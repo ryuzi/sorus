@@ -1,0 +1,86 @@
+# sorus の systemd ユニット。
+#
+# 導入例:
+#   sudo useradd --system --home-dir /var/lib/sorus --shell /usr/sbin/nologin sorus
+#   sudo install -m 0755 bin/sorus /usr/local/bin/sorus
+#   sudo install -m 0644 deploy/systemd/sorus.service /etc/systemd/system/sorus.service
+#   sudo install -d -m 0750 /etc/sorus && sudo editor /etc/sorus/sorus.env   # ADMIN_PASSWORD 等
+#   sudo systemctl daemon-reload && sudo systemctl enable --now sorus
+# バックアップ（稼働中でも可。cron や systemd timer から呼べる）:
+#   sudo -u sorus env DB_PATH=/var/lib/sorus/database.db BACKUP_DIR=/var/lib/sorus/backups \
+#     /usr/local/bin/sorus backup
+
+[Unit]
+Description=sorus
+Documentation=file:///usr/local/share/doc/sorus/README.md
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sorus
+Restart=on-failure
+RestartSec=5s
+# main.go は SIGTERM で 10 秒のグレースフルシャットダウンを行う。
+KillSignal=SIGTERM
+TimeoutStopSec=20s
+
+# 永続データは /var/lib/sorus（StateDirectory）に置く。相対パスの既定値もここに解決される。
+StateDirectory=sorus
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/sorus
+Environment=DB_PATH=/var/lib/sorus/database.db
+Environment=UPLOAD_DIR=/var/lib/sorus/uploads
+Environment=SEARCH_INDEX_DIR=/var/lib/sorus/search_index
+Environment=ATTACHMENT_DIR=/var/lib/sorus/attachments
+Environment=AUTOCERT_CACHE_DIR=/var/lib/sorus/certs
+Environment=BACKUP_DIR=/var/lib/sorus/backups
+Environment=PORT=8080
+# 秘密情報やサイト設定（ADMIN_PASSWORD, AUTOCERT_DOMAIN, AUTOCERT_EMAIL, SITE_NAME, BASE_URL,
+# GEMINI_API_KEY など）は root のみ読めるファイルに置く。先頭の "-" はファイルが無くても起動する指定。
+EnvironmentFile=-/etc/sorus/sorus.env
+
+# --- 権限分離 ---
+# 専用のシステムユーザーで実行し、80/443 の bind に必要な権限だけを与える。
+User=sorus
+Group=sorus
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+UMask=0077
+
+# --- サンドボックス ---
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+# 許可外のシステムコールはプロセスを kill せず EPERM で失敗させる。
+SystemCallErrorNumber=EPERM
+
+# --- リソース制限 ---
+LimitNOFILE=65536
+MemoryMax=1G
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target

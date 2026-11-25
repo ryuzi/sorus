@@ -1,0 +1,6 @@
+{
+  "name": { "ja": "モダン", "en": "Modern" },
+  "description": { "ja": "シンプルで洗練されたフラットデザイン", "en": "Clean, modern flat design" },
+  "color_scheme": "light dark",
+  "order": 10
+}

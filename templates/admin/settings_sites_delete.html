@@ -1,0 +1,63 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}
+{{/* サイトの一覧・削除も、ほかの設定画面と同じ左メニュー付きの2ペインにする（admin_ux_polish_and_mcp_spec.md §2-3）。 */}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0 max-w-3xl">
+  <div class="mb-5">
+    <h1 class="text-xl font-bold text-neutral-900">{{$.T "site_delete_title"}}</h1>
+    <p class="mt-1 text-sm text-neutral-600">{{$.T "site_delete_lead" $d.SiteName}}</p>
+  </div>
+
+  {{with $d.Error}}
+  <div id="site-delete-error" class="notice notice-error mb-5 p-4" role="alert">{{.}}</div>
+  {{end}}
+
+  <div class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+    <section aria-labelledby="site-delete-what-title">
+      <h2 id="site-delete-what-title" class="text-sm font-semibold text-neutral-900">{{$.T "site_delete_what_title"}}</h2>
+      <p class="mt-1 text-sm text-neutral-700">{{$.T "site_delete_what_body"}}</p>
+    </section>
+
+    <section class="mt-5 border-t border-neutral-200 pt-5" aria-labelledby="site-delete-backup-title">
+      <h2 id="site-delete-backup-title" class="text-sm font-semibold text-neutral-900">{{$.T "site_delete_backup_title"}}</h2>
+      <p class="mt-1 text-sm text-neutral-700">{{$.T "site_delete_backup_body"}}</p>
+      <p id="site-delete-theme-warning" class="notice notice-warn mt-2">{{$.T "site_delete_theme_warning"}}</p>
+      <p id="site-delete-backup-folder" class="mt-2 break-all rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 font-mono text-sm text-neutral-900">{{$d.BackupFolder}}</p>
+      <p class="mt-2 flex items-center text-sm text-neutral-600">{{if $ja}}あとで戻すには{{else}}To restore later{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden><span>{{$.T "site_delete_restore_note"}}</span><span>{{$.T "site_delete_theme_restore"}}</span></span></span></p>
+    </section>
+
+    <form id="site-delete-form" method="post" action="/admin/settings/sites/delete" class="mt-5 border-t border-neutral-200 pt-5">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <label for="site-delete-name" class="block text-sm font-semibold text-neutral-800">{{$.T "site_delete_confirm_label" $d.SiteName}}</label>
+      <input id="site-delete-name" name="site_name" type="text" required autocomplete="off" spellcheck="false"
+             value="{{$d.TypedName}}" data-expected-name="{{$d.SiteName}}"
+             class="mt-1.5 w-full rounded-lg border {{if $d.Error}}border-rose-400{{else}}border-neutral-300{{end}} px-3 py-2 text-sm text-neutral-900 focus:border-zinc-500 focus:outline-none">
+      <div class="mt-5 flex flex-wrap items-center gap-3">
+        <button type="submit" id="site-delete-submit"
+                class="btn btn-danger btn-md">{{$.T "site_delete_submit"}}</button>
+        <a href="/admin/settings/sites" class="btn btn-secondary btn-md">{{$.T "site_delete_cancel"}}</a>
+      </div>
+    </form>
+  </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+(function () {
+  'use strict';
+  var input = document.getElementById('site-delete-name');
+  var submit = document.getElementById('site-delete-submit');
+  if (!input || !submit) return;
+  var expected = input.getAttribute('data-expected-name') || '';
+  function check() {
+    submit.disabled = input.value !== expected;
+  }
+  check();
+  input.addEventListener('input', check);
+})();
+</script>
+{{end}}

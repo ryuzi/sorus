@@ -1,0 +1,31 @@
+/* Modern: clean neutral surfaces, flat cards with a hairline shadow, and a blue accent. */
+:root {
+  --bg: #ffffff; --surface: #f5f7fa; --fg: #1f2328; --muted: #5c6470; --border: #e1e5eb;
+  --accent: #1f5fc7; --accent-fg: #ffffff; --accent-soft: #e9f1fd; --mark: #fff1a6;
+  --code-bg: #f3f5f8; --code-fg: #1f2328;
+  --font-body: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+  --font-heading: var(--font-body);
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --radius: 8px; --radius-lg: 12px; --content-width: 1080px; --prose-width: 760px;
+  --shadow: 0 1px 2px rgb(16 24 40 / .05), 0 1px 3px rgb(16 24 40 / .08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418; --surface: #1a1f26; --fg: #e6e9ee; --muted: #9ba4b0; --border: #2b323c;
+    --accent: #78aefc; --accent-fg: #0b1526; --accent-soft: #1b2b44; --mark: #6b5a1e;
+    --code-bg: #0b0e12; --code-fg: #e6e9ee;
+    --shadow: 0 1px 3px rgb(0 0 0 / .5);
+  }
+}
+.site-title { font-weight: 700; letter-spacing: -.01em; }
+.page-title, .article-title { letter-spacing: -.01em; }
+.prose pre { border: 1px solid var(--border); }
+.prose h2 { border-bottom-width: 1px; }
+.card { border-color: var(--border); }
+.front-gallery { margin: 2.5rem auto; max-width: var(--content-width); }
+.front-gallery .page-title { margin-bottom: 1rem; }
+.photo-gallery.masonry-grid { column-gap: 1rem; }
+.gallery-item { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 2px 8px rgb(16 24 40 / .06); }
+.gallery-item:hover { box-shadow: 0 8px 24px rgb(16 24 40 / .14); }
+.gallery-item figcaption { padding: .65rem .8rem .75rem; }
+@media (prefers-color-scheme: dark) { .gallery-item { box-shadow: 0 2px 10px rgb(0 0 0 / .24); } .gallery-item:hover { box-shadow: 0 8px 24px rgb(0 0 0 / .4); } }

@@ -1,0 +1,32 @@
+[Unit]
+Description=Online SQLite backup for sorus
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=sorus
+Group=sorus
+StateDirectory=sorus
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/sorus
+Environment=DB_PATH=/var/lib/sorus/database.db
+Environment=BACKUP_DIR=/var/lib/sorus/backups
+EnvironmentFile=-/etc/sorus/sorus.env
+ExecStart=/usr/local/bin/sorus backup
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

@@ -1,0 +1,38 @@
+/* News: Mincho headlines, paper tones, ruled sections, and a deep red accent. */
+:root {
+  --bg: #f8f4ea; --surface: #fffcf5; --fg: #2a231b; --muted: #685c4e; --border: #dbd0be;
+  --accent: #971b1b; --accent-fg: #fffaf0; --accent-soft: #f3e2d8; --mark: #f1da88;
+  --code-bg: #2a231b; --code-fg: #f4ecdc;
+  --font-body: "Yu Mincho", YuMincho, "Hiragino Mincho ProN", "Noto Serif JP", "Noto Serif CJK JP", "BIZ UDPMincho", Georgia, "Times New Roman", serif;
+  --font-heading: "Yu Mincho", YuMincho, "Hiragino Mincho ProN", "Noto Serif JP", "Noto Serif CJK JP", "BIZ UDPMincho", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --radius: 2px; --radius-lg: 2px; --content-width: 980px; --prose-width: 720px;
+  --shadow: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1814; --surface: #24201a; --fg: #ece3d3; --muted: #b3a690; --border: #463d32;
+    --accent: #f08d7c; --accent-fg: #1b1814; --accent-soft: #3a2420; --mark: #6a5726;
+    --code-bg: #110f0c; --code-fg: #ece3d3;
+  }
+}
+.site-header { border-bottom: 3px double var(--fg); }
+.site-title { font-size: 1.6rem; font-weight: 700; letter-spacing: .06em; }
+.page-title { font-weight: 700; padding-bottom: .3em; border-bottom: 1px solid var(--fg); }
+.article-title { font-size: 2.1rem; font-weight: 700; line-height: 1.4; padding-bottom: .4em; border-bottom: 1px solid var(--border); }
+.card { border-width: 0 0 1px; background: transparent; }
+.card-body { padding: 12px 2px 16px; }
+.card-title { font-size: 1.2rem; font-weight: 700; }
+.badge { border-radius: 0; background: transparent; padding: 0; color: var(--accent); letter-spacing: .08em; }
+.prose h2 { font-weight: 700; border-bottom: 1px solid var(--fg); }
+.prose h3 { font-weight: 700; }
+.prose blockquote { border-left: 3px solid var(--accent); background: var(--surface); padding: .75rem 1rem; color: var(--fg); font-family: var(--font-heading); }
+.toc { border-top: 2px solid var(--fg); border-bottom: 1px solid var(--border); background: transparent; }
+.prose blockquote > :last-child { margin-bottom: 0; }
+.front-gallery { margin: 2.25rem auto; max-width: var(--content-width); border-top: 3px double var(--fg); padding-top: 1rem; }
+.front-gallery .page-title { margin-bottom: 1rem; border-bottom: 1px solid var(--fg); }
+.photo-gallery.masonry-grid { column-gap: 1rem; }
+.gallery-item { border: 1px solid var(--border); border-radius: 0; background: var(--surface); box-shadow: none; }
+.gallery-item:hover { transform: none; box-shadow: none; }
+.gallery-item img { filter: saturate(.9); }
+.gallery-item figcaption { border-top: 1px solid var(--border); padding: .55rem .7rem .65rem; font-size: .86rem; line-height: 1.5; }

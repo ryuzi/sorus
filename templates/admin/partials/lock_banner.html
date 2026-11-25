@@ -1,0 +1,14 @@
+{{define "lock_banner"}}{{$ja := ne .Lang "en"}}{{$csrf := .CSRFToken}}{{with .Data.Lock}}
+<div id="lock-banner" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-3 text-neutral-900" role="alert">
+  <div>
+    <p class="font-semibold">{{$.T "lock_warning" .UserName}}</p>
+    <p class="text-sm">{{if $ja}}最終操作: {{formatTime .LockedAt}}{{else}}Last activity: {{formatTime .LockedAt}}{{end}}</p>
+  </div>
+  {{if $.Data.CanForceUnlock}}
+  <form method="post" action="/admin/articles/{{.ArticleID}}/force-unlock" data-confirm="{{if $ja}}{{.UserName}}さんの編集ロックを強制解除しますか？保存されていない変更は失われる可能性があります。{{else}}Force-release {{.UserName}}'s edit lock? Unsaved changes may be lost.{{end}}">
+    <input type="hidden" name="_csrf" value="{{$csrf}}">
+    <button type="submit" id="force-unlock-button" class="btn btn-primary btn-sm">{{$.T "lock_force_unlock"}}</button>
+  </form>
+  {{end}}
+</div>
+{{end}}{{end}}

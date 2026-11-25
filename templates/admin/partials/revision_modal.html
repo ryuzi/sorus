@@ -1,0 +1,62 @@
+{{define "revision_modal"}}{{$ja := ne .Lang "en"}}
+<dialog id="revision-modal" class="ai-modal w-[min(64rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="revision-modal-title">
+  <div class="flex items-center justify-between border-b border-neutral-200 px-5 py-3">
+    <h2 id="revision-modal-title" class="font-semibold text-neutral-800">{{if $ja}} リビジョン履歴{{else}} Revision history{{end}}</h2>
+    <button type="button" data-revision-close class="btn btn-ghost btn-sm" aria-label="{{.T "close"}}">{{.T "close"}}</button>
+  </div>
+  <div class="grid md:grid-cols-[17rem_1fr]">
+    <div id="revision-list" class="max-h-[70vh] overflow-y-auto border-b border-neutral-200 p-3 md:border-b-0 md:border-r" aria-live="polite">
+      <p class="p-2 text-sm text-neutral-400">{{if $ja}}読み込み中…{{else}}Loading…{{end}}</p>
+    </div>
+    <div id="revision-diff" class="max-h-[70vh] overflow-y-auto p-5" aria-live="polite">
+      <p class="text-sm text-neutral-400">{{if $ja}}左の一覧から版を選ぶと、現在の内容との差分を表示します。{{else}}Choose a version from the list on the left to see how it differs from the current content.{{end}}</p>
+    </div>
+  </div>
+</dialog>
+{{end}}
+
+{{define "revision_list"}}{{$ja := ne .Lang "en"}}
+<ol class="space-y-1">
+  {{range .Revisions}}
+  <li>
+    <button type="button" class="revision-item w-full rounded-lg px-3 py-2 text-left hover:bg-neutral-100"
+            data-revision-diff="/admin/articles/{{$.ArticleID}}/revisions/{{.Num}}/diff">
+      <span class="flex items-center justify-between gap-2">
+        <span class="font-semibold text-neutral-800">{{if $ja}}第{{.Num}}版{{else}}Version {{.Num}}{{end}}</span>
+        {{if .IsCurrent}}<span class="rounded-full bg-zinc-100 px-2 text-[11px] font-medium text-zinc-700"{{if $ja}}>現在</span>{{else}}>Current</span>{{end}}{{end}}
+      </span>
+      <span class="block text-xs text-neutral-500">{{formatTime .CreatedAt}}・{{.AuthorName}}</span>
+      <span class="block text-xs text-neutral-500">{{if $ja}}{{with .Comment}}{{.}}・{{end}}{{.Chars}}字{{else}}{{with .Comment}}{{.}} · {{end}}{{.Chars}} chars{{end}}
+        <span class="{{if gt .CharDelta 0}}text-neutral-600{{else if lt .CharDelta 0}}text-neutral-600{{else}}text-neutral-400{{end}}">{{signed .CharDelta}}</span></span>
+    </button>
+  </li>
+  {{else}}
+  <li class="p-2 text-sm text-neutral-400">{{if $ja}}まだ履歴はありません。保存すると自動で記録されます。{{else}}No history yet. It is recorded automatically when you save.{{end}}</li>
+  {{end}}
+</ol>
+{{end}}
+
+{{define "revision_diff"}}{{$ja := ne .Lang "en"}}
+<div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h3 class="font-semibold text-neutral-800">{{if $ja}}第{{.Num}}版 → 現在の内容{{else}}Version {{.Num}} → current content{{end}}</h3>
+    <p class="text-xs text-neutral-500">{{formatTime .CreatedAt}}・{{.AuthorName}}{{with .Comment}}・{{.}}{{end}}</p>
+  </div>
+  {{if .CanRestore}}
+  <form id="revision-restore-form" method="post" action="/admin/articles/{{.ArticleID}}/revisions/{{.Num}}/restore"
+        data-confirm="{{if $ja}}第{{.Num}}版の内容に復元しますか？現在の内容も履歴に残るため、あとから元に戻せます。{{else}}Restore version {{.Num}}? The current content is also kept in the history, so you can undo this later.{{end}}">
+    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+    <button type="submit" id="revision-restore-button" class="btn btn-primary btn-sm">{{if $ja}}このバージョンに復元{{else}}Restore this version{{end}}</button>
+  </form>
+  {{end}}
+</div>
+{{if .Changed}}
+<p class="mb-3 text-xs text-neutral-500">{{if $ja}}<del class="diff-del">赤</del> はこの版にあって現在は無い部分、<ins class="diff-add">緑</ins> はその後に追加された部分です。{{else}}<del class="diff-del">Red</del> marks text in this version that is no longer present, and <ins class="diff-add">green</ins> marks text added since.{{end}}</p>
+<div class="mb-1 text-xs font-semibold text-neutral-500"{{if $ja}}>タイトル</div>{{else}}>Title</div>{{end}}
+<div class="diff-view mb-4 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm">{{.TitleDiff}}</div>
+<div class="mb-1 text-xs font-semibold text-neutral-500"{{if $ja}}>本文</div>{{else}}>Body</div>{{end}}
+<div class="diff-view revision-diff-body rounded-lg border border-neutral-200 bg-neutral-50 p-3 font-mono text-sm leading-relaxed">{{.BodyDiff}}</div>
+{{else}}
+<p class="rounded-lg bg-neutral-50 p-4 text-sm text-neutral-500">{{if $ja}}この版は現在の内容と同じです。{{else}}This version is the same as the current content.{{end}}</p>
+{{end}}
+{{end}}

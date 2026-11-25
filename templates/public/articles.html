@@ -1,0 +1,44 @@
+{{define "content"}}
+{{with .Data}}
+<nav class="breadcrumb" aria-label="{{if eq $.Lang "en"}}Breadcrumb{{else}}パンくずリスト{{end}}"><ol><li><a href="{{if eq $.Lang "en"}}/en/{{else}}/{{end}}">{{if eq $.Lang "en"}}Home{{else}}ホーム{{end}}</a></li><li aria-current="page">{{$.ArticlesLabel}}</li></ol></nav>
+<div class="articles-header-row">
+  <h1 class="page-title">{{$.ArticlesLabel}}</h1>
+  {{if .ArchiveYears}}
+  <div class="year-filter-select">
+    <label class="year-filter-label" for="year-filter">{{if eq $.Lang "en"}}Year{{else}}年別{{end}}</label>
+    <select id="year-filter" aria-label="{{if eq $.Lang "en"}}Archive by Year{{else}}年別アーカイブ{{end}}" onchange="if(this.value) window.location.href=this.value;">
+      <option value="{{.AllYearsURL}}"{{if not .CurrentYear}} selected{{end}}>{{if eq $.Lang "en"}}All Years ({{.TotalArchiveCount}}){{else}}すべての年 ({{.TotalArchiveCount}}){{end}}</option>
+      {{range .ArchiveYears}}<option value="{{.URL}}"{{if .Current}} selected{{end}}>{{if eq $.Lang "en"}}{{.Year}} ({{.Count}}){{else}}{{.Year}}年 ({{.Count}}){{end}}</option>
+      {{end}}
+    </select>
+    <noscript>
+      <nav class="archive-years" aria-label="{{if eq $.Lang "en"}}Archive by Year{{else}}年別アーカイブ{{end}}">
+        <a class="archive-year{{if not .CurrentYear}} is-current{{end}}" href="{{.AllYearsURL}}"{{if not .CurrentYear}} aria-current="page"{{end}}>{{if eq $.Lang "en"}}All Years{{else}}すべての年{{end}} <span>({{.TotalArchiveCount}})</span></a>
+        {{range .ArchiveYears}}<a class="archive-year{{if .Current}} is-current{{end}}" href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Year}} <span>({{.Count}})</span></a>
+        {{end}}
+      </nav>
+    </noscript>
+  </div>
+  {{end}}
+</div>
+{{if .Categories}}
+<div class="articles-filter-bar">
+  <nav class="category-filter-pills" aria-label="{{if eq $.Lang "en"}}Filter by category{{else}}カテゴリ絞り込み{{end}}">
+    <a class="category-filter-pill{{if not .CurrentCategory}} is-current{{end}}" href="{{.AllCategoriesURL}}"{{if not .CurrentCategory}} aria-current="page"{{end}}>{{if eq $.Lang "en"}}All{{else}}すべて{{end}} <span class="category-filter-count">({{.CategoryTotal}})</span></a>
+    {{range .Categories}}<a class="category-filter-pill{{if .Current}} is-current{{end}}" href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Name}} <span class="category-filter-count">({{.Count}})</span></a>
+    {{end}}
+  </nav>
+</div>
+{{end}}
+{{if .Articles}}
+<div class="card-grid">
+  {{range .Articles}}{{template "article_card" .}}{{end}}
+</div>
+{{template "pagination" .Pagination}}
+{{else if or .CurrentCategory .CurrentYear}}
+<p class="empty">{{if eq $.Lang "en"}}No articles match this filter. <a href="{{.ArchiveBaseURL}}">Show all articles</a>{{else}}この条件に合う記事はありません。<a href="{{.ArchiveBaseURL}}">すべての記事を見る</a>{{end}}</p>
+{{else}}
+<p class="empty">{{if eq $.Lang "en"}}No articles published yet.{{else}}まだ公開された記事はありません。{{end}}</p>
+{{end}}
+{{end}}
+{{end}}

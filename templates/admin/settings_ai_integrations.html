@@ -1,0 +1,13 @@
+{{define "content"}}
+{{/* 「AI」の先頭の画面（handlers_ai_integrations.go）。AI 機能の ON/OFF をこの PC と公開サーバーの両方に効かせ、OFF にするときは
+     許可済みの AI アプリの連携と API トークンも解除できる。AI 機能が OFF でも開ける（ON に戻す入口）。スイッチ・公開サーバーの状態・
+     タブ（使う AI・外部の AI アプリとつなぐ）は共通の partials/ai_tabs.html が出す。 */}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+    {{template "settings_subnav" $}}
+    <div class="min-w-0">
+      {{template "ai_tabs" $}}
+    </div>
+  </div>
+</div>
+{{end}}

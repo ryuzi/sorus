@@ -1,0 +1,145 @@
+/* Portal: navy header and navigation, white square cards on a gray page, and accent ribbons for section titles. */
+:root {
+  --bg: #eeeeee; --surface: #ffffff; --fg: #222222; --muted: #555b66; --border: #d5d9e0;
+  --accent: #1151d3; --accent-fg: #ffffff; --accent-soft: #e2eafa; --mark: #fde68a;
+  --code-bg: #0b1f3a; --code-fg: #e6edf7;
+  --font-body: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", Meiryo, "Yu Gothic", sans-serif;
+  --font-heading: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --radius: 2px; --radius-lg: 0; --content-width: 1140px; --prose-width: 760px;
+  --shadow: 0 1px 3px rgb(0 0 0 / .15);
+  /* Theme-private colors for the bands that have no base token. */
+  --portal-heading: #212121; --portal-link-hover: #002954; --portal-link-hover-fg: #ffffff;
+  --portal-header-bg: #06264f; --portal-header-fg: #ffffff; --portal-header-line: rgb(255 255 255 / .28);
+  --portal-nav-bg: #003773; --portal-nav-fg: #ffffff;
+  --portal-footer-bg: #091e36; --portal-footer-fg: #aaaed1; --portal-footer-link: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1526; --surface: #13213a; --fg: #e3e8f1; --muted: #a3b1c6; --border: #2a3d5e;
+    --accent: #6ea0ff; --accent-fg: #0b1526; --accent-soft: #1b3159; --mark: #6b5a16;
+    --code-bg: #060d19; --code-fg: #dce6f5;
+    --shadow: 0 1px 3px rgb(0 0 0 / .5);
+    --portal-heading: #f1f4f9; --portal-link-hover: #a9c6ff; --portal-link-hover-fg: #0b1526;
+    --portal-header-bg: #081a35; --portal-header-fg: #ffffff; --portal-header-line: rgb(255 255 255 / .22);
+    --portal-nav-bg: #0f2d5a; --portal-nav-fg: #ffffff;
+    --portal-footer-bg: #060e1b; --portal-footer-fg: #aab3d4; --portal-footer-link: #ffffff;
+  }
+}
+
+/* Header: a solid navy band with a white, heavy site title. */
+.site-header { border-bottom: 0; background: var(--portal-header-bg); }
+.site-header .header-inner { padding-top: 20px; padding-bottom: 20px; }
+.site-title { color: var(--portal-header-fg); font-size: 1.7rem; font-weight: 800; letter-spacing: -.01em; line-height: 1.3; }
+.site-title:hover { text-decoration: underline; text-underline-offset: .15em; }
+.site-header .search-form input { border-color: var(--portal-header-line); background: var(--surface); color: var(--fg); }
+.search-form input { border-radius: var(--radius); }
+.search-form button { border-radius: var(--radius); font-weight: 700; }
+.search-form button:hover { background: var(--portal-link-hover); color: var(--portal-link-hover-fg); }
+
+/* Category navigation: white bold items on the navy band; the accent fills the hovered item. */
+.category-nav { border-top: 0; background: var(--portal-nav-bg); }
+.category-nav ul { gap: 0; padding-top: 0; padding-bottom: 0; }
+.category-nav a { padding: 12px 16px; border-radius: 0; color: var(--portal-nav-fg); font-size: .875rem; font-weight: 700; line-height: 1.5; }
+.category-nav a:hover, .category-nav a:focus-visible, .category-nav a[aria-current] { background: var(--accent); color: var(--accent-fg); }
+.category-nav a:focus-visible { outline: 2px solid var(--portal-nav-fg); outline-offset: -2px; }
+
+/* Section titles: a ribbon with a right-pointing tip on top of a full-width accent rule.
+   The space after the tip is painted with the backdrop color, so the rule stays visible below it. */
+.page-title, .related-articles > h2, .attachments-title {
+  --portal-ribbon-pad: .4em;
+  display: flex; align-items: stretch; column-gap: .9em;
+  margin: 0 0 20px; padding: var(--portal-ribbon-pad) 0 var(--portal-ribbon-pad) .9em;
+  border-bottom: 2px solid var(--accent); background: var(--accent); color: var(--accent-fg);
+  font-size: 1.1rem; font-weight: 800; line-height: 1.5; letter-spacing: -.01em; text-align: left;
+}
+.page-title::after, .related-articles > h2::after, .attachments-title::after {
+  content: ""; flex: 1 0 1em; margin: calc(-1 * var(--portal-ribbon-pad)) 0;
+  background:
+    linear-gradient(to bottom left, transparent 50%, var(--accent) 50%) 0 0 / .9em 50.5% no-repeat,
+    linear-gradient(to top left, transparent 50%, var(--accent) 50%) 0 100% / .9em 50.5% no-repeat,
+    var(--portal-ribbon-backdrop, var(--bg));
+}
+.not-found .page-title { padding-left: 0; }
+.not-found .page-title::before { content: ""; flex: 1 0 1em; margin: calc(-1 * var(--portal-ribbon-pad)) 0; background: var(--portal-ribbon-backdrop, var(--bg)); }
+.related-articles > h2, .attachments-title { font-size: 1rem; margin-bottom: 16px; }
+.related-articles, .attachments { border-top: 0; }
+
+/* Cards: square white surfaces with a soft shadow and no border. */
+.card-grid { gap: 24px; }
+.card { border: 0; background: var(--surface); }
+.card-body { padding: 14px 18px 18px; }
+.card-title { font-size: 1.08rem; font-weight: 800; line-height: 1.5; letter-spacing: -.01em; }
+.card-title a { color: var(--portal-heading); }
+.card-title a:hover { color: var(--accent); }
+.card-excerpt { font-size: .9rem; line-height: 1.75; }
+@media (min-width: 960px) {
+  /* The newest article in a list spans two columns, with the image beside the text. Not on the front page,
+     whose six news cards would leave one card alone on the last row. */
+  :not(.front-news) > .page-title:first-child + .card-grid > .card:first-child { grid-column: span 2; flex-direction: row; }
+  :not(.front-news) > .page-title:first-child + .card-grid > .card:first-child .card-media { flex: 0 0 56%; }
+  :not(.front-news) > .page-title:first-child + .card-grid > .card:first-child .card-media img { height: 100%; min-height: 240px; aspect-ratio: auto; }
+  :not(.front-news) > .page-title:first-child + .card-grid > .card:first-child .card-body { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 22px 26px; }
+  :not(.front-news) > .page-title:first-child + .card-grid > .card:first-child .card-title { font-size: 1.45rem; line-height: 1.45; }
+}
+
+/* Category badge: a small square accent label. */
+.badge {
+  padding: 2px 8px; border-radius: 0; background: var(--accent); color: var(--accent-fg);
+  font-size: max(11px, .72rem); font-weight: 700; line-height: 1.6; letter-spacing: .03em;
+}
+.meta .badge { margin-right: .4em; }
+.card-body .badge:hover, .card-body .badge:focus-visible, .article-header .badge:hover, .article-header .badge:focus-visible { background: var(--portal-link-hover); color: var(--portal-link-hover-fg); }
+
+/* Article: the whole article sits on one white panel. */
+.breadcrumb a:hover { color: var(--accent); }
+.article {
+  --portal-article-pad: 32px; --portal-ribbon-backdrop: var(--surface);
+  padding: 28px var(--portal-article-pad) 36px; background: var(--surface); box-shadow: var(--shadow);
+}
+.article-title { color: var(--portal-heading); font-size: 2rem; font-weight: 800; line-height: 1.4; letter-spacing: -.015em; margin-top: 12px; }
+.hero { margin: 24px calc(-1 * var(--portal-article-pad)); }
+.toc { border: 1px solid var(--border); border-top: 3px solid var(--accent); background: var(--surface); }
+.toc-title { color: var(--portal-heading); font-weight: 800; }
+.toc a { color: var(--fg); text-decoration: none; }
+.toc a:hover { color: var(--accent); text-decoration: underline; }
+.prose { font-size: 1.05rem; line-height: 1.95; }
+.prose h2, .prose h3, .prose h4 { color: var(--portal-heading); font-weight: 800; letter-spacing: -.01em; }
+.prose h2 { padding: .25em 0 .3em .6em; border-bottom: 1px solid var(--border); border-left: 5px solid var(--accent); }
+.prose h3 { padding-bottom: .2em; border-bottom: 2px solid var(--accent-soft); }
+.prose a { color: var(--accent); }
+.prose a:hover { color: var(--portal-link-hover); }
+.prose blockquote { border-left: 4px solid var(--accent); padding: .8em 1.1em; background: var(--bg); color: var(--fg); }
+.prose blockquote > :last-child { margin-bottom: 0; }
+.prose :not(pre) > code { background: var(--accent-soft); color: var(--fg); }
+.prose pre { line-height: 1.6; }
+.prose th { background: var(--bg); color: var(--portal-heading); font-weight: 700; text-align: left; }
+.prose th, .prose td { border-color: var(--border); }
+.attachment-card a { border-radius: 0; }
+.related-article-card { border: 0; }
+.related-article-card > a:hover h3, .related-article-card > a:focus-visible h3 { color: var(--accent); }
+.related-article-body h3 { color: var(--portal-heading); font-weight: 800; }
+@media (max-width: 600px) {
+  .article { --portal-article-pad: 16px; padding-top: 20px; padding-bottom: 28px; }
+  .article-title { font-size: 1.55rem; }
+  .site-title { font-size: 1.4rem; }
+}
+
+/* Search results and pagination on white surfaces. */
+.search-hits { display: grid; gap: 12px; }
+.search-hit { padding: 16px 20px; border-bottom: 0; background: var(--surface); box-shadow: var(--shadow); }
+.pagination a { border: 0; background: var(--surface); box-shadow: var(--shadow); color: var(--accent); font-weight: 700; }
+.pagination a:hover, .pagination a:focus-visible { background: var(--accent); color: var(--accent-fg); }
+.not-found { padding-top: 24px; }
+
+/* Footer: a dark navy band with soft text and white links. */
+.site-footer { border-top: 0; background: var(--portal-footer-bg); color: var(--portal-footer-fg); }
+.site-footer .container { padding-top: 24px; padding-bottom: 24px; }
+.site-footer a { color: var(--portal-footer-link); }
+.front-gallery { margin: 2.5rem auto; max-width: var(--content-width); }
+.front-gallery .page-title { margin-bottom: 1rem; }
+.photo-gallery.masonry-grid { column-gap: 1.1rem; }
+.gallery-item { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+.gallery-item:hover { border-color: var(--accent); }
+.gallery-item img { border-bottom: 1px solid var(--border); }
+.gallery-item figcaption { padding: .65rem .8rem; }

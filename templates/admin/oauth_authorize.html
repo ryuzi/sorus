@@ -1,0 +1,66 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}
+{{/* OAuth 2.1 の同意画面（handlers_oauth.go）。AI アプリ（ChatGPT・Claude など）に、ログイン中のユーザーの権限で sorus を
+     操作させてよいかを尋ねる。許可・拒否のフォームは専用の CSRF トークンで守り、認可要求のパラメーターをそのまま送り返す。
+     公開専用モード（handlers_oauth_public.go）では、先に PC の sorus で表示した確認コードを入れてもらい（LoginRequired）、
+     本人を確かめた結果（Ticket）を同意画面のフォームで送り返す。 */}}
+<div class="flex min-h-screen items-center justify-center px-4">
+  <div class="w-full max-w-md">
+    <div class="mb-6 text-center">
+      <h1 class="mt-2 text-2xl font-bold">{{if and .SiteName (not $d.HideSiteName)}}{{.SiteName}}{{else}}sorus{{end}}</h1>
+      <p class="mt-1 text-sm text-neutral-500">{{if $ja}}AI アプリとの連携{{else}}Connect an AI app{{end}}</p>
+    </div>
+    {{if $d.Error}}
+    <div id="oauth-error" class="space-y-3 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm" role="alert">
+      <h2 class="text-lg font-semibold">{{if $ja}}接続できませんでした{{else}}Could not connect{{end}}</h2>
+      <p class="text-sm text-neutral-700">{{$d.Error}}</p>
+    </div>
+    {{else if $d.LoginRequired}}
+    <form id="oauth-login" method="post" action="/oauth/authorize" class="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+      {{template "oauth_request_fields" .}}
+      <input type="hidden" name="step" value="login">
+      <h2 class="text-lg font-semibold"><span id="oauth-client-name" class="break-all">{{$d.ClientName}}</span>{{if $ja}} との連携を始めます{{else}} wants to connect{{end}}</h2>
+      <p class="text-sm text-neutral-700">{{if $ja}}本人の確認のため、PC の sorus の「設定」→「MCP連携」→「公開サーバー」で「確認コードを表示」を押し、表示された8文字のコードを入れてください（10分間・1回だけ使えます）。{{else}}To confirm it is you, open sorus on your PC, go to Settings → MCP → Public server, choose "Show confirmation code", and enter the 8-character code (valid for 10 minutes, once).{{end}}</p>
+      {{if $d.LoginError}}<p id="oauth-login-error" class="notice notice-error" role="alert">{{$d.LoginError}}</p>{{end}}
+      <label class="block text-sm font-medium" for="oauth-login-code">{{if $ja}}確認コード{{else}}Confirmation code{{end}}</label>
+      <input id="oauth-login-code" name="login_code" type="text" inputmode="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="20" required placeholder="ABCD-EFGH" autofocus
+             class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-mono tracking-widest focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+      <dl class="rounded-lg bg-neutral-50 px-4 py-3 text-xs text-neutral-600">
+        <div class="flex gap-2"><dt class="shrink-0 font-medium">{{if $ja}}戻り先:{{else}}Returns to:{{end}}</dt><dd id="oauth-redirect-host" class="break-all font-mono">{{$d.RedirectHost}}</dd></div>
+      </dl>
+      <p class="text-xs text-neutral-500">{{if $ja}}心当たりのない接続なら「やめる」を押してください。{{else}}If you did not start this connection, choose "Cancel".{{end}}</p>
+      <div class="flex gap-3">
+        <button type="submit" name="decision" value="deny" formnovalidate id="oauth-login-cancel" class="btn btn-secondary btn-md flex-1">{{if $ja}}やめる{{else}}Cancel{{end}}</button>
+        <button type="submit" id="oauth-login-submit" class="btn btn-primary btn-md flex-1">{{if $ja}}次へ{{else}}Next{{end}}</button>
+      </div>
+    </form>
+    {{else}}
+    <form id="oauth-consent" method="post" action="/oauth/authorize" class="space-y-4 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+      {{template "oauth_request_fields" .}}
+      {{if $d.Ticket}}<input type="hidden" name="ticket" value="{{$d.Ticket}}">{{end}}
+      <h2 class="text-lg font-semibold"><span id="oauth-client-name" class="break-all">{{$d.ClientName}}</span>{{if $ja}} に sorus の利用を許可しますか？{{else}} wants to use sorus{{end}}</h2>
+      <p class="text-sm text-neutral-700">{{if $ja}}許可すると、この AI アプリは「<span id="oauth-user-name">{{$d.UserName}}</span>」さんの権限（<span id="oauth-user-role">{{.T (roleKey $d.Role)}}</span>）で、記事の検索・下書きの作成・推敲・校閲の申請などを行えるようになります。{{else}}If you allow it, this AI app can search articles, write drafts, proofread, and submit for review with the permissions of <span id="oauth-user-name">{{$d.UserName}}</span> (<span id="oauth-user-role">{{.T (roleKey $d.Role)}}</span>).{{end}}</p>
+      <dl class="rounded-lg bg-neutral-50 px-4 py-3 text-xs text-neutral-600">
+        <div class="flex gap-2"><dt class="shrink-0 font-medium">{{if $ja}}戻り先:{{else}}Returns to:{{end}}</dt><dd id="oauth-redirect-host" class="break-all font-mono">{{$d.RedirectHost}}</dd></div>
+      </dl>
+      <p class="text-xs text-neutral-500">{{if $ja}}心当たりのない接続なら「許可しない」を押してください。許可した連携は「設定」→「MCP連携」からいつでも取り消せます。{{else}}If you did not start this connection, choose "Deny". You can revoke the connection at any time from Settings → MCP.{{end}}</p>
+      <div class="flex gap-3">
+        <button type="submit" name="decision" value="deny" id="oauth-deny" class="btn btn-secondary btn-md flex-1">{{if $ja}}許可しない{{else}}Deny{{end}}</button>
+        <button type="submit" name="decision" value="allow" id="oauth-allow" class="btn btn-primary btn-md flex-1">{{if $ja}}許可する{{else}}Allow{{end}}</button>
+      </div>
+    </form>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "oauth_request_fields"}}{{$d := .Data}}
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <input type="hidden" name="response_type" value="{{$d.Request.ResponseType}}">
+      <input type="hidden" name="client_id" value="{{$d.Request.ClientID}}">
+      <input type="hidden" name="redirect_uri" value="{{$d.Request.RedirectURI}}">
+      <input type="hidden" name="code_challenge" value="{{$d.Request.CodeChallenge}}">
+      <input type="hidden" name="code_challenge_method" value="{{$d.Request.CodeChallengeMethod}}">
+      <input type="hidden" name="state" value="{{$d.Request.State}}">
+      <input type="hidden" name="scope" value="{{$d.Request.Scope}}">
+      <input type="hidden" name="resource" value="{{$d.Request.Resource}}">
+{{end}}

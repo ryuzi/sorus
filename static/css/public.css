@@ -1,0 +1,580 @@
+/* 公開サイトのスタイル。描画をブロックする外部 CSS・JS を使わず、このファイルだけで組む。 */
+/* 本体のスタイルはすべてレイヤー sorus-base に入れる。テーマの CSS はレイヤーに入れないため、詳細度に関係なく
+   ここの指定より優先される。テーマが変えてよいのは :root のトークンと、テンプレートにある公開クラスだけ。 */
+@layer sorus-base {
+  /* デザイントークンの既定値。テーマ（static/themes/<id>/theme.css）は :root でこれらを上書きする。
+     color-scheme はここに書かない。CSS の値は <meta name="color-scheme">（theme.json の color_scheme）より優先されるため。 */
+  :root {
+    --bg: #ffffff; --surface: #f8fafc; --fg: #1e293b; --muted: #64748b; --border: #e2e8f0;
+    --accent: #4338ca; --accent-fg: #ffffff; --accent-soft: #eef2ff; --mark: #fef08a;
+    --code-bg: #0f172a; --code-fg: #e2e8f0;
+    --font-body: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+    --font-heading: var(--font-body);
+    --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --radius: 8px; --radius-lg: 12px; --content-width: 1080px; --prose-width: 760px;
+    --shadow: 0 1px 3px rgb(15 23 42 / .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f172a; --surface: #1e293b; --fg: #e2e8f0; --muted: #94a3b8; --border: #334155;
+      --accent: #a5b4fc; --accent-fg: #0f172a; --accent-soft: #1e1b4b; --mark: #854d0e;
+      --code-bg: #020617; --code-fg: #e2e8f0; }
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); line-height: 1.8;
+    font-family: var(--font-body); }
+  a { color: var(--accent); }
+  img { max-width: 100%; height: auto; }
+  .container { width: 100%; max-width: var(--content-width); margin: 0 auto; padding: 0 16px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .skip-link { position: absolute; left: -999px; }
+  .skip-link:focus { left: 8px; top: 8px; background: var(--bg); padding: 4px 8px; z-index: 10; }
+
+  .site-header { border-bottom: 1px solid var(--border); background: var(--bg); }
+  .header-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 14px; }
+  .site-title { font-size: 1.35rem; font-weight: 800; color: var(--fg); text-decoration: none; }
+  .header-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: flex-end; flex: 1 1 auto; }
+  .search-form { display: flex; gap: 6px; flex: 1 1 200px; max-width: 420px; }
+  .search-form input { flex: 1; min-width: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--fg); font: inherit; }
+  .search-form button { padding: 8px 14px; border: 0; border-radius: var(--radius); background: var(--accent); color: var(--accent-fg); font: inherit; font-weight: 600; cursor: pointer; }
+  .search-form-large { max-width: none; margin-bottom: 20px; }
+  .lang-switcher { display: inline-flex; align-items: center; gap: 2px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.05em; border: 1px solid var(--border); border-radius: 999px; padding: 2px; background: var(--surface); }
+  .lang-switcher-current { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-fg); line-height: 1.4; }
+  .lang-switcher-link { display: inline-block; padding: 2px 8px; border-radius: 999px; color: var(--muted); text-decoration: none; line-height: 1.4; transition: color 0.15s, background 0.15s; }
+  .lang-switcher-link:hover { color: var(--fg); background: var(--border); }
+  .lang-switcher-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .lang-switcher-disabled { display: inline-block; padding: 2px 8px; border-radius: 999px; color: var(--border); cursor: not-allowed; line-height: 1.4; opacity: 0.6; }
+  .category-nav { border-top: 1px solid var(--border); }
+  .category-nav ul { display: flex; gap: 4px; list-style: none; margin: 0 auto; padding-top: 6px; padding-bottom: 6px; overflow-x: auto; }
+  .category-nav a { display: block; padding: 4px 10px; border-radius: 999px; color: var(--muted); text-decoration: none; white-space: nowrap; font-size: .9rem; }
+  .category-nav a:hover { background: var(--accent-soft); color: var(--accent); }
+  /* サイト構成のメニュー（.category-nav の中の .site-menu）。表示中のページを指す項目は aria-current="page"。 */
+  .site-menu a { color: var(--fg); font-weight: 600; }
+  .category-nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+  /* メニューのドロップダウン（サイト構成の子項目）とスマートフォンのメニュー（static/js/public.js）。テーマが変えてよい
+     公開クラス: .nav-toggle・.nav-toggle-icon・.nav-toggle-label・.has-submenu・.is-current-parent・.submenu-toggle・
+     .submenu-toggle-label・.submenu-caret・.site-submenu。状態は aria-expanded と .site-header.is-nav-ready（スクリプトが
+     動いている）・.is-nav-open（スマートフォンのメニューを開いている）・.is-sticky（ヘッダーが画面の上に固定されている）、
+     .has-submenu.is-open。浮かせたドロップダウンの
+     背景は --site-nav-bg（無ければスクリプトがメニューの帯の背景色を入れる）、影は --site-submenu-shadow で変えられる。 */
+  .nav-toggle { display: none; }
+  .site-menu .has-submenu { position: relative; display: flex; align-items: center; }
+  .submenu-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 4px 8px; border: 0; border-radius: 999px; background: none; color: var(--fg); font: inherit; font-size: .9rem; font-weight: 600; line-height: inherit; white-space: nowrap; cursor: pointer; }
+  .has-submenu > a + .submenu-toggle { margin-left: -4px; padding: 4px 8px 4px 4px; color: var(--muted); }
+  .submenu-toggle-label { padding: 4px 10px; }
+  .submenu-toggle:hover, .submenu-toggle[aria-expanded="true"], .is-current-parent > .submenu-toggle-label { background: var(--accent-soft); color: var(--accent); }
+  .submenu-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .submenu-caret { flex: none; width: .42em; height: .42em; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-25%) rotate(45deg); transition: transform .15s ease; }
+  .submenu-toggle[aria-expanded="true"] .submenu-caret { transform: translateY(20%) rotate(-135deg); }
+  .category-nav .site-submenu { display: none; flex-direction: column; gap: 2px; margin: 0; padding: 6px; overflow: visible; list-style: none; }
+  .category-nav .site-submenu a { white-space: normal; }
+  .site-menu .submenu-toggle[aria-expanded="true"] + .site-submenu { display: flex; }
+  /* スクリプトが動かないときは、ポインターを載せる・キーボードで中に入ると開く。 */
+  .category-nav:not(.is-enhanced) .has-submenu:hover > .site-submenu, .category-nav:not(.is-enhanced) .has-submenu:focus-within > .site-submenu { display: flex; }
+  @media (min-width: 768px) {
+    /* PC: メニューは折り返して並べ（横スクロールの枠はドロップダウンを切り取るため使わない）、子項目は親の下に浮かせる。 */
+    .category-nav .site-menu { flex-wrap: wrap; overflow: visible; }
+    .category-nav .site-submenu { position: absolute; top: 100%; left: 0; z-index: 40; width: max-content; min-width: 13rem; max-width: min(22rem, calc(100vw - 32px)); border: 1px solid var(--border); border-radius: var(--radius); background: var(--site-nav-bg, var(--bg)); box-shadow: var(--site-submenu-shadow, 0 10px 30px rgb(15 23 42 / .14)); }
+    .site-menu > .has-submenu:last-child > .site-submenu, .site-menu > .has-submenu:nth-last-child(2) > .site-submenu { right: 0; left: auto; }
+  }
+  @media (max-width: 767.98px) {
+    /* スマートフォン: 閉じているあいだはサイト名とボタンの1行。開くと検索窓とメニュー（縦の一覧、子項目はアコーディオン）を出す。 */
+    .site-header.is-nav-ready .header-inner { row-gap: 10px; padding-top: 10px; padding-bottom: 10px; }
+    .site-header.is-nav-ready .site-title { flex: 1 1 0; min-width: 0; font-size: 1.15rem; line-height: 1.4; }
+    .site-header.is-nav-ready .header-tools { order: 1; flex: 0 1 auto; }
+    .site-header.is-nav-ready .nav-toggle { order: 2; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin: 0; padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--fg); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+    .site-header.is-nav-ready .nav-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .nav-toggle-icon, .nav-toggle-icon::before, .nav-toggle-icon::after { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; transition: transform .2s ease, background-color .2s ease; }
+    .nav-toggle-icon { position: relative; }
+    .nav-toggle-icon::before, .nav-toggle-icon::after { position: absolute; left: 0; content: ""; }
+    .nav-toggle-icon::before { top: -6px; }
+    .nav-toggle-icon::after { top: 6px; }
+    .nav-toggle[aria-expanded="true"] .nav-toggle-icon { background: transparent; }
+    .nav-toggle[aria-expanded="true"] .nav-toggle-icon::before { transform: translateY(6px) rotate(45deg); }
+    .nav-toggle[aria-expanded="true"] .nav-toggle-icon::after { transform: translateY(-6px) rotate(-45deg); }
+    .site-header.is-nav-ready:not(.is-nav-open) .header-inner .search-form, .site-header.is-nav-ready:not(.is-nav-open) .category-nav { display: none; }
+    .site-header.is-nav-open .header-inner > .search-form, .site-header.is-nav-open .header-tools { order: 3; flex: 1 1 100%; max-width: none; }
+    .site-header.is-nav-open .header-tools .search-form { flex: 1 1 100%; max-width: none; }
+    /* ヘッダーを画面の上に固定するテーマ（.is-sticky）では、長いメニューを画面の中でスクロールできるようにする。 */
+    .site-header.is-sticky.is-nav-open .category-nav { max-height: calc(100vh - 8rem); max-height: calc(100dvh - 8rem); overflow-y: auto; overscroll-behavior: contain; }
+    .site-header.is-nav-ready .site-menu { flex-direction: column; gap: 2px; overflow: visible; padding-top: 8px; padding-bottom: 12px; }
+    .site-header.is-nav-ready .site-menu a, .site-header.is-nav-ready .submenu-toggle-label { padding: 10px 12px; border-radius: var(--radius); font-size: 1rem; white-space: normal; }
+    .site-header.is-nav-ready .site-menu .has-submenu { flex-wrap: wrap; }
+    .site-header.is-nav-ready .has-submenu > a { flex: 1 1 0; min-width: 0; }
+    .site-header.is-nav-ready .has-submenu > a + .submenu-toggle { align-self: stretch; justify-content: center; min-width: 44px; margin: 0; padding: 0 14px; border-radius: var(--radius); }
+    .site-header.is-nav-ready .submenu-toggle-label { flex: 1 1 100%; justify-content: space-between; text-align: left; }
+    .site-header.is-nav-ready .category-nav .site-submenu { flex: 1 1 100%; padding: 0 0 6px 16px; }
+    .site-header.is-nav-ready .category-nav .site-submenu a { font-size: .95rem; font-weight: 500; }
+  }
+  @media (prefers-reduced-motion: reduce) { .submenu-caret, .nav-toggle-icon, .nav-toggle-icon::before, .nav-toggle-icon::after { transition: none; } }
+
+  main.container { padding-top: 24px; padding-bottom: 48px; min-height: 60vh; }
+  .page-title, .article-title, .prose h2, .prose h3, .prose h4, .site-title, .card-title { font-family: var(--font-heading); }
+  .page-title { font-size: 1.6rem; line-height: 1.4; margin: 0 0 16px; }
+  .lead { color: var(--muted); margin-top: -8px; }
+  .empty { color: var(--muted); }
+  .meta { color: var(--muted); font-size: .85rem; margin: 6px 0 0; }
+  .badge { display: inline-block; padding: 1px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: .78rem; font-weight: 600; text-decoration: none; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; align-items: stretch; }
+  .card { display: flex; flex-direction: column; height: 100%; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg); box-shadow: var(--shadow); transition: border-color .15s ease; }
+  .card:hover { border-color: var(--accent); }
+  /* カードの画像は縦長・正方形・極端な横長でも枠いっぱいに cover で切り抜き（余白を作らない）、上寄り 25% に合わせて
+     人物の頭を切らない。is-contain（余白をとって全体を収める）は記事ページのアイキャッチ（.hero）にだけ付く。 */
+  .card-media img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center 25%; }
+  .card-media.is-placeholder, .front-card-media.is-placeholder, .related-article-media.is-placeholder { display: block; width: 100%; aspect-ratio: 16 / 9; background: linear-gradient(135deg, #eef2f7, #dbe4ef); }
+  img.is-contain { object-fit: contain; object-position: center; padding: 12px; background-color: #f8fafc; }
+  .card-body { display: flex; flex-direction: column; flex: 1 1 auto; padding: 14px 16px 16px; }
+  .card-title { font-size: 1.1rem; line-height: 1.5; margin: 6px 0 0; }
+  .card-title a { color: var(--fg); text-decoration: none; }
+  .card-title a:hover { color: var(--accent); text-decoration: underline; }
+  .card-excerpt { color: var(--muted); font-size: .92rem; margin: 6px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .card .meta { margin-top: auto; padding-top: 10px; }
+
+  /* 画像なしカード（エディトリアル・タイポグラフィカード自立） */
+  .card:not(:has(.card-media)) { background: var(--surface); }
+  .card:not(:has(.card-media)) .card-body {
+    padding-top: 18px;
+  }
+  .card:not(:has(.card-media)) .card-title {
+    font-size: 1.18rem;
+    line-height: 1.45;
+  }
+  .card:not(:has(.card-media)) .card-excerpt {
+    -webkit-line-clamp: 5;
+    line-height: 1.6;
+  }
+
+  /* 画像を出さないカード（テンプレートの --no-media）。 */
+  .card--no-media { background: var(--surface); }
+  .card--no-media .card-body { padding: 18px 16px 16px; }
+  .card--no-media .card-excerpt { -webkit-line-clamp: 5; }
+
+  /* 記事一覧のフィルタバー: 左の列にカテゴリのピル、右の列に年のセレクト。長いカテゴリ名でピルが何行に折り返しても、
+     年のセレクトは右上に留まり（上端で揃える）、縦中央に浮いたりピルの並びに割り込んだりしない。狭い画面では縦に積む。 */
+  .articles-header-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; margin: 0 0 16px; }
+  .articles-header-row .page-title { margin: 0; flex: 1 1 auto; }
+  .articles-filter-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px 16px; margin: 0 0 20px; }
+  .articles-filter-bar > .category-filter-pills:only-child { grid-column: 1 / -1; }
+  .category-filter-pills { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+  .category-filter-pills a { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--fg); font-size: .85rem; text-decoration: none; white-space: nowrap; }
+  .category-filter-pills a:hover, .category-filter-pills a[aria-current], .category-filter-pills a.is-current, .category-filter-pills a.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .year-filter-select:not(select) { display: inline-flex; align-items: center; gap: 8px; justify-self: end; }
+  .year-filter-label { flex: none; white-space: nowrap; }
+  select.year-filter-select, .year-filter-select select { padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--fg); font: inherit; font-size: .88rem; }
+  select.year-filter-select { justify-self: end; }
+  @media (max-width: 640px) {
+    .articles-filter-bar { grid-template-columns: minmax(0, 1fr); }
+    .year-filter-select:not(select), select.year-filter-select { justify-self: stretch; }
+    select.year-filter-select, .year-filter-select select { width: 100%; }
+  }
+
+  .pagination { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; margin-top: 32px; }
+  .archive-years { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 20px; }
+  .archive-years-label { color: var(--muted); font-size: .88rem; font-weight: 600; margin-right: 4px; }
+  .archive-year { display: inline-flex; gap: 4px; align-items: center; border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; color: var(--fg); text-decoration: none; font-size: .85rem; }
+  .archive-year span { color: var(--muted); font-size: .78rem; }
+  .archive-year:hover, .archive-year.is-current { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .pagination a, .pagination .disabled, .pagination [aria-current="page"] { padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; }
+  .pagination .disabled { color: var(--muted); opacity: .5; }
+  .page-status { color: var(--muted); }
+  /* ページ番号（1 … 4 5 [6] 7 8 … 47）。番号は幅をそろえ、現在のページは枠を塗る。現在位置の文字（.page-status）は末尾に小さく添える。 */
+  .pagination .page-number { min-width: 2.5em; padding-inline: 8px; text-align: center; font-variant-numeric: tabular-nums; }
+  .pagination a:hover, .pagination a:focus-visible { border-color: var(--accent); color: var(--accent); }
+  .pagination [aria-current="page"] { border-color: var(--accent); background: var(--accent); color: var(--accent-fg, #fff); font-weight: 600; }
+  .pagination .page-ellipsis { color: var(--muted); padding: 0 2px; }
+  .pagination .page-status { font-size: .85rem; font-variant-numeric: tabular-nums; }
+  @media (max-width: 640px) {
+    /* 狭い画面では番号を隠し「← 前へ 6 / 47 次へ →」の1行にする。テーマの .pagination a（番号のリンクにも当たる）が
+       display を指定しても番号と省略の印をそろえて隠すため !important にする（片方だけ残ると番号が飛んで見える）。 */
+    .pagination .page-number, .pagination .page-ellipsis { display: none !important; }
+    .pagination .page-status { order: 1; }
+    .pagination .page-next { order: 2; }
+  }
+
+  .breadcrumb ol { display: flex; flex-wrap: wrap; list-style: none; margin: 0 0 12px; padding: 0; font-size: .85rem; color: var(--muted); }
+  .breadcrumb li + li::before { content: "›"; margin: 0 6px; }
+  .breadcrumb a { color: var(--muted); }
+
+  .article { max-width: var(--prose-width); margin: 0 auto; }
+  /* 固定ページ（/<slug>）の外枠。記事と同じ読みやすい幅にし、日付・カテゴリの行が無い分だけ見出しの前後を詰める。 */
+  .page { max-width: var(--prose-width); margin: 0 auto; }
+  .page > .hero:first-child { margin-top: 0; }
+  .page .article-header { margin-bottom: 8px; }
+  /* トップに固定ページを出すときのトップ（front.html）: ページの導入、主要ページへのカード、新着記事。 */
+  .front-hero { max-width: var(--prose-width); margin: 0 auto 32px; }
+  .front-hero > .hero:first-child { margin-top: 0; }
+  .front-hero .article-title { margin: 0 0 12px; }
+  .front-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(200px, calc((100% - 60px) / 4)), 1fr)); gap: 20px; list-style: none; margin: 0 0 40px; padding: 0; }
+  .front-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+  .front-card-media img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center 25%; }
+  .front-card-media.is-placeholder { background: linear-gradient(135deg, #eef2f7, #dbe4ef); }
+  .front-card-body { padding: 14px 16px 16px; }
+  .front-card--no-media { border-top: 3px solid var(--accent); }
+  .front-card-index { display: block; margin: 0 0 6px; color: var(--muted); font-family: var(--font-mono); font-size: .8rem; font-weight: 700; letter-spacing: .06em; }
+  .front-card-title { font-family: var(--font-heading); font-size: 1.1rem; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
+  .front-card-title a { color: var(--fg); text-decoration: none; }
+  .front-card-title a:hover { color: var(--accent); text-decoration: underline; }
+  .front-card-excerpt { color: var(--muted); font-size: .92rem; margin: 6px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .front-news-more { margin: 20px 0 0; text-align: right; }
+  .front-news-more a { font-weight: 600; }
+  .article-title { font-size: 1.9rem; line-height: 1.45; margin: 8px 0 0; overflow-wrap: anywhere; }
+  .hero { margin: 20px 0; }
+  .hero img { display: block; width: 100%; border-radius: var(--radius-lg); }
+  /* 記事レイアウト（デスクトップ Sticky サイドバー目次 & モバイル開閉） */
+  .article-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .article-layout .toc-sidebar {
+    order: 0;
+    margin: 16px 0 24px;
+  }
+  .article-layout .prose {
+    order: 1;
+    min-width: 0;
+  }
+
+  .toc {
+    margin: 20px 0;
+    padding: 14px 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    font-size: .92rem;
+  }
+  .toc-title {
+    display: inline-block;
+    margin: 0;
+    font-weight: 700;
+  }
+  .toc-collapsible summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    list-style: none;
+  }
+  .toc-collapsible summary::-webkit-details-marker {
+    display: none;
+  }
+  .toc-collapsible summary::after {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform .2s ease;
+    margin-left: 8px;
+  }
+  .toc-collapsible[open] summary::after {
+    transform: rotate(-135deg);
+  }
+  .toc-body {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .toc ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: toc-sec;
+  }
+  .toc li {
+    padding: 3px 0;
+    line-height: 1.5;
+  }
+  .toc a {
+    color: var(--fg);
+    text-decoration: none;
+  }
+  .toc a:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  /* 階層ツリー構造 */
+  .toc .toc-level-2 {
+    font-weight: 600;
+    counter-increment: toc-sec;
+    counter-reset: toc-sub;
+  }
+  .toc .toc-level-2 > a::before {
+    content: counter(toc-sec) ". ";
+    color: var(--muted);
+    font-weight: 400;
+    font-size: .88em;
+    font-family: var(--font-mono);
+    margin-right: 4px;
+  }
+  .toc .toc-level-3 {
+    margin-left: 1rem;
+    padding-left: 0.75rem;
+    border-left: 1.5px solid var(--border);
+    font-size: .92em;
+    counter-increment: toc-sub;
+    counter-reset: toc-subsub;
+  }
+  .toc .toc-level-3 > a::before {
+    content: counter(toc-sec) "." counter(toc-sub) " ";
+    color: var(--muted);
+    font-size: .85em;
+    font-family: var(--font-mono);
+    margin-right: 4px;
+  }
+  .toc .toc-level-4 {
+    margin-left: 2rem;
+    padding-left: 0.75rem;
+    border-left: 1.5px solid var(--border);
+    font-size: .88em;
+    counter-increment: toc-subsub;
+  }
+  .toc .toc-level-4 > a::before {
+    content: counter(toc-sec) "." counter(toc-sub) "." counter(toc-subsub) " ";
+    color: var(--muted);
+    font-size: .82em;
+    font-family: var(--font-mono);
+    margin-right: 4px;
+  }
+  .toc .toc-level-5, .toc .toc-level-6 {
+    margin-left: 2.75rem;
+    padding-left: 0.5rem;
+    border-left: 1px solid var(--border);
+    font-size: .85em;
+  }
+
+  @media (min-width: 1024px) {
+    .article:has(.article-layout),
+    .page:has(.article-layout) {
+      max-width: var(--content-width);
+    }
+    .article-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 40px;
+      align-items: start;
+    }
+    .article-layout .prose {
+      order: 1;
+      max-width: var(--prose-width);
+    }
+    .article-layout .toc-sidebar {
+      order: 2;
+      position: sticky;
+      /* ヘッダーを画面の上に固定するテーマでは、その高さ（public.js の --site-header-sticky-h）の分だけ下げる。 */
+      top: calc(var(--site-header-sticky-h, 4rem) + 1.5rem);
+      max-height: calc(100vh - var(--site-header-sticky-h, 4rem) - 3rem);
+      overflow-y: auto;
+      scrollbar-width: thin;
+      margin: 0;
+    }
+    .toc-collapsible > :not(summary) {
+      display: block !important;
+    }
+    .toc-collapsible::details-content {
+      display: block !important;
+    }
+    .toc-collapsible summary {
+      pointer-events: none;
+      cursor: default;
+    }
+    .toc-collapsible summary::after {
+      display: none;
+    }
+    .toc-body {
+      margin-top: 8px;
+      padding-top: 8px;
+    }
+  }
+
+  .prose { font-size: 1.05rem; line-height: 1.95; overflow-wrap: anywhere; }
+  /* 目次から飛んだ見出しが、画面の上に固定したヘッダーに隠れないようにする（固定しないテーマでは少しの余白だけ）。 */
+  .prose h2, .prose h3, .prose h4 { line-height: 1.45; margin: 2em 0 .7em; scroll-margin-top: calc(var(--site-header-sticky-h, 3.5rem) + 1.5rem); }
+  .prose h2 { font-size: 1.4rem; padding-bottom: .3em; border-bottom: 2px solid var(--border); }
+  .prose h3 { font-size: 1.2rem; }
+  .prose p, .prose ul, .prose ol, .prose blockquote, .prose pre, .prose table { margin: 0 0 1.2em; }
+  .prose blockquote { border-left: 4px solid var(--border); padding-left: 1em; color: var(--muted); }
+  .prose code { background: var(--surface); border-radius: calc(var(--radius) / 2); padding: .1em .35em; font-family: var(--font-mono); font-size: .9em; }
+  .prose pre { background: var(--code-bg); color: var(--code-fg); border-radius: var(--radius); padding: 1em; overflow-x: auto; }
+  .prose pre code { background: none; color: inherit; padding: 0; }
+  .prose img { border-radius: var(--radius); }
+  .prose table { border-collapse: collapse; display: block; overflow-x: auto; }
+  /* .prose の overflow-wrap: anywhere がセルに継がれると、セルの最小幅が1文字になり、短い列（年の「2024」など）が
+     1文字ずつ折り返される。セルでは単語の途中で折らず、表が本文の幅を超えたら .prose table の横スクロールで見せる。
+     セルの中のリンク（長い URL）とコードだけは途中で折り、1つの長い語のために表全体が広がらないようにする。 */
+  .prose th, .prose td { border: 1px solid var(--border); padding: .4em .8em; overflow-wrap: normal; word-break: normal; }
+  .prose th a, .prose td a, .prose th code, .prose td code { overflow-wrap: anywhere; }
+
+  .result-count { color: var(--muted); }
+  .search-hits { list-style: none; margin: 0; padding: 0; }
+  .search-hit { padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .snippet { margin: 6px 0 0; color: var(--muted); font-size: .92rem; }
+  mark { background: var(--mark); color: inherit; padding: 0 1px; border-radius: 2px; }
+  .search-results-loading { opacity: .55; transition: opacity .15s; }
+
+  .not-found { text-align: center; padding: 48px 0; }
+  .site-footer { border-top: 1px solid var(--border); color: var(--muted); font-size: .85rem; }
+  .site-footer .container { display: flex; justify-content: space-between; padding-top: 18px; padding-bottom: 18px; }
+  .site-footer p { margin: 0; }
+  /* フッターのサイトマップ（サイト構成の site_footer_menu）。見出しごとの列にリンクを並べ、狭い画面では2列・1列に折り返す。
+     テーマが変えてよい公開クラス: .footer-sitemap・.footer-sitemap-inner・.footer-sitemap-col・.footer-sitemap-heading・.footer-sitemap-links。 */
+  .footer-sitemap { border-bottom: 1px solid var(--border); }
+  .footer-sitemap-inner { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr)); gap: 24px 32px; width: 100%; max-width: var(--content-width); margin: 0 auto; padding: 28px 16px; }
+  .footer-sitemap-col { min-width: 0; }
+  .footer-sitemap-heading { margin: 0 0 10px; color: var(--fg); font-family: var(--font-heading); font-size: .82rem; font-weight: 700; letter-spacing: .06em; line-height: 1.5; }
+  .footer-sitemap-heading a { color: inherit; text-decoration: none; }
+  .footer-sitemap-links { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .footer-sitemap a { color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
+  .footer-sitemap-heading a, .footer-sitemap a[aria-current="page"] { color: var(--fg); }
+  .footer-sitemap a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: .2em; }
+  .footer-sitemap a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  /* 論文・学会発表の書誌情報 */
+  .scholarly-meta { display: grid; gap: 2px 16px; margin: 12px 0 0; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); font-size: .88rem; }
+  .scholarly-meta div { display: flex; gap: 12px; }
+  .scholarly-meta dt { flex: 0 0 6.5em; color: var(--muted); }
+  .scholarly-meta dd { margin: 0; overflow-wrap: anywhere; }
+  /* 数式（KaTeX）。読み込み前・失敗時も TeX のソースが読めるようにし、長い数式は横スクロールさせる。 */
+  .prose .math-display { display: block; margin: 0 0 1.2em; overflow-x: auto; text-align: center; }
+  .prose .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  /* 添付ファイルのダウンロードカード */
+  .attachments { margin-top: 40px; padding-top: 20px; border-top: 2px solid var(--border); }
+  .attachments-title { font-size: 1.1rem; margin: 0 0 12px; }
+  .attachment-cards { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
+  .attachment-card a { display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: center; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--fg); text-decoration: none; }
+  .attachment-card a:hover, .attachment-card a:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+  .attachment-type { grid-row: span 2; min-width: 3.2em; padding: 6px 8px; border-radius: var(--radius); background: var(--accent); color: var(--accent-fg); font-size: .75rem; font-weight: 800; text-align: center; }
+  .attachment-name { font-weight: 600; overflow-wrap: anywhere; }
+  .attachment-meta { color: var(--muted); font-size: .8rem; }
+  .related-articles { margin-top: 40px; padding-top: 20px; border-top: 2px solid var(--border); }
+  .related-articles > h2 { margin: 0 0 14px; font-size: 1.2rem; }
+  .related-article-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .related-article-card { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow); }
+  .related-article-card > a { display: block; height: 100%; color: var(--fg); text-decoration: none; }
+  .related-article-card > a:hover, .related-article-card > a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .related-article-media img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center 25%; }
+  .related-article-card--no-media { border-top: 3px solid var(--accent); }
+  .related-article-media.is-placeholder { background: linear-gradient(135deg, #eef2f7, #dbe4ef); }
+  .related-article-body { padding: 12px 14px 14px; }
+  .related-article-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .related-article-date { color: var(--muted); font-size: .75rem; font-family: var(--font-mono); }
+  .related-article-body h3 { margin: 4px 0 6px; font-size: 1rem; line-height: 1.5; }
+  .related-article-body p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+  /* フォトギャラリー（:::gallery 記法・トップページ・テーマの {{template "gallery"}}）。どの並べ方も写真を切り抜かず、
+     元の縦横比のまま並べる（行揃えのスクリプトが動かないときだけ、行の幅に合わせてわずかに切り抜く）。
+     並べ方は figure の class（gallery-layout-justified・-masonry・-cards）で切り替える。
+     エディタの簡易プレビューは admin.css の .prose-preview .photo-gallery が同じ並べ方を真似る。
+     --gallery-gap（写真の間隔）と --gallery-row-height（行揃えの行の目安の高さ）はテーマが上書きしてよい。 */
+  .photo-gallery { --gallery-gap: 12px; margin: 0 0 1.2em; padding: 0; }
+  .gallery-item { position: relative; overflow: hidden; cursor: zoom-in; }
+  .gallery-item:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .gallery-item img, .prose .gallery-item img { display: block; width: 100%; border-radius: 0; }
+  .gallery-item figcaption { color: var(--muted); font-size: .82rem; line-height: 1.6; }
+  /* 行揃え（justified・既定）: 行ごとに高さをそろえ、幅いっぱいに並べる。幅は static/js/justified_gallery.js が
+     縦横比から計算して各写真に指定し、並べ終えると .is-justified が付く。キャプションは写真の下端に重ね、指したときだけ出す。
+     スクリプトが動く前・動かないときは CSS だけで並べる: 同じ高さの行に写真を元の縦横比の幅で左から詰め、行の余りを
+     各写真に等分して右端をそろえる（広げた分だけ上下をわずかに切り抜く）。最後の行の余りは ::after の詰め物が受け、
+     写真を引き伸ばさずに左へ寄せる（詰め物は負の余白で間隔を打ち消し、自分のために行を増やさない）。 */
+  .photo-gallery.gallery-layout-justified { --gallery-gap: 6px; --gallery-row-height: 170px; display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--gallery-gap); }
+  @media (min-width: 640px) { .photo-gallery.gallery-layout-justified { --gallery-row-height: 210px; } }
+  @media (min-width: 960px) { .photo-gallery.gallery-layout-justified { --gallery-gap: 8px; --gallery-row-height: 240px; } }
+  .photo-gallery.gallery-layout-justified::after { content: ""; flex: 1000 1 0; margin-left: calc(-1 * var(--gallery-gap)); }
+  .gallery-layout-justified .gallery-item { flex: 1 1 auto; max-width: 100%; height: var(--gallery-row-height); margin: 0; border-radius: calc(var(--radius) / 2); background: var(--surface); }
+  .gallery-layout-justified .gallery-item img { width: auto; min-width: 100%; max-width: 100%; height: 100%; object-fit: cover; transition: transform .45s cubic-bezier(.2, 0, 0, 1); }
+  /* 並べ終えたら、スクリプトが指定した幅のまま並べる（幅いっぱいの行の最後の写真だけ、スクリプトが flex-grow で端数を埋める）。 */
+  .photo-gallery.gallery-layout-justified.is-justified::after { content: none; }
+  .gallery-layout-justified.is-justified .gallery-item { flex: 0 0 auto; }
+  .gallery-layout-justified.is-justified .gallery-item img { width: 100%; }
+  .gallery-layout-justified .gallery-item:hover img { transform: scale(1.03); }
+  .gallery-layout-justified .gallery-item figcaption { position: absolute; right: 0; bottom: 0; left: 0; padding: 22px 10px 7px; overflow: hidden; background: linear-gradient(to top, rgb(15 23 42 / .72), rgb(15 23 42 / 0)); color: #f8fafc; font-size: .78rem; line-height: 1.5; white-space: nowrap; text-overflow: ellipsis; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
+  .gallery-layout-justified .gallery-item:hover figcaption, .gallery-layout-justified .gallery-item:focus-visible figcaption { opacity: 1; }
+  /* 段組み（masonry）: CSS Columns で縦横比の異なる写真を隙間なく段に詰める。masonry-grid は並べ方を導入する前の
+     クラスで、生 HTML の古い形とテーマの互換のために同じ見た目にする。 */
+  .photo-gallery.gallery-layout-masonry, .photo-gallery.masonry-grid { column-count: 1; column-gap: var(--gallery-gap); }
+  @media (min-width: 480px) { .photo-gallery.gallery-layout-masonry, .photo-gallery.masonry-grid { column-count: 2; } }
+  @media (min-width: 768px) { .photo-gallery.gallery-layout-masonry, .photo-gallery.masonry-grid { column-count: 3; } }
+  .gallery-layout-masonry .gallery-item, .masonry-grid .gallery-item { break-inside: avoid; margin: 0 0 var(--gallery-gap); border-radius: var(--radius); background: var(--surface); transition: transform .2s ease, box-shadow .2s ease; }
+  .gallery-layout-masonry .gallery-item:hover, .masonry-grid .gallery-item:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .gallery-layout-masonry .gallery-item figcaption, .masonry-grid .gallery-item figcaption { padding: 6px 10px 8px; }
+  /* カード（cards）: 写真を額縁のような余白（マット）で囲み、元の縦横比のまま中央に置いて、下にキャプションを静かに添える。
+     同じ行のカードは高さをそろえ、キャプションの位置を下端でそろえる（写真は余白の中で上下中央）。 */
+  .photo-gallery.gallery-layout-cards { --gallery-gap: 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); align-items: stretch; gap: var(--gallery-gap); }
+  .gallery-layout-cards .gallery-item { container-type: inline-size; display: flex; flex-direction: column; margin: 0; padding: clamp(10px, 7%, 18px); border: 1px solid var(--border); border-radius: 3px; background: var(--bg); box-shadow: 0 1px 2px rgb(15 23 42 / .04), 0 12px 28px -18px rgb(15 23 42 / .28); transition: transform .25s ease, box-shadow .25s ease; }
+  .gallery-layout-cards .gallery-item:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgb(15 23 42 / .05), 0 18px 36px -18px rgb(15 23 42 / .34); }
+  /* 縦長の写真はカードの幅の 1.25 倍の高さまでにし（余白の中に収めて縮める）、同じ行の横長の写真の上下が空きすぎないようにする。 */
+  .gallery-layout-cards .gallery-item img { height: auto; max-height: min(62vh, 26rem); max-height: min(125cqw, 62vh, 26rem); margin: auto 0; object-fit: contain; }
+  .gallery-layout-cards .gallery-item figcaption { padding: 12px 2px 0; font-size: .8rem; letter-spacing: .02em; text-align: center; overflow-wrap: anywhere; }
+  @media (prefers-reduced-motion: reduce) {
+    .photo-gallery .gallery-item, .photo-gallery .gallery-item img, .photo-gallery .gallery-item figcaption { transition: none; }
+    .photo-gallery .gallery-item:hover, .photo-gallery .gallery-item:hover img { transform: none; }
+  }
+  /* トップページのフォトギャラリーの下の「すべて見る」リンク（サイト構成の top_gallery_link_*）。 */
+  .front-gallery-more { margin: 24px 0 0; text-align: center; }
+  .front-gallery-more a { display: inline-flex; align-items: center; gap: .55em; min-height: 44px; padding: .5em 1.5em; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); color: var(--fg); font-size: .92rem; font-weight: 600; letter-spacing: .03em; text-decoration: none; transition: color .2s ease, border-color .2s ease, background-color .2s ease; }
+  .front-gallery-more a::after { content: "\2192"; content: "\2192" / ""; transition: transform .2s ease; }
+  .front-gallery-more a:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .front-gallery-more a:hover::after { transform: translateX(3px); }
+  .front-gallery-more a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .front-gallery-more a, .front-gallery-more a::after { transition: none; } .front-gallery-more a:hover::after { transform: none; } }
+  /* :::gallery の「もっと見る」（limit を書かないタグのギャラリー。gallery.go・justified_gallery.js）。ギャラリーの直後に
+     総枚数と、続きを読むボタンを中央に並べる。まだ見せていない写真（hidden）は並べ方の display より優先して隠す。 */
+  .photo-gallery .gallery-item[hidden] { display: none !important; }
+  .gallery-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 16px; margin: 4px 0 1.6em; }
+  .gallery-count { display: inline-flex; align-items: center; padding: 2px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; letter-spacing: .03em; }
+  .gallery-more-button { display: inline-flex; align-items: center; gap: .5em; min-height: 44px; padding: .5em 1.5em; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); color: var(--fg); font: inherit; font-size: .92rem; font-weight: 600; letter-spacing: .03em; cursor: pointer; transition: color .2s ease, border-color .2s ease, background-color .2s ease; }
+  .gallery-more-button::after { content: "\2193"; content: "\2193" / ""; }
+  .gallery-more-button:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .gallery-more-button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .gallery-more-button:disabled { cursor: progress; opacity: .6; }
+  @media (prefers-reduced-motion: reduce) { .gallery-more-button { transition: none; } }
+  /* 年別の絞り込み（:::gallery の year_filter="true"。gallery.go・justified_gallery.js）。ギャラリーの直前の「すべて」「2025年」…のピル。
+     見た目は記事一覧のカテゴリの絞り込み（.category-filter-pills a）にそろえる。読み込み中のギャラリーは aria-busy で薄くする。 */
+  .gallery-year-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+  .gallery-year-pill { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); color: var(--fg); font: inherit; font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; transition: color .2s ease, border-color .2s ease, background-color .2s ease; }
+  .gallery-year-pill:hover, .gallery-year-pill.is-active, .gallery-year-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .gallery-year-pill:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .photo-gallery[aria-busy="true"] { opacity: .55; transition: opacity .2s ease; }
+  @media (prefers-reduced-motion: reduce) { .gallery-year-pill, .photo-gallery[aria-busy="true"] { transition: none; } }
+  /* 画像の拡大表示（layout.html の <dialog id="cms-lightbox">、static/js/lightbox.js） */
+  .cms-lightbox-trigger { cursor: zoom-in; }
+  .cms-lightbox-trigger:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .cms-lightbox { width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden; background: transparent; color: #f8fafc; touch-action: none; -webkit-user-select: none; user-select: none; }
+  .cms-lightbox[open] { display: flex; align-items: center; justify-content: center; }
+  .cms-lightbox::backdrop { background: rgb(15 23 42 / .82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); opacity: var(--cms-lightbox-dim, 1); }
+  .cms-lightbox-figure { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 100%; margin: 0; padding: 64px 16px 24px; }
+  .cms-lightbox-stage { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; width: 100%; min-height: 0; }
+  .cms-lightbox-image { display: block; max-width: min(100%, 1400px); max-height: 100%; object-fit: contain; border-radius: 6px; cursor: zoom-in; box-shadow: 0 12px 40px rgb(0 0 0 / .45); transform-origin: center; will-change: transform; -webkit-user-drag: none; }
+  .cms-lightbox-image.is-animating { transition: transform .25s cubic-bezier(.2, 0, 0, 1); }
+  .cms-lightbox.is-zoomed .cms-lightbox-image { cursor: grab; }
+  .cms-lightbox.is-zoomed.is-dragging .cms-lightbox-image, .cms-lightbox.is-dragging .cms-lightbox-image { cursor: grabbing; }
+  .cms-lightbox-caption { flex: none; max-width: 60em; max-height: 30vh; overflow-y: auto; color: #f8fafc; font-size: .95rem; line-height: 1.6; text-align: center; touch-action: pan-y; -webkit-user-select: text; user-select: text; }
+  .cms-lightbox-toolbar { position: absolute; top: 0; right: 0; left: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 0 16px; pointer-events: none; }
+  .cms-lightbox-toolbar > * { pointer-events: auto; }
+  .cms-lightbox-counter { margin: 0; padding: 4px 12px; border-radius: 999px; background: rgb(15 23 42 / .6); color: #f8fafc; font-size: .88rem; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+  .cms-lightbox-counter[hidden] { display: block; visibility: hidden; }
+  .cms-lightbox-close { width: 44px; height: 44px; margin-left: auto; border: 0; border-radius: 999px; background: rgb(15 23 42 / .6); color: #f8fafc; font-size: 1.8rem; line-height: 1; cursor: pointer; }
+  .cms-lightbox-nav { position: absolute; top: 50%; z-index: 2; display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; margin-top: -24px; padding: 0 0 4px; border: 0; border-radius: 999px; background: rgb(15 23 42 / .6); color: #f8fafc; font-size: 2.2rem; line-height: 1; cursor: pointer; }
+  .cms-lightbox-nav[hidden] { display: none; }
+  .cms-lightbox-nav:disabled { opacity: .3; cursor: default; }
+  .cms-lightbox-prev { left: 12px; }
+  .cms-lightbox-next { right: 12px; }
+  .cms-lightbox-close:hover, .cms-lightbox-close:focus-visible, .cms-lightbox-nav:not(:disabled):hover, .cms-lightbox-nav:focus-visible { background: rgb(15 23 42 / .9); outline: 2px solid #f8fafc; outline-offset: 2px; }
+  /* 画像のタップで操作 UI とキャプションを控えめに隠す（フォーカスが来たら lightbox.js が出し直す）。 */
+  .cms-lightbox-toolbar, .cms-lightbox-nav, .cms-lightbox-caption { transition: opacity .2s ease; }
+  .cms-lightbox.is-ui-hidden .cms-lightbox-toolbar, .cms-lightbox.is-ui-hidden .cms-lightbox-nav, .cms-lightbox.is-ui-hidden .cms-lightbox-caption { opacity: 0; pointer-events: none; }
+  .cms-lightbox.is-ui-hidden .cms-lightbox-toolbar > * { pointer-events: none; }
+  /* スマートフォンでは左右ボタンを画面下に寄せ、画像を指で払う操作の邪魔をしない。 */
+  @media (max-width: 640px), (pointer: coarse) {
+    .cms-lightbox-nav { top: auto; bottom: 16px; margin-top: 0; width: 44px; height: 44px; font-size: 2rem; }
+    .cms-lightbox-figure { padding-bottom: 72px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cms-lightbox-image.is-animating, .cms-lightbox-toolbar, .cms-lightbox-nav, .cms-lightbox-caption { transition: none; }
+  }
+  html:has(.cms-lightbox[open]) { overflow: hidden; }
+  ::view-transition-group(cms-lightbox-image) { animation-duration: .3s; animation-timing-function: cubic-bezier(.2, 0, 0, 1); }
+}

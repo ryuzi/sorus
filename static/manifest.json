@@ -1,0 +1,29 @@
+{
+  "name": "sorus CMS",
+  "short_name": "sorus",
+  "description": "ローカルファーストの執筆・発信ツール",
+  "id": "/admin",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "categories": ["productivity", "utilities"],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "shortcuts": [
+    {
+      "name": "新しい記事",
+      "short_name": "新規作成",
+      "url": "/admin/articles/new",
+      "description": "新しい記事の下書きを作成します"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

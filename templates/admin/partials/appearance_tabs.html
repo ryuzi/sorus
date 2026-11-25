@@ -1,0 +1,6 @@
+{{define "appearance_tabs"}}{{/* 「外観」のテーマ・サイト構成の画面の上に出すタブ。page をそのまま渡す。 */}}
+<nav class="admin-tabs mb-6 flex gap-1 border-b border-neutral-200 text-sm" aria-label="{{.T "appearance"}}">
+  <a href="/admin/settings/theme" id="tab-theme" class="-mb-px whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-neutral-600 hover:text-neutral-900"{{if .AtPath "/admin/settings/theme"}} aria-current="page"{{end}}>{{.T "appearance_tab_theme"}}</a>
+  <a href="/admin/settings/structure" id="tab-structure" class="-mb-px whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-neutral-600 hover:text-neutral-900"{{if .AtPath "/admin/settings/structure"}} aria-current="page"{{end}}>{{.T "structure"}}</a>
+</nav>
+{{end}}

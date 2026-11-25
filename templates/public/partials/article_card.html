@@ -1,0 +1,14 @@
+{{define "article_card"}}
+<article class="card{{if .HideCardMedia}} card--no-media{{end}}">
+  {{if not .HideCardMedia}}{{with .ImageHTML}}<a href="{{$.URL}}" class="card-media" tabindex="-1" aria-hidden="true">{{.}}</a>{{else}}<a href="{{$.URL}}" class="card-media is-placeholder" tabindex="-1" aria-hidden="true"></a>{{end}}{{end}}
+  <div class="card-body">
+    {{with .CategoryName}}<a class="badge" href="{{$.CategoryURL}}">{{.}}</a>{{end}}
+    <h2 class="card-title"><a href="{{.URL}}">{{.Title}}</a></h2>
+    {{with .Excerpt}}<p class="card-excerpt">{{.}}</p>{{end}}
+    <p class="meta">
+      <time datetime="{{isoTime .PublishedAt}}">{{formatDate .PublishedAt .Lang}}</time>
+      {{with .AuthorName}}<span>・{{.}}</span>{{end}}
+    </p>
+  </div>
+</article>
+{{end}}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily 03:00 JST CMS database backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Tokyo
+Persistent=true
+RandomizedDelaySec=5m
+Unit=sorus-backup.service
+
+[Install]
+WantedBy=timers.target

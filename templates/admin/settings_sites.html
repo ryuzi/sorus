@@ -1,0 +1,97 @@
+{{define "content"}}{{$d := .Data}}{{$ja := ne .Lang "en"}}{{$help := "Show help"}}{{if $ja}}{{$help = "説明を表示"}}{{end}}
+{{/* サイトの一覧・削除も、ほかの設定画面と同じ左メニュー付きの2ペインにする（admin_ux_polish_and_mcp_spec.md §2-3）。 */}}
+<div class="mx-auto max-w-7xl px-4 py-6">
+  <div class="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+  {{template "settings_subnav" $}}
+    <div class="min-w-0">
+  <div class="mb-5">
+    <h1 class="text-xl font-bold text-neutral-900">{{$.T "sites_title"}}</h1>
+    <p class="mt-1 text-sm text-neutral-600">{{$.T "sites_desc"}}</p>
+  </div>
+
+  {{with $d.Notice}}
+  <div id="sites-notice" class="notice notice-info mb-5 p-4" role="status">{{.}}</div>
+  {{end}}
+  {{with $d.Error}}
+  <div id="sites-error" class="notice notice-error mb-5 p-4" role="alert">{{.}}</div>
+  {{end}}
+
+  <section id="sites-list" class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="sites-list-title">
+    <h2 id="sites-list-title" class="text-base font-semibold text-neutral-900">{{$.T "sites_list_title"}}</h2>
+    <ul class="mt-4 divide-y divide-neutral-200">
+      {{range $d.Sites}}
+      <li class="flex flex-wrap items-start justify-between gap-4 py-4 first:pt-0 last:pb-0"{{if .Current}} aria-current="true"{{end}}>
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-semibold text-neutral-900">{{.Name}}</span>
+            {{if .Current}}<span class="rounded-full bg-neutral-900 px-2.5 py-0.5 text-xs font-medium text-white" data-current-site="true">{{$.T "site_current"}}</span>{{end}}
+            {{if .Unnamed}}<span class="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs text-neutral-600">{{$.T "site_setup_pending"}}</span>{{end}}
+          </div>
+          {{if .OpenError}}
+          <div class="notice notice-error mt-2 p-3">
+            <p class="font-semibold">{{.OpenSummary}}</p>
+            {{with .Dir}}<p class="mt-1 break-all">{{$.T "site_open_failed_folder" .}}</p>{{end}}
+            <details class="mt-2">
+              <summary class="cursor-pointer">{{$.T "site_open_failed_details"}}</summary>
+              <p class="mt-1 break-all font-mono text-xs">{{.OpenError}}</p>
+            </details>
+            {{with $d.LogPath}}<p class="mt-1 break-all font-mono text-xs text-rose-800">{{$.T "site_open_failed_log" .}}</p>{{end}}
+          </div>
+          {{else}}
+          <p class="mt-1 text-sm text-neutral-600">{{$.T "site_address"}}: <code class="break-all font-mono text-neutral-900">{{.AdminURL}}</code></p>
+          {{if .NameUnreadable}}
+          <div class="notice notice-error mt-2 p-3">
+            <p class="font-semibold">{{$.T "site_name_unreadable"}}</p>
+            <details class="mt-2">
+              <summary class="cursor-pointer">{{$.T "site_open_failed_details"}}</summary>
+              <p class="mt-1 break-all font-mono text-xs">{{.NameError}}</p>
+            </details>
+          </div>
+          {{end}}
+          {{end}}
+        </div>
+        {{if or (not .OpenError) .CanForget}}
+        <div class="flex shrink-0 items-center gap-2">
+          {{if not .OpenError}}
+          <a href="{{.AdminURL}}" class="btn btn-secondary btn-sm">{{$.T "site_open"}}</a>
+          {{if .CanDeleteUnnamed}}
+          <form method="post" action="/admin/settings/sites/{{.ID}}/delete" data-confirm="{{$.T "site_delete_unnamed_confirm"}}">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <button type="submit" class="btn btn-danger btn-sm">{{$.T "site_delete_unnamed"}}</button>
+          </form>
+          {{end}}
+          {{end}}
+          {{if .CanForget}}
+          <form method="post" action="/admin/settings/sites/{{.ID}}/forget" data-confirm="{{$.T "site_forget_confirm" .Dir}}">
+            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+            <button type="submit" class="btn btn-danger btn-sm">{{$.T "site_forget"}}</button>
+          </form>
+          {{end}}
+        </div>
+        {{end}}
+      </li>
+      {{end}}
+    </ul>
+  </section>
+
+  <section id="site-create" class="mt-6 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm" aria-labelledby="site-create-title">
+    <h2 id="site-create-title" class="flex items-center text-base font-semibold text-neutral-900">{{$.T "site_new_title"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "site_new_desc"}}</span></span></h2>
+    <form method="post" action="/admin/settings/sites" class="mt-4">
+      <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+      <button type="submit" id="site-create-submit" class="btn btn-primary btn-md">{{$.T "site_new_button"}}</button>
+    </form>
+  </section>
+
+  {{if $d.CanDeleteCurrent}}
+  <section id="site-delete" class="mt-6 rounded-xl border border-rose-200 bg-white p-6 shadow-sm" aria-labelledby="site-delete-section-title">
+    <h2 id="site-delete-section-title" class="text-base font-semibold text-rose-900">{{$.T "site_delete_section_title"}}</h2>
+    <p class="mt-1 text-sm text-neutral-600">{{$.T "site_delete_section_desc"}}</p>
+    <div class="mt-4">
+      <a href="/admin/settings/sites/delete" id="site-delete-link" class="btn btn-danger btn-md">{{$.T "site_delete_link"}}</a>
+    </div>
+  </section>
+  {{end}}
+    </div>
+  </div>
+</div>
+{{end}}

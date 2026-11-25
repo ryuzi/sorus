@@ -1,0 +1,15 @@
+/* Broken: the dark tokens sit in a negated query, which applies in light mode. */
+:root {
+  --bg: #ffffff; --surface: #f5f5f5; --fg: #111111; --muted: #555555; --border: #dddddd;
+  --accent: #0b57d0; --accent-fg: #ffffff; --accent-soft: #e8f0fe; --mark: #fff59d;
+  --code-bg: #111111; --code-fg: #eeeeee;
+  --font-body: system-ui, sans-serif; --font-heading: Georgia, serif; --font-mono: ui-monospace, monospace;
+  --radius: 6px; --radius-lg: 10px; --content-width: 1000px; --prose-width: 720px; --shadow: none;
+}
+@media not (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111111; --surface: #1c1c1c; --fg: #eeeeee; --muted: #aaaaaa; --border: #333333;
+    --accent: #8ab4f8; --accent-fg: #111111; --accent-soft: #1f2a3d; --mark: #5c4f12;
+    --code-bg: #000000; --code-fg: #eeeeee;
+  }
+}

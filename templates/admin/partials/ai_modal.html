@@ -1,0 +1,230 @@
+{{define "ai_toolbar"}}{{$ja := ne .Lang "en"}}{{$tr := and .SourceArticle .MultilingualEnabled}}
+{{/* AI のボタンは用途別の3つにまとめる（desktop_quit_and_editor_ux_spec.md §1.3 (4)）。
+     「AI で下書き」は単独のボタン、「文章を整える ▾」「仕上げ・告知 ▾」は <details> のメニュー。
+     メニューの開閉（外側クリック・Esc・項目クリックで閉じる）は static/js/ai.js が行う。
+     各ボタンの data-ai-action と #social-open-button はそのまま残し、static/js/editor.js・social.js から使う。
+     メニューが切れないよう、狭い画面でも横スクロールにはせず折り返す。「仕上げ・告知」は画面の右へはみ出さないよう右揃えで開く。
+     「文章を整える ▾」の項目は役割が重ならないよう、何をするかを名前と一言の説明で分ける（ux_security_docs_final_polish_spec.md §1.3）:
+     「指示・トーンを指定して直す…」（data-ai-partial。ai.js が article_edit.html の window.sorusOpenPartialTranslate を呼ぶ）、
+     「自動で推敲する」（proofread）、「平易な表現に書き直す」（simplify）、「事実関係・裏取りを確認」（fact-check）、「翻訳する」（translate）。
+     翻訳モード（原文がある英語版・$tr）では、ゼロから書く「AI で下書き」と、原文の翻訳と重なる「翻訳する」を出さず、
+     先頭に主導線の「全文をAI翻訳」（#translate-article-btn。動作は article_edit.html のスクリプト）、その横に
+     「選択範囲を英語に翻訳・推敲」と表示の2択（原文と比較 / 仕上がりプレビュー）を並べる（§1.3）。
+     ツールバーは通常・翻訳のどちらでも左右のペインの上に1本だけ置き、右端の「自サイトの過去記事を参照する」「使う AI」は
+     #ai-toolbar-side として sm 以上では常に1段目の右端・同じ高さに固定する（左のボタンが増えても折り返すのは左側だけ）。 */}}
+<div id="ai-toolbar" class="mb-2 flex flex-wrap items-center gap-2 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start" role="toolbar" aria-label="{{if $ja}}AI執筆アシスタント{{else}}AI writing assistant{{end}}"
+     data-ai-configured="{{.AIConfigured}}"{{if $tr}} data-ai-mode="translation"{{end}}>
+  <div id="ai-toolbar-main" class="flex min-w-0 flex-wrap items-center gap-2">
+  {{if $tr}}
+  <button type="button" id="translate-article-btn" class="btn btn-primary btn-sm ai-button shrink-0"
+          title="{{if $ja}}原文のタイトル・抜粋・本文をまとめて英語に翻訳します（入っている内容を置き換える前に、差分を確かめられます）{{else}}Translate the original title, excerpt, and body into English in one go (you can check the differences before anything is replaced){{end}}">{{if $ja}}全文をAI翻訳{{else}}Translate all with AI{{end}}</button>
+  <button type="button" data-ai-partial hidden
+          title="{{if $ja}}本文で選んだ部分（未選択なら入力した文）を、トーンや指示に沿って英語に翻訳・推敲します{{else}}Translate or polish the selected part of the body into English, following the tone and instructions you choose{{end}}"
+          class="btn btn-secondary btn-sm ai-button shrink-0">{{if $ja}}選択範囲を英語に翻訳・推敲{{else}}Translate / polish selection{{end}}</button>
+  {{template "translation_view_toggle" .}}
+  {{else}}
+  <button type="button" data-ai-action="draft" title="{{if $ja}}対話メモやテーマから下書き記事を作成します{{else}}Create a draft article from chat notes or a topic{{end}}"
+          class="btn btn-primary btn-sm ai-button shrink-0">{{if $ja}}AI で下書き{{else}}AI draft{{end}}</button>
+  {{end}}
+
+  <details class="ai-menu relative shrink-0" data-ai-menu>
+    <summary class="btn btn-secondary btn-sm" aria-haspopup="true">{{if $ja}}文章を整える{{else}}Polish text{{end}} <span aria-hidden="true">▾</span></summary>
+    <div class="absolute left-0 top-full z-30 mt-1 flex w-max min-w-[17rem] max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-neutral-200 bg-white p-1 shadow-lg" data-ai-menu-panel>
+      {{if not $tr}}
+      <button type="button" data-ai-partial hidden
+              title="{{if $ja}}本文で選んだ部分（未選択なら入力した文）を、好みのトーンや自由な指示に沿って AI に書き直してもらいます{{else}}Have AI rewrite the selected part (or text you type) in the tone or with the instructions you give{{end}}"
+              class="ai-button flex flex-col rounded-md px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"><span>{{if $ja}}指示・トーンを指定して直す…{{else}}Revise with your own instructions…{{end}}</span><span class="text-xs text-neutral-500">{{if .MultilingualEnabled}}{{if $ja}}選んだ部分を、好みのトーンや自由な指示で書き直し・翻訳{{else}}Rewrite or translate the selection in your tone or with your instructions{{end}}{{else}}{{if $ja}}選んだ部分を、好みのトーンや自由な指示で書き直し{{else}}Rewrite the selection in your tone or with your instructions{{end}}{{end}}</span></button>
+      {{end}}
+      <button type="button" data-ai-action="proofread" title="{{if $ja}}誤字脱字・文体・読みやすさをまとめて直します（段落を選んでいればその部分、未選択なら本文全体）{{else}}Fix typos, style, and readability in one go (the selected paragraph, or the whole body if nothing is selected){{end}}"
+              class="ai-button flex flex-col rounded-md px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"><span>{{if $ja}}自動で推敲する{{else}}Proofread automatically{{end}}</span><span class="text-xs text-neutral-500">{{if $ja}}誤字脱字・文体・読みやすさをまとめて直す{{else}}Typos, style, and readability in one go{{end}}</span></button>
+      <button type="button" data-ai-action="simplify" title="{{if $ja}}難しい言い回しや専門用語を、やさしい言葉に書き直します{{else}}Rewrite difficult wording and jargon in plain words{{end}}"
+              class="ai-button flex flex-col rounded-md px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"><span>{{if $ja}}平易な表現に書き直す{{else}}Rewrite in plain words{{end}}</span><span class="text-xs text-neutral-500">{{if $ja}}難しい言い回しをわかりやすく{{else}}Turn difficult wording into plain words{{end}}</span></button>
+      <button type="button" data-ai-action="fact-check" title="{{if $ja}}本文の主張を取り出し、事実と合っているかを確かめます{{else}}Pick out the claims in the body and check whether they are accurate{{end}}"
+              class="ai-button flex flex-col rounded-md px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"><span>{{if $ja}}事実関係・裏取りを確認{{else}}Check facts and sources{{end}}</span><span class="text-xs text-neutral-500">{{if $ja}}書き換えず、正しいかどうかだけを確かめる{{else}}Checks accuracy without rewriting{{end}}</span></button>
+      {{if not $tr}}
+      <button type="button" data-ai-action="translate" title="{{if $ja}}本文を別の言語に翻訳します{{else}}Translate the body into another language{{end}}"
+              class="ai-button flex flex-col rounded-md px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"><span>{{if $ja}}翻訳する{{else}}Translate{{end}}</span><span class="text-xs text-neutral-500">{{if $ja}}本文を別の言語に翻訳{{else}}Translate the body into another language{{end}}</span></button>
+      {{end}}
+    </div>
+  </details>
+
+  <details class="ai-menu relative shrink-0" data-ai-menu>
+    <summary class="btn btn-secondary btn-sm" aria-haspopup="true">{{if $ja}}仕上げ・告知{{else}}Finish &amp; share{{end}} <span aria-hidden="true">▾</span></summary>
+    <div class="absolute right-0 top-full z-30 mt-1 flex w-max min-w-[15rem] max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-neutral-200 bg-white p-1 shadow-lg" data-ai-menu-panel>
+      <button type="button" data-ai-action="suggest-titles"
+              class="ai-button rounded-md px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none">{{if $ja}}タイトルを提案{{else}}Suggest titles{{end}}</button>
+      <button type="button" data-ai-action="summarize"
+              class="ai-button rounded-md px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none">{{if $ja}}リード文（抜粋）を作成{{else}}Write a lead (excerpt){{end}}</button>
+      <button type="button" id="social-open-button" data-social-open data-social-editor data-article-id="{{.Form.ID}}"
+              title="{{if $ja}}X・Instagram・LINE 向けの告知文を作ります（AI未設定ならテンプレートで作成）{{else}}Create announcements for X, Instagram, and LINE (uses a template if AI is not set up){{end}}"
+              class="rounded-md px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none">{{if $ja}}SNS 告知文を作成{{else}}Create social posts{{end}}</button>
+    </div>
+  </details>
+  </div>
+
+  {{/* 過去記事の参照・使う AI は、通常・翻訳のどちらでもツールバー1段目の右端に、同じ高さ（h-8 = btn-sm の高さ）で置く。 */}}
+  <div id="ai-toolbar-side" class="ml-auto flex h-8 shrink-0 items-center justify-end gap-x-3 whitespace-nowrap text-xs text-neutral-500">
+    <label class="flex items-center gap-1.5 whitespace-nowrap">
+      <input id="ai-use-rag" type="checkbox" class="rounded border-neutral-300 text-zinc-600 focus:ring-zinc-500">
+      {{if $ja}}自サイトの過去記事を参照する{{else}}Refer to past articles on this site{{end}}
+    </label>
+    {{/* APIキーを登録したAIが2つ以上あるときは、この記事で使うAIを切り替えられる（admin_ux_redesign_spec.md §2-7）。
+         選んだ値は static/js/editor.js が /admin/ai/* の要求に provider として付けて送る。 */}}
+    {{if gt (len .AIConfiguredProviders) 1}}
+    <label for="ai-provider-select" class="flex items-center gap-1.5 whitespace-nowrap">{{if $ja}}使うAI{{else}}AI to use{{end}}
+      <select id="ai-provider-select" class="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-800 focus:border-zinc-500 focus:outline-none">
+        {{range .AIConfiguredProviders}}<option value="{{.Value}}"{{if eq .Label $.AIProvider}} selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+    </label>
+    {{else if .AIConfigured}}
+    <span id="ai-status" class="whitespace-nowrap text-neutral-400">AI: {{.AIProvider}}</span>
+    {{else}}
+    <a id="ai-status" href="/admin/settings/ai" class="whitespace-nowrap text-neutral-400 hover:text-neutral-700 hover:underline">{{if $ja}}AI を設定する{{else}}Set up AI{{end}}</a>
+    {{end}}
+  </div>
+</div>
+<script src="{{asset "js/ai.js"}}" defer></script>
+{{end}}
+
+{{/* translation_view_toggle は翻訳編集画面（+EN）の表示の2択（原文と比較 / 仕上がりプレビュー）。切り替えは static/js/editor.js。
+     編集できるときは AI ツールバーの「全文をAI翻訳」の並びに、閲覧専用のときは原文バーに置く（どちらか一方だけに出す）。 */}}
+{{define "translation_view_toggle"}}{{$ja := ne .Lang "en"}}
+  <div id="translation-view-toggle" role="group" aria-label="{{if $ja}}表示の切り替え{{else}}Switch view{{end}}"
+       class="inline-flex shrink-0 rounded-lg border border-neutral-300 bg-white p-0.5">
+    <button type="button" data-view-mode="compare" aria-pressed="{{if .ShowSplitView}}true{{else}}false{{end}}"
+            title="{{if $ja}}左に原文、右に翻訳の編集欄を並べます{{else}}Show the original on the left and the translation editor on the right{{end}}"
+            class="rounded-md px-3 py-1 text-xs font-medium text-neutral-600 hover:text-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white">{{if $ja}}原文と比較{{else}}Compare with original{{end}}</button>
+    <button type="button" data-view-mode="preview" aria-pressed="{{if .ShowSplitView}}false{{else}}true{{end}}"
+            title="{{if $ja}}編集欄の横に、仕上がりの簡易プレビューを並べます{{else}}Show a quick preview of the result next to the editor{{end}}"
+            class="rounded-md px-3 py-1 text-xs font-medium text-neutral-600 hover:text-neutral-900 aria-pressed:bg-neutral-900 aria-pressed:text-white">{{if $ja}}仕上がりプレビュー{{else}}Result preview{{end}}</button>
+  </div>
+{{end}}
+
+{{define "ai_modal"}}{{$ja := ne .Lang "en"}}
+<dialog id="ai-modal" class="ai-modal w-[min(56rem,calc(100vw-2rem))] rounded-xl p-0 shadow-2xl" aria-labelledby="ai-modal-title">
+  <div class="flex items-center justify-between border-b border-neutral-200 px-5 py-3">
+    <h2 id="ai-modal-title" class="font-semibold text-neutral-800">{{if $ja}}AI執筆アシスタント{{else}}AI writing assistant{{end}}</h2>
+    <button type="button" data-ai-close class="btn btn-ghost btn-sm" aria-label="{{.T "close"}}">{{.T "close"}}</button>
+  </div>
+  <div class="max-h-[70vh] overflow-y-auto px-5 py-4">
+    <div data-ai-pane="loading" class="flex flex-col items-center gap-3 py-10 text-neutral-500" role="status">
+      <span class="ai-spinner" aria-hidden="true"></span>
+      <p id="ai-loading-text">{{if $ja}}編集長が推敲中...{{else}}The editor is polishing...{{end}}</p>
+    </div>
+
+    <div data-ai-pane="error" class="py-6 text-center" hidden>
+      <p id="ai-error-text" class="font-medium text-neutral-600" role="alert"></p>
+    </div>
+
+    <div data-ai-pane="guide" hidden>
+      <p class="mb-3 font-medium text-neutral-800"> {{if $ja}}AIアシスタントはまだ使えるように設定されていません{{else}}The AI assistant has not been set up yet{{end}}</p>
+      <p id="ai-guide-text" class="mb-4 text-sm text-neutral-700">{{if $ja}}{{.AIGuide}}{{else}}To use the AI assistant, register an API key under "Settings" → "AI Settings", or set <code>GEMINI_API_KEY</code> in <code>.env</code> or as an environment variable.{{end}}</p>
+      <p id="ai-guide-settings" class="mb-4 text-sm text-neutral-700">
+        {{if $ja}}サイトの管理者が <a href="/admin/settings/ai" class="font-medium text-zinc-800 underline">「設定」→「AI」</a> の画面で{{else}}Once a site administrator registers an API key on the <a href="/admin/settings/ai" class="font-medium text-zinc-800 underline">"Settings" → "AI Settings"</a> page,{{end}}
+        {{if $ja}}APIキーを登録すると、再起動しなくてもすぐに使えるようになります。{{else}}it can be used right away without restarting.{{end}}
+      </p>
+      <p class="mb-1 text-sm text-neutral-600">{{if $ja}}環境変数で設定する場合の例（設定してから sorus を起動し直します）:{{else}}Example of configuring with environment variables (restart sorus after setting them):{{end}}</p>
+      <pre class="mb-3 overflow-x-auto rounded-lg bg-neutral-900 p-3 text-xs text-neutral-100">{{if $ja}}# Google Gemini（無料枠あり・おすすめ）: https://aistudio.google.com/app/apikey で発行{{else}}# Google Gemini (free tier available, recommended): get a key at https://aistudio.google.com/app/apikey{{end}}
+GEMINI_API_KEY=xxxxxxxx
+
+{{if $ja}}# OpenAI / Anthropic Claude を使う場合{{else}}# To use OpenAI / Anthropic Claude{{end}}
+AI_PROVIDER=openai   OPENAI_API_KEY=sk-...
+AI_PROVIDER=claude   ANTHROPIC_API_KEY=sk-ant-...
+
+{{if $ja}}# Ollama などのローカルLLM（OpenAI互換）を使う場合{{else}}# To use a local LLM such as Ollama (OpenAI-compatible){{end}}
+AI_PROVIDER=custom   AI_BASE_URL=http://localhost:11434/v1   AI_MODEL=llama3.1</pre>
+      <p class="text-xs text-neutral-500">{{if $ja}}記事の編集・保存はこのまま続けられます。{{else}}You can keep editing and saving the article.{{end}}</p>
+    </div>
+
+    <div data-ai-pane="proofread" hidden>
+      <p class="mb-2 flex flex-wrap gap-3 text-xs text-neutral-500">
+        <span id="ai-proofread-scope"></span>
+        <span>{{if $ja}}<ins class="diff-add">追加</ins> <del class="diff-del">削除</del>{{else}}<ins class="diff-add">Added</ins> <del class="diff-del">Removed</del>{{end}}</span>
+      </p>
+      <p id="ai-proofread-nochange" class="mb-2 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700" hidden>{{if $ja}}修正の必要な箇所は見つかりませんでした{{else}}No corrections needed{{end}} </p>
+      <div id="ai-diff" class="diff-view rounded-lg border border-neutral-200 bg-white p-4 text-sm leading-relaxed"></div>
+    </div>
+
+    <div data-ai-pane="titles" hidden>
+      <p class="mb-3 text-sm text-neutral-600">{{if $ja}}気に入ったタイトルの「このタイトルを採用」を押すと、タイトル欄に反映されます。{{else}}Press "Use this title" on the one you like to put it in the title field.{{end}}</p>
+      <ol id="ai-title-list" class="flex flex-col gap-2"></ol>
+    </div>
+
+    <div data-ai-pane="summary" hidden>
+      <label for="ai-summary-text" class="mb-1 block text-sm text-neutral-600">{{if $ja}}リード文（反映する前に手直しできます）{{else}}Lead text (you can edit it before applying){{end}}</label>
+      <textarea id="ai-summary-text" rows="5" class="w-full rounded-lg border border-neutral-300 p-3 text-sm leading-relaxed focus:border-zinc-500 focus:outline-none"></textarea>
+      <p class="mt-1 text-right text-xs text-neutral-400"><span id="ai-summary-count">0</span>{{if $ja}} 文字{{else}} characters{{end}}</p>
+    </div>
+
+    <div data-ai-pane="fact-check" hidden>
+      <p id="ai-fact-summary" class="mb-3 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700"></p>
+      <ol id="ai-fact-claims" class="flex flex-col gap-3"></ol>
+      <div id="ai-fact-sources" class="mt-4" hidden>
+        <h3 class="mb-2 text-sm font-semibold text-neutral-700">{{if $ja}}検索で見つかった根拠{{else}}Sources found by search{{end}}</h3>
+        <ul id="ai-fact-source-list" class="flex flex-col gap-2"></ul>
+      </div>
+      <iframe id="ai-search-entry-point" class="mt-3 w-full rounded-lg border border-neutral-200" title="{{if $ja}}Google 検索候補{{else}}Google search suggestions{{end}}"
+              sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
+    </div>
+
+    <div data-ai-pane="academic-text" hidden>
+      <label for="ai-academic-text" class="mb-1 block text-sm text-neutral-600">{{if $ja}}生成結果{{else}}Result{{end}}</label>
+      <textarea id="ai-academic-text" rows="10" class="w-full rounded-lg border border-neutral-300 p-3 text-sm leading-relaxed focus:border-zinc-500 focus:outline-none"></textarea>
+    </div>
+
+    <div data-ai-pane="draft-input" hidden>
+      <p class="mb-3 text-sm text-neutral-600">{{if $ja}}外部AI（ChatGPTやClaude、Geminiなど）との対話メモや要点から、記事の下書き（タイトル・スラッグ・抜粋・本文）を一括生成します。{{else}}Generate a full article draft (title, slug, excerpt, body) from chat notes with external AI (ChatGPT, Claude, Gemini, etc.) or key points.{{end}}</p>
+      <div class="mb-3">
+        <label for="ai-draft-topic" class="mb-1 block text-sm font-medium text-neutral-700">{{if $ja}}記事のテーマ・主題 <span class="text-xs text-rose-600">必須</span>{{else}}Article topic <span class="text-xs text-rose-600">Required</span>{{end}}</label>
+        <input type="text" id="ai-draft-topic" class="w-full rounded-lg border border-neutral-300 p-2 text-sm focus:border-zinc-500 focus:outline-none" placeholder="{{if $ja}}何についての記事かを短く入力{{else}}Briefly describe what the article is about{{end}}">
+      </div>
+      <div class="mb-3">
+        <label for="ai-draft-notes" class="mb-1 block text-sm font-medium text-neutral-700">{{if $ja}}対話メモ・箇条書き・要点{{else}}Chat notes, bullet points, key points{{end}}</label>
+        <textarea id="ai-draft-notes" rows="6" class="w-full rounded-lg border border-neutral-300 p-2 text-sm focus:border-zinc-500 focus:outline-none" placeholder="{{if $ja}}例: AIとの壁打ち内容、取材メモ、伝えたい要点など{{else}}e.g. brainstorming with AI, interview notes, points you want to make{{end}}"></textarea>
+      </div>
+      <div class="mb-4">
+        <label for="ai-draft-context" class="mb-1 block text-sm font-medium text-neutral-700">{{if $ja}}補足・トーン指定（任意）{{else}}Additional notes / tone (optional){{end}}</label>
+        <input type="text" id="ai-draft-context" class="w-full rounded-lg border border-neutral-300 p-2 text-sm focus:border-zinc-500 focus:outline-none" placeholder="{{if $ja}}想定する読者や、文章の雰囲気・語り口など{{else}}Intended readers, mood, voice, etc.{{end}}">
+      </div>
+      <div class="text-right">
+        <button type="button" id="ai-draft-generate-btn" class="btn btn-primary btn-md">{{if $ja}}下書きを生成する{{else}}Generate draft{{end}}</button>
+      </div>
+    </div>
+
+    <div data-ai-pane="draft-preview" hidden>
+      <p class="mb-3 text-sm text-neutral-600">{{if $ja}}生成された下書きを確認し、エディタに反映してください。{{else}}Review the generated draft and apply it to the editor.{{end}}</p>
+      <div class="mb-3">
+        <label for="ai-draft-preview-title" class="mb-1 block text-xs font-medium text-neutral-500">{{if $ja}}タイトル{{else}}Title{{end}}</label>
+        <input type="text" id="ai-draft-preview-title" class="w-full rounded-lg border border-neutral-300 p-2 text-sm font-semibold text-neutral-800">
+      </div>
+      <div class="mb-3 grid grid-cols-2 gap-3">
+        <div>
+          <label for="ai-draft-preview-slug" class="mb-1 block text-xs font-medium text-neutral-500">{{if $ja}}スラッグ（URL名）{{else}}Slug (URL name){{end}}</label>
+          <input type="text" id="ai-draft-preview-slug" class="w-full rounded-lg border border-neutral-300 p-2 text-xs font-mono text-neutral-700">
+        </div>
+        <div>
+          <label for="ai-draft-preview-summary" class="mb-1 block text-xs font-medium text-neutral-500">{{if $ja}}抜粋・リード文{{else}}Excerpt / lead text{{end}}</label>
+          <input type="text" id="ai-draft-preview-summary" class="w-full rounded-lg border border-neutral-300 p-2 text-xs text-neutral-700">
+        </div>
+      </div>
+      <div class="mb-2">
+        <label for="ai-draft-preview-content" class="mb-1 block text-xs font-medium text-neutral-500">{{if $ja}}本文 (Markdown){{else}}Body (Markdown){{end}}</label>
+        <textarea id="ai-draft-preview-content" rows="10" class="w-full rounded-lg border border-neutral-300 p-3 font-mono text-sm leading-relaxed focus:border-zinc-500 focus:outline-none"></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3">
+    <button type="button" data-ai-close class="btn btn-secondary btn-md">{{.T "close"}}</button>
+    <button type="button" id="ai-apply-draft" data-ai-footer="draft-preview" hidden
+            class="btn btn-primary btn-md">{{if $ja}}エディタに反映する{{else}}Apply to editor{{end}}</button>
+    <button type="button" id="ai-apply-proofread" data-ai-footer="proofread" hidden
+            class="btn btn-primary btn-md">{{if $ja}}エディタに反映する{{else}}Apply to editor{{end}}</button>
+    <button type="button" id="ai-summary-insert" data-ai-footer="summary" hidden
+            class="btn btn-secondary btn-md">{{if $ja}}本文冒頭に挿入{{else}}Insert at top of body{{end}}</button>
+    <button type="button" id="ai-summary-excerpt" data-ai-footer="summary" hidden
+            class="btn btn-primary btn-md">{{if $ja}}抜粋に設定{{else}}Set as excerpt{{end}}</button>
+    <button type="button" id="ai-apply-academic" data-ai-footer="academic-text" hidden
+            class="btn btn-primary btn-md">{{if $ja}}本文に適用{{else}}Apply to body{{end}}</button>
+  </div>
+</dialog>
+{{end}}

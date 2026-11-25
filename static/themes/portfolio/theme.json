@@ -1,0 +1,6 @@
+{
+  "name": { "ja": "ポートフォリオ", "en": "Portfolio" },
+  "description": { "ja": "作品や写真、研究成果をゆったりと見せるショーケース向け", "en": "A spacious, visual-first showcase for creative work, photography, and research" },
+  "color_scheme": "light dark",
+  "order": 50
+}

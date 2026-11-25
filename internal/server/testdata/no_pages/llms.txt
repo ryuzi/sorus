@@ -1,0 +1,22 @@
+# 回帰テスト
+
+> 固定ページのないサイト
+
+## Articles
+- [記事その13](https://media.example.ac.jp/articles/post-13): 抜粋13
+- [記事その12](https://media.example.ac.jp/articles/post-12): 抜粋12
+- [記事その11](https://media.example.ac.jp/articles/post-11): 抜粋11
+- [記事その10](https://media.example.ac.jp/articles/post-10): 抜粋10
+- [記事その9](https://media.example.ac.jp/articles/post-9): 抜粋9
+- [記事その8](https://media.example.ac.jp/articles/post-8): 抜粋8
+- [記事その7](https://media.example.ac.jp/articles/post-7): 抜粋7
+- [記事その6](https://media.example.ac.jp/articles/post-6): 抜粋6
+- [記事その5](https://media.example.ac.jp/articles/post-5): 抜粋5
+- [記事その4](https://media.example.ac.jp/articles/post-4): 抜粋4
+- [記事その3](https://media.example.ac.jp/articles/post-3): 抜粋3
+- [記事その2](https://media.example.ac.jp/articles/post-2): 抜粋2
+- [記事その1](https://media.example.ac.jp/articles/post-1): 抜粋1
+
+## Optional
+
+- [Full content](https://media.example.ac.jp/llms-full.txt): Complete Markdown for all published articles.
