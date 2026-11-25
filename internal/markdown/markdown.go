@@ -1,5 +1,5 @@
 // Package markdown は記事本文の Markdown を安全な HTML に変換する。
-// Goldmark (GFM + LaTeX 数式) でパースし、見出しにアンカー ID を付与して目次を抽出した上で、
+// Goldmark (GFM + LaTeX 数式・フォトギャラリー・注意書き・タブ) でパースし、見出しにアンカー ID を付与して目次を抽出した上で、
 // Bluemonday で XSS サニタイズする。
 package markdown
 
@@ -40,11 +40,12 @@ var semanticClassElements = []string{
 	"div", "p", "figure", "figcaption", "img", "ul", "ol", "li", "table", "blockquote", "section", "span",
 }
 
-// reservedClassNames は sorus の生成物（数式・フォトギャラリー）と、それを描画するスクリプト・スタイルが目印に使うクラス。
+// reservedClassNames は sorus の生成物（数式・フォトギャラリー・タブ）と、それを描画するスクリプト・スタイルが目印に使うクラス。
 // 生 HTML の汎用クラスには使えず、生成物と同じ要素・同じ値のとき（newPolicy の個別の許可）だけ残す。
-var reservedClassNames = append([]string{MathInlineClass, MathDisplayClass, GalleryItemClass, GalleryClass, GalleryMasonryGridClass,
+// 注意書き（callout.go）はスクリプトを使わず、生 HTML の callout クラスも今までどおり使えるよう、予約しない。
+var reservedClassNames = append(append([]string{MathInlineClass, MathDisplayClass, GalleryItemClass, GalleryClass, GalleryMasonryGridClass,
 	GalleryMoreClass, GalleryCountClass, GalleryMoreButtonClass},
-	galleryLayoutClassNames()...)
+	galleryLayoutClassNames()...), tabsClassNames...)
 
 // galleryLayoutClassNames は並べ方のクラス（gallery-layout-justified など）の一覧を返す。
 func galleryLayoutClassNames() []string {
@@ -157,7 +158,7 @@ var approvedYouTubeSrcPattern = regexp.MustCompile(`\bsrc="https://www\.youtube-
 // policy は生成後に状態を変更しないため、並行に使用してよい。
 var policy = newPolicy()
 
-func newMarkdown(opts GalleryOptions) goldmark.Markdown {
+func newMarkdown(opts GalleryOptions, tabs *tabsState) goldmark.Markdown {
 	return goldmark.New(
 		goldmark.WithExtensions(
 			// extension.GFM 相当。表の揃えは UGCPolicy が style 属性を落とすため align 属性で出力する。
@@ -167,6 +168,8 @@ func newMarkdown(opts GalleryOptions) goldmark.Markdown {
 			extension.TaskList,
 			mathExtension{},
 			galleryExtension{opts: opts},
+			calloutExtension{},
+			tabsExtension{state: tabs},
 		),
 		// 生 HTML は Goldmark で捨てずに出力し、Bluemonday で許可要素のみ残す。
 		// WordPress 由来の本文など、安全な生 HTML を含む記事を扱うため。
@@ -201,6 +204,17 @@ func newPolicy() *bluemonday.Policy {
 	p.AllowAttrs("tabindex").Matching(regexp.MustCompile(`^0$`)).OnElements("div")
 	p.AllowAttrs("role").Matching(regexp.MustCompile(`^button$`)).OnElements("div")
 	p.AllowAttrs("aria-label").OnElements("div")
+	// GitHub 風の注意書き（callout.go）。全体・本文の div と見出しの p のクラス、role="note" だけを許可する。
+	p.AllowAttrs("class").Matching(calloutClassPattern).OnElements("div")
+	p.AllowAttrs("class").Matching(regexp.MustCompile(`^` + CalloutTitleClass + `$`)).OnElements("p")
+	p.AllowAttrs("role").Matching(regexp.MustCompile(`^note$`)).OnElements("div")
+	// タブ切り替え（tabs.go）の中身。中身の div のクラス・role="tabpanel"・ボタンへの aria-labelledby と、名前の p のクラス
+	// だけを許可する（id は UGCPolicy が許可している）。外枠（data-tabs）・タブの並び（role="tablist"）・ボタン（button）は
+	// 「もっと見る」と同じく、サニタイズの後に差し込む（expandTabs）。
+	p.AllowAttrs("class").Matching(tabPanelClassPattern).OnElements("div")
+	p.AllowAttrs("class").Matching(regexp.MustCompile(`^` + TabTitleClass + `$`)).OnElements("p")
+	p.AllowAttrs("role").Matching(regexp.MustCompile(`^tabpanel$`)).OnElements("div")
+	p.AllowAttrs("aria-labelledby").Matching(tabLabelledByPattern).OnElements("div")
 	// altTextPattern で日本語の句読点（、。）を含む安全な代替テキストを許可する。
 	p.AllowAttrs("alt").Matching(altTextPattern).OnElements("img")
 	// data-full は bluemonday の URL 検査の対象外のため、http(s) の絶対 URL か ":" を含まない相対 URL に限る。
@@ -246,7 +260,8 @@ func RenderWithGalleryQuery(mdText string, resolver GalleryQueryResolver) (*Rend
 func RenderWithGalleryOptions(mdText string, opts GalleryOptions) (*RenderResult, error) {
 	src := []byte(mdText)
 	opts.buttonToken = rand.Text()
-	md := newMarkdown(opts)
+	tabs := &tabsState{token: opts.buttonToken}
+	md := newMarkdown(opts, tabs)
 	doc := md.Parser().Parse(text.NewReader(src))
 	headings := annotateHeadings(doc, src)
 
@@ -255,7 +270,7 @@ func RenderWithGalleryOptions(mdText string, opts GalleryOptions) (*RenderResult
 		return nil, fmt.Errorf("markdown: render: %w", err)
 	}
 	return &RenderResult{
-		HTML:     expandGalleryMoreButtons(sanitizeHTML(buf.String()), opts.buttonToken),
+		HTML:     tabs.expandTabs(expandGalleryMoreButtons(sanitizeHTML(buf.String()), opts.buttonToken)),
 		Headings: headings,
 	}, nil
 }
