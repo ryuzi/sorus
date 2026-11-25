@@ -3,24 +3,21 @@
 // ブラウザの中で絞り込んで表示する。サーバーが無くても動くよう、外部のライブラリやビルドは使わない。
 // 照合は大文字・小文字、全角・半角、ひらがな・カタカナの違いを無視した部分一致で、空白で区切った語をすべて含むものを出す。
 // URL の ?q= を読み、ヘッダーの検索窓から送られた語でも結果を表示する。
+// 照合の部品は window.sorusStaticSearch にも置き、Cmd+K のすばやい検索（public.js）が静的エクスポートのどのページからでも
+// 同じ決まりで絞り込めるようにする（public.js は検索を開いたときにこのスクリプトを読み込む）。
 (function () {
   "use strict";
+  // 検索ページと Cmd+K の検索の両方で読み込まれても、部品とページの結び付けは1回だけにする。
+  if (window.sorusStaticSearch) return;
   var DEBOUNCE_MS = 200;
   // SNIPPET_RUNES は結果に出す本文の抜き出しの最大文字数。
   var SNIPPET_RUNES = 120;
   // MAX_QUERY_RUNES は検索語の最大文字数（動的なサーバーの検索と同じ）。
   var MAX_QUERY_RUNES = 100;
 
-  var form = document.querySelector("form[data-static-search]");
-  if (!form) return;
-  var target = document.querySelector(form.getAttribute("data-static-search"));
-  var input = form.querySelector("input[name=q]");
-  if (!target || !input) return;
-  var indexURL = target.getAttribute("data-index") || "/search-index.json";
   var pageLang = (document.documentElement.getAttribute("lang") || "ja").toLowerCase().split("-")[0];
-  var loading = null;
-  var timer = null;
-  var seq = 0;
+  // loadings は検索用インデックスの URL ごとの読み込み（Promise）。
+  var loadings = {};
 
   // normalize は照合用に文字の違いをならす。NFKC で全角英数・半角カナをそろえ、小文字にし、カタカナをひらがなにする。
   function normalize(s) {
@@ -37,10 +34,10 @@
     return normalize(q).split(/\s+/).filter(function (t) { return t !== ""; });
   }
 
-  // load は検索用インデックスを読み、各項目に照合用の文字列を付けて返す。2回目以降は同じ結果を使う。
-  function load() {
-    if (!loading) {
-      loading = fetch(indexURL, { credentials: "same-origin" })
+  // load は検索用インデックス（indexURL）を読み、各項目に照合用の文字列を付けて返す。2回目以降は同じ結果を使う。
+  function load(indexURL) {
+    if (!loadings[indexURL]) {
+      var loading = fetch(indexURL, { credentials: "same-origin" })
         .then(function (res) {
           if (!res.ok) throw new Error("search index: " + res.status);
           return res.json();
@@ -54,19 +51,21 @@
           });
           return items;
         });
-      loading.catch(function () { loading = null; });
+      loading.catch(function () { delete loadings[indexURL]; });
+      loadings[indexURL] = loading;
     }
-    return loading;
+    return loadings[indexURL];
   }
 
   // find は words をすべて含む項目を返す。タイトルに一致した項目を先に、それ以外はインデックスの順（新しい順）に並べる。
-  // ページの言語（pageLang）と一致する記事のみに絞り込む。
-  function find(items, words) {
+  // 言語 lang（省略時はページの言語 pageLang）と一致する記事のみに絞り込む。
+  function find(items, words, lang) {
+    var wantLang = lang || pageLang;
     var inTitle = [];
     var inBody = [];
     items.forEach(function (it) {
       var itemLang = (it.lang || "ja").toLowerCase().split("-")[0];
-      if (itemLang !== pageLang) return;
+      if (itemLang !== wantLang) return;
       var titleHits = 0;
       for (var i = 0; i < words.length; i++) {
         var w = words[i];
@@ -141,6 +140,27 @@
     return m[1] + "年" + Number(m[2]) + "月" + Number(m[3]) + "日";
   }
 
+  window.sorusStaticSearch = {
+    MAX_QUERY_RUNES: MAX_QUERY_RUNES,
+    normalize: normalize,
+    terms: terms,
+    load: load,
+    find: find,
+    snippet: snippet,
+    appendHighlighted: appendHighlighted,
+    formatDate: formatDate
+  };
+
+  // ここから下は静的エクスポートの検索ページ（search.html の form[data-static-search]）の結び付け。
+  var form = document.querySelector("form[data-static-search]");
+  if (!form) return;
+  var target = document.querySelector(form.getAttribute("data-static-search"));
+  var input = form.querySelector("input[name=q]");
+  if (!target || !input) return;
+  var indexURL = target.getAttribute("data-index") || "/search-index.json";
+  var timer = null;
+  var seq = 0;
+
   function el(tag, className, text) {
     var e = document.createElement(tag);
     if (className) e.className = className;
@@ -209,7 +229,7 @@
       return;
     }
     target.classList.add("search-results-loading");
-    load()
+    load(indexURL)
       .then(function (items) {
         if (mine === seq) render(q, words, find(items, words));
       })
