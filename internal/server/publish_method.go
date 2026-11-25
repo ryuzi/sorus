@@ -229,8 +229,8 @@ func (s *Server) clearPublishConfig() error {
 		return err
 	}
 	defer tx.Rollback()
-	for _, key := range []string{publishSettingKind, publishSettingServer, publishSettingCloudflare, publishSettingGitHub,
-		publishSettingNetlify, publishSettingS3, publishSettingFolder} {
+	for _, key := range []string{publishSettingKind, publishSettingServer, publishSettingCloudflare, publishSettingCloudflareWorkers,
+		publishSettingGitHub, publishSettingNetlify, publishSettingS3, publishSettingFolder} {
 		if _, err := tx.Exec(`DELETE FROM settings WHERE key = ?`, key); err != nil {
 			return err
 		}
