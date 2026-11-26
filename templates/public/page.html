@@ -2,9 +2,11 @@
 {{with .Data}}
 {{- /* メニューのセクションに入っているページは、左にセクションのページの一覧（doc_sidebar）を置く3列の表示にする。 */ -}}
 {{if $.DocNav}}<div class="doc-layout">{{template "doc_sidebar" $}}<div class="doc-main">{{end}}
+{{- /* 親ページを持つ固定ページは、ホームと表示中のページの間に祖先のページ（$.PageAncestors。ルートが先頭）を挟む。 */}}
 <nav class="breadcrumb" aria-label="{{if eq $.Lang "en"}}Breadcrumb{{else}}パンくずリスト{{end}}">
   <ol>
-    <li><a href="{{if eq $.Lang "en"}}/en/{{else}}/{{end}}">{{if eq $.Lang "en"}}Home{{else}}ホーム{{end}}</a></li>
+    <li><a href="{{if eq $.Lang "en"}}/en/{{else}}/{{end}}">{{if eq $.Lang "en"}}Home{{else}}ホーム{{end}}</a></li>{{range $.PageAncestors}}
+    <li><a href="{{.URL}}">{{.Label}}</a></li>{{end}}
     <li aria-current="page">{{.Article.Title}}</li>
   </ol>
 </nav>

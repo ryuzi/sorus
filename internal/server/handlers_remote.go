@@ -640,6 +640,7 @@ func (s *Server) remoteSyncArticle(ctx context.Context, a *article.Article, with
 		TranslationGroupID: a.TranslationGroupID,
 		SourceArticleID:    sourceID,
 	}
+	out.ParentID, out.SortOrder = syncHierarchyOf(a)
 	if withPublishedAt && a.PublishedAt != nil && !a.PublishedAt.IsZero() {
 		t := a.PublishedAt.UTC()
 		out.PublishedAt = &t
@@ -1244,6 +1245,7 @@ func (s *Server) handleRemoteSubmit(c echo.Context) error {
 	if a.SourceArticleID.Valid {
 		sourceID = a.SourceArticleID.String
 	}
+	parentID, sortOrder := syncHierarchyOf(a)
 	req := SyncRequest{
 		Action: SyncActionSubmitDraft,
 		Article: &SyncArticle{
@@ -1258,6 +1260,8 @@ func (s *Server) handleRemoteSubmit(c echo.Context) error {
 			Lang:               a.Lang,
 			TranslationGroupID: a.TranslationGroupID,
 			SourceArticleID:    sourceID,
+			ParentID:           parentID,
+			SortOrder:          sortOrder,
 		},
 		Images: images,
 	}
@@ -1735,6 +1739,10 @@ func (s *Server) importRemoteArticle(c echo.Context, cfg remoteConfig, p *SyncPe
 	}
 	if p.SourceArticleID != "" {
 		a.SourceArticleID = sql.NullString{String: p.SourceArticleID, Valid: true}
+	}
+	// 固定ページの階層。階層を返さない古い公開サーバーからは今の親・並び順のまま、親がこの PC に無ければ今の親のまま取り込む。
+	if err := s.applySyncHierarchy(ctx, a, p.ParentID, p.SortOrder); err != nil {
+		return err
 	}
 	// 公開サーバーで作成中の下書きは、この PC でも下書きのまま続きを書く。
 	a.Status = article.StatusReview
