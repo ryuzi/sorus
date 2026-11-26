@@ -139,6 +139,13 @@ var (
 	ErrPublished = errors.New("article: already published")
 	// ErrNotInTrash はゴミ箱にない（状態が deleted でない）記事を復元・完全削除しようとしたことを示す。
 	ErrNotInTrash = errors.New("article: not in trash")
+	// ErrInvalidParent は親ページ（ParentID）の指定が不正であることを示す。記事（KindPost）に親を指定した、
+	// 親が存在しない・固定ページでない・ゴミ箱にある、自分自身や自分の子孫を親にした（循環）のいずれか。
+	// Save・Create は ErrInvalid とあわせて包んで返す。
+	ErrInvalidParent = errors.New("article: invalid parent page")
+	// ErrHasChildPages は子ページ（ゴミ箱のものを除く）を持つ固定ページを記事（KindPost）に変えようとしたことを示す。
+	// 記事は親になれないため、先に子ページを別の親へ移すか親から外す。Save・Create は ErrInvalid とあわせて包んで返す。
+	ErrHasChildPages = errors.New("article: page has child pages")
 	// ErrRestoreConflict はゴミ箱の記事を戻すと、同じ翻訳グループの同じ言語の記事が2つになることを示す
 	// （idx_articles_group_lang はゴミ箱の記事を除いて一意）。
 	ErrRestoreConflict = errors.New("article: another article already uses this translation")
@@ -188,6 +195,13 @@ type Article struct {
 	// CheckedOutClient は編集中の印を付けた PC の sorus の識別子（remote_client_id）。同じ人・同じトークンを
 	// 別の PC で使っていても、どの PC で編集中かを見分ける。識別子を送らない古い PC の印では空。
 	CheckedOutClient string `db:"checked_out_client" json:"checked_out_client,omitempty"`
+
+	// 固定ページの階層。ParentID は親の固定ページの ID で、最上位のページと記事（post）では空
+	// （articles.parent_id は NULL）。親を持てるのは KindPage だけで、親は存在する（ゴミ箱にない）固定ページに限り、
+	// 自分自身・自分の子孫は親にできない（Save が検証する）。
+	ParentID string `db:"parent_id" json:"parent_id,omitempty"`
+	// SortOrder は同じ親の中での並び順（小さいほど先）。同じ値どうしはタイトル・作成日時の順に並べる（ListChildPages）。
+	SortOrder int `db:"sort_order" json:"sort_order"`
 }
 
 // CheckoutTTL はチェックアウト（PC の sorus での編集中の印）の有効期間。これを過ぎた印は無視する。
@@ -218,7 +232,8 @@ const columns = `id, title, slug, content_markdown, content_html, excerpt, featu
 	author_id, category_id, status, locked_by, locked_at, published_at, created_at, updated_at,
 	doi, journal_name, conference_name, co_authors, kind,
 	lang, translation_group_id, source_article_id, is_outdated,
-	remote_updated_at, checked_out_by, checked_out_at, checked_out_client`
+	remote_updated_at, checked_out_by, checked_out_at, checked_out_client,
+	COALESCE(parent_id, '') AS parent_id, sort_order`
 
 // Service は記事の CRUD を行う。並行に使用してよい。
 type Service struct {
@@ -271,6 +286,8 @@ func (s *Service) IsReservedPageSlug(slug string) bool {
 // nil なら現在時刻を公開日時とする。予約は published と未来の PublishedAt で表し、StatusScheduled は保存できない。
 // published 以外の記事の未来の PublishedAt は、まだ公開していない予定の日時のため消す（予約の取り消し）。
 // 読者に見えたことのある記事（保存済みの公開日時が現在以前）を予約にしようとすると ErrPublished（ErrInvalid を兼ねる）を返す。
+// ParentID（前後の空白は除く）を持てるのはページだけで、親を変えるときは validateParent の規則で確かめ、不正なら
+// ErrInvalidParent（ErrInvalid を兼ねる）を返す。子ページのあるページを記事に変えると ErrHasChildPages を返す。
 // 更新時の CreatedAt は保存済みの値を維持する。
 // 成功すると a に保存後の値（ID、Slug、ContentHTML、日時など）を反映する。失敗時は a を変更しない。
 func (s *Service) Save(a *Article) error {
@@ -308,6 +325,10 @@ func (s *Service) save(a *Article, createOnly bool) error {
 	if !next.Kind.Valid() {
 		return fmt.Errorf("%w: unknown kind %q", ErrInvalid, next.Kind)
 	}
+	next.ParentID = strings.TrimSpace(next.ParentID)
+	if next.ParentID != "" && next.Kind != KindPage {
+		return fmt.Errorf("%w: %w: only pages can have a parent (kind %q)", ErrInvalid, ErrInvalidParent, next.Kind)
+	}
 	lang := strings.ToLower(strings.TrimSpace(next.Lang))
 	if lang == "" {
 		lang = "ja"
@@ -330,6 +351,9 @@ func (s *Service) save(a *Article, createOnly bool) error {
 	}
 	if strings.TrimSpace(next.TranslationGroupID) == "" {
 		next.TranslationGroupID = next.ID
+	}
+	if next.ParentID == next.ID {
+		return fmt.Errorf("%w: %w: a page cannot be its own parent", ErrInvalid, ErrInvalidParent)
 	}
 	requestedSlug := next.Slug
 	base := requestedSlug
@@ -384,8 +408,11 @@ func (s *Service) write(a *Article, baseSlug, requestedSlug string, now time.Tim
 		CreatedAt   time.Time  `db:"created_at"`
 		PublishedAt *time.Time `db:"published_at"`
 		Slug        string     `db:"slug"`
+		Kind        Kind       `db:"kind"`
+		ParentID    string     `db:"parent_id"`
 	}
-	err = conn.GetContext(ctx, &stored, `SELECT created_at, published_at, slug FROM articles WHERE id = ?`, a.ID)
+	err = conn.GetContext(ctx, &stored, `SELECT created_at, published_at, slug, kind, COALESCE(parent_id, '') AS parent_id
+		FROM articles WHERE id = ?`, a.ID)
 	exists := err == nil
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("find article: %w", err)
@@ -409,6 +436,18 @@ func (s *Service) write(a *Article, baseSlug, requestedSlug string, now time.Tim
 	if a.Kind == KindPage && s.IsReservedPageSlug(baseSlug) {
 		return fmt.Errorf("%w: %w: %q", ErrInvalid, ErrReservedSlug, baseSlug)
 	}
+	// 親を変えない保存では親を検証し直さない（親をゴミ箱に入れた後も子ページを編集できるようにする）。
+	// 循環は親を変える保存でしか生じないため、変えるたびに確かめれば十分。
+	if a.ParentID != "" && (!exists || a.ParentID != stored.ParentID) {
+		if err := validateParent(ctx, conn, a.ID, a.ParentID); err != nil {
+			return err
+		}
+	}
+	if exists && stored.Kind == KindPage && a.Kind != KindPage {
+		if err := detachChildrenForKindChange(ctx, conn, a.ID); err != nil {
+			return err
+		}
+	}
 
 	if a.Slug, err = uniqueSlug(ctx, conn, baseSlug, a.ID); err != nil {
 		return err
@@ -417,11 +456,13 @@ func (s *Service) write(a *Article, baseSlug, requestedSlug string, now time.Tim
 	query := `INSERT INTO articles (id, title, slug, content_markdown, content_html, excerpt, featured_image_url,
 			author_id, category_id, status, locked_by, locked_at, published_at, created_at, updated_at,
 			doi, journal_name, conference_name, co_authors, kind,
-			lang, translation_group_id, source_article_id, is_outdated)
+			lang, translation_group_id, source_article_id, is_outdated,
+			parent_id, sort_order)
 		VALUES (:id, :title, :slug, :content_markdown, :content_html, :excerpt, :featured_image_url,
 			:author_id, :category_id, :status, :locked_by, :locked_at, :published_at, :created_at, :updated_at,
 			:doi, :journal_name, :conference_name, :co_authors, :kind,
-			:lang, :translation_group_id, :source_article_id, :is_outdated)`
+			:lang, :translation_group_id, :source_article_id, :is_outdated,
+			NULLIF(:parent_id, ''), :sort_order)`
 	if exists {
 		query = `UPDATE articles SET title = :title, slug = :slug, content_markdown = :content_markdown,
 			content_html = :content_html, excerpt = :excerpt, featured_image_url = :featured_image_url,
@@ -430,7 +471,8 @@ func (s *Service) write(a *Article, baseSlug, requestedSlug string, now time.Tim
 			doi = :doi, journal_name = :journal_name,
 			conference_name = :conference_name, co_authors = :co_authors, kind = :kind,
 			lang = :lang, translation_group_id = :translation_group_id,
-			source_article_id = :source_article_id, is_outdated = :is_outdated
+			source_article_id = :source_article_id, is_outdated = :is_outdated,
+			parent_id = NULLIF(:parent_id, ''), sort_order = :sort_order
 		WHERE id = :id`
 	}
 	q, args, err := sqlx.Named(query, a)
@@ -445,6 +487,62 @@ func (s *Service) write(a *Article, baseSlug, requestedSlug string, now time.Tim
 		return fmt.Errorf("commit: %w", err)
 	}
 	committed = true
+	return nil
+}
+
+// validateParent は記事 selfID の親を parentID にできるかを確かめる。親は存在する、ゴミ箱にない固定ページに限り、
+// selfID 自身と selfID の子孫（親をたどると selfID に着くページ）は親にできない。不正なら ErrInvalidParent
+// （ErrInvalid を兼ねる）を返す。write のトランザクションの中で呼び、並行の付け替えで循環ができないようにする。
+func validateParent(ctx context.Context, conn *sqlx.Conn, selfID, parentID string) error {
+	var parent struct {
+		Kind   Kind   `db:"kind"`
+		Status Status `db:"status"`
+	}
+	err := conn.GetContext(ctx, &parent, `SELECT kind, status FROM articles WHERE id = ?`, parentID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("%w: %w: parent %q not found", ErrInvalid, ErrInvalidParent, parentID)
+	}
+	if err != nil {
+		return fmt.Errorf("find parent: %w", err)
+	}
+	if parent.Kind != KindPage {
+		return fmt.Errorf("%w: %w: parent %q is not a page (kind %q)", ErrInvalid, ErrInvalidParent, parentID, parent.Kind)
+	}
+	if parent.Status == StatusDeleted {
+		return fmt.Errorf("%w: %w: parent %q is in the trash", ErrInvalid, ErrInvalidParent, parentID)
+	}
+	// parentID から親をたどり、selfID に着けば循環になる。UNION は同じ ID を2度たどらないため、
+	// DB を直接編集して既に循環している階層でも止まる。
+	var cycle bool
+	err = conn.GetContext(ctx, &cycle, `WITH RECURSIVE ancestors(id) AS (
+			SELECT ?
+			UNION
+			SELECT a.parent_id FROM articles a JOIN ancestors ON a.id = ancestors.id
+			WHERE a.parent_id IS NOT NULL AND a.parent_id <> ''
+		)
+		SELECT EXISTS (SELECT 1 FROM ancestors WHERE id = ?)`, parentID, selfID)
+	if err != nil {
+		return fmt.Errorf("check parent cycle: %w", err)
+	}
+	if cycle {
+		return fmt.Errorf("%w: %w: parent %q is a descendant of %q", ErrInvalid, ErrInvalidParent, parentID, selfID)
+	}
+	return nil
+}
+
+// detachChildrenForKindChange は固定ページ id を記事に変える前に、子ページを確かめる。ゴミ箱にない子ページがあれば
+// ErrHasChildPages（ErrInvalid を兼ねる）を返し、ゴミ箱の子ページだけなら親から外す（戻したときに記事の下に入らない）。
+func detachChildrenForKindChange(ctx context.Context, conn *sqlx.Conn, id string) error {
+	var n int
+	if err := conn.GetContext(ctx, &n, `SELECT COUNT(*) FROM articles WHERE parent_id = ? AND status <> ?`, id, StatusDeleted); err != nil {
+		return fmt.Errorf("count child pages: %w", err)
+	}
+	if n > 0 {
+		return fmt.Errorf("%w: %w: %d child page(s)", ErrInvalid, ErrHasChildPages, n)
+	}
+	if _, err := conn.ExecContext(ctx, `UPDATE articles SET parent_id = NULL WHERE parent_id = ?`, id); err != nil {
+		return fmt.Errorf("detach trashed child pages: %w", err)
+	}
 	return nil
 }
 
@@ -559,7 +657,8 @@ func (s *Service) trashState(id string) error {
 }
 
 // HardDelete はゴミ箱の記事 id を物理削除する。版の履歴・コメント・添付資料・埋め込み・閲覧数の行は外部キーの
-// ON DELETE CASCADE で消え、この記事を翻訳元にしていた記事の source_article_id は NULL にする。
+// ON DELETE CASCADE で消え、この記事を翻訳元にしていた記事の source_article_id と、この固定ページを親にしていた
+// 子ページの parent_id は NULL にする（子ページは最上位に移る）。
 // 添付資料のファイルは消さないため、結果の AttachmentFiles を呼び出し側が消す。
 // 存在しなければ ErrNotFound、ゴミ箱になければ ErrNotInTrash を返す（公開中の記事を誤って消さない）。
 func (s *Service) HardDelete(id string) (PurgeResult, error) {
@@ -638,6 +737,10 @@ func (s *Service) purge(cond string, args ...any) (PurgeResult, error) {
 		WHERE source_article_id IN (`+sub+`)`, params...); err != nil {
 		return PurgeResult{}, fmt.Errorf("detach translations: %w", err)
 	}
+	if _, err := conn.ExecContext(ctx, `UPDATE articles SET parent_id = NULL
+		WHERE parent_id IN (`+sub+`)`, params...); err != nil {
+		return PurgeResult{}, fmt.Errorf("detach child pages: %w", err)
+	}
 	if _, err := conn.ExecContext(ctx, `DELETE FROM articles WHERE `+where, params...); err != nil {
 		return PurgeResult{}, fmt.Errorf("delete: %w", err)
 	}
@@ -663,6 +766,42 @@ func (s *Service) ListPublished(limit, offset int) ([]*Article, error) {
 		return nil, fmt.Errorf("article: list published: %w", err)
 	}
 	return articles, nil
+}
+
+// PageOrder は固定ページの並び順の ORDER BY 句（articles の別名 a）。同じ親の中で sort_order、タイトル、作成日時の順に
+// 並べ、最後の id は同じ値どうしの順を決める。ListChildPages・ListVisiblePages と MCP の子ページの一覧が使う。
+const PageOrder = `a.sort_order ASC, a.title ASC, julianday(a.created_at) ASC, a.id ASC`
+
+// ListChildPages は parentID を親とする、now の時点で読者に見える固定ページ（VisibleCondition）を
+// sort_order・タイトル・作成日時の順に返す。parentID が空なら最上位（親の無い）の固定ページを返す。
+// 公開サイトのサイドバー・パンくずに使う。該当がなければ空スライスを返す。
+func (s *Service) ListChildPages(ctx context.Context, parentID string, now time.Time) ([]*Article, error) {
+	cond, args := `(a.parent_id IS NULL OR a.parent_id = '')`, []any(nil)
+	if parentID = strings.TrimSpace(parentID); parentID != "" {
+		cond, args = `a.parent_id = ?`, []any{parentID}
+	}
+	pages := []*Article{}
+	err := s.db.SelectContext(ctx, &pages, `SELECT `+columns+` FROM articles a
+		WHERE a.kind = ? AND `+cond+` AND `+VisibleCondition+`
+		ORDER BY `+PageOrder, append(append([]any{KindPage}, args...), StatusPublished, now.UTC())...)
+	if err != nil {
+		return nil, fmt.Errorf("article: list child pages: %w", err)
+	}
+	return pages, nil
+}
+
+// ListVisiblePages は now の時点で読者に見えるすべての固定ページを、親子を問わず ListChildPages と同じ順に返す。
+// 階層（木）は呼び出し側が ParentID で組み立てる。親が読者に見えない（下書き・ゴミ箱など）ページも含むため、
+// 木にするときは親が結果に無いページの扱いを決めること。該当がなければ空スライスを返す。
+func (s *Service) ListVisiblePages(ctx context.Context, now time.Time) ([]*Article, error) {
+	pages := []*Article{}
+	err := s.db.SelectContext(ctx, &pages, `SELECT `+columns+` FROM articles a
+		WHERE a.kind = ? AND `+VisibleCondition+`
+		ORDER BY `+PageOrder, KindPage, StatusPublished, now.UTC())
+	if err != nil {
+		return nil, fmt.Errorf("article: list visible pages: %w", err)
+	}
+	return pages, nil
 }
 
 // Translations は同一 translation_group_id を持つすべての言語の記事一覧を取得する（言語コード昇順）。

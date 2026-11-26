@@ -305,3 +305,7 @@ const schemaV13 = `SELECT 1;`
 // （checked_out_by, checked_out_at, checked_out_client）を articles に足す。列の有無を確かめてから足すため、
 // 列の追加は addArticleSyncState（migrationHooks）で行う。SQL の本体はない。
 const schemaV14 = `SELECT 1;`
+
+// schemaV15 は固定ページの階層（親ページ parent_id と並び順 sort_order）を articles に足す。列の有無を確かめてから
+// 足すため、列の追加と索引 idx_articles_parent_sort は addPageHierarchy（migrationHooks）で行う。SQL の本体はない。
+const schemaV15 = `SELECT 1;`

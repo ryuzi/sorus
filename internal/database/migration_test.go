@@ -1139,3 +1139,92 @@ func TestMigrateV14ToleratesExistingColumns(t *testing.T) {
 		t.Errorf("sync columns = %d (%v), want 4", n, err)
 	}
 }
+
+// v15 は既存の記事・ページを壊さずに親ページ（parent_id: NULL）と並び順（sort_order: 0）の列と索引を足す。
+func TestMigrateV15AddsPageHierarchy(t *testing.T) {
+	db, err := Connect(filepath.Join(t.TempDir(), "v14.db"))
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := MigrateTo(db, 14); err != nil {
+		t.Fatalf("MigrateTo 14: %v", err)
+	}
+	insertUser(t, db, "u1", "alice")
+	cat := insertCategory(t, db, "ニュース", "news")
+	mustExec(t, db, `INSERT INTO articles (id, title, slug, author_id, category_id, status, kind)
+		VALUES ('p-1', '研究紹介', 'research', 'u1', ?, 'published', 'page'),
+		       ('a-1', '既存記事', 'old', 'u1', ?, 'draft', 'post')`, cat, cat)
+
+	if err := Migrate(db); err != nil {
+		t.Fatalf("Migrate v14 -> v%d: %v", SchemaVersion(), err)
+	}
+	var version int
+	if err := db.Get(&version, "PRAGMA user_version"); err != nil || version != SchemaVersion() || SchemaVersion() < 15 {
+		t.Fatalf("user_version = %d (%v), SchemaVersion = %d, want >= 15", version, err, SchemaVersion())
+	}
+	var rows []struct {
+		ID        string  `db:"id"`
+		ParentID  *string `db:"parent_id"`
+		SortOrder int     `db:"sort_order"`
+	}
+	if err := db.Select(&rows, `SELECT id, parent_id, sort_order FROM articles ORDER BY id`); err != nil {
+		t.Fatalf("select hierarchy columns: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want 2", len(rows))
+	}
+	for _, r := range rows {
+		if r.ParentID != nil || r.SortOrder != 0 {
+			t.Errorf("existing row %s: parent_id = %v, sort_order = %d, want NULL and 0", r.ID, r.ParentID, r.SortOrder)
+		}
+	}
+
+	// 新しい行も既定値で入り、NULL の sort_order は拒む。
+	mustExec(t, db, `INSERT INTO articles (id, title, slug, author_id, category_id, kind, parent_id, sort_order)
+		VALUES ('p-2', 'メンバー', 'members', 'u1', ?, 'page', 'p-1', 2)`, cat)
+	if _, err := db.Exec(`INSERT INTO articles (id, title, slug, author_id, category_id, sort_order)
+		VALUES ('a-2', 'x', 'x', 'u1', ?, NULL)`, cat); err == nil {
+		t.Error("sort_order NULL was accepted, want NOT NULL constraint error")
+	}
+
+	var plan []struct {
+		ID      int    `db:"id"`
+		Parent  int    `db:"parent"`
+		NotUsed int    `db:"notused"`
+		Detail  string `db:"detail"`
+	}
+	if err := db.Select(&plan, `EXPLAIN QUERY PLAN SELECT id FROM articles WHERE parent_id = ? ORDER BY sort_order`, "p-1"); err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	var details []string
+	for _, p := range plan {
+		details = append(details, p.Detail)
+	}
+	if got := strings.Join(details, "; "); !strings.Contains(got, "idx_articles_parent_sort") || strings.Contains(got, "TEMP B-TREE") {
+		t.Errorf("plan = %q, want idx_articles_parent_sort without a temp b-tree", got)
+	}
+}
+
+// 列や索引が先に足されている DB でも v15 の移行が失敗しないこと。
+func TestMigrateV15ToleratesExistingColumns(t *testing.T) {
+	db, err := Connect(filepath.Join(t.TempDir(), "v14-cols.db"))
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := MigrateTo(db, 14); err != nil {
+		t.Fatalf("MigrateTo 14: %v", err)
+	}
+	mustExec(t, db, `ALTER TABLE articles ADD COLUMN parent_id TEXT`)
+	if err := Migrate(db); err != nil {
+		t.Fatalf("Migrate with pre-existing column: %v", err)
+	}
+	var n int
+	if err := db.Get(&n, `SELECT COUNT(*) FROM pragma_table_info('articles') WHERE name IN ('parent_id', 'sort_order')`); err != nil || n != 2 {
+		t.Errorf("hierarchy columns = %d (%v), want 2", n, err)
+	}
+	if err := db.Get(&n, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_articles_parent_sort'`); err != nil || n != 1 {
+		t.Errorf("idx_articles_parent_sort = %d (%v), want 1", n, err)
+	}
+}

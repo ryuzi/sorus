@@ -27,6 +27,7 @@ var migrations = []string{
 	schemaV12,
 	schemaV13,
 	schemaV14,
+	schemaV15,
 }
 
 // migrationHooks は SQL だけでは書けないデータの移行。キーのバージョンの SQL を適用した直後に、
@@ -36,6 +37,7 @@ var migrationHooks = map[int]func(ctx context.Context, conn *sqlx.Conn) error{
 	11: protectEnPageSlug,
 	13: addMediaTakenAt,
 	14: addArticleSyncState,
+	15: addPageHierarchy,
 }
 
 // addMediaTakenAt は media に撮影日時 taken_at が無ければ足し、未設定の行を登録日時（created_at）で埋める。
@@ -60,8 +62,11 @@ func addMediaTakenAt(ctx context.Context, conn *sqlx.Conn) error {
 	return nil
 }
 
+// columnDef は ADD COLUMN で足す列の名前と定義。
+type columnDef struct{ name, def string }
+
 // articleSyncColumns は addArticleSyncState が articles に足す列と、その定義。
-var articleSyncColumns = []struct{ name, def string }{
+var articleSyncColumns = []columnDef{
 	{"remote_updated_at", "DATETIME"},
 	{"checked_out_by", "TEXT NOT NULL DEFAULT ''"},
 	{"checked_out_at", "DATETIME"},
@@ -75,7 +80,13 @@ var articleSyncColumns = []struct{ name, def string }{
 //
 // 列が先に足されている DB でも失敗しないよう、pragma_table_info で有無を確かめてから足す。
 func addArticleSyncState(ctx context.Context, conn *sqlx.Conn) error {
-	for _, col := range articleSyncColumns {
+	return addMissingArticleColumns(ctx, conn, articleSyncColumns)
+}
+
+// addMissingArticleColumns は cols のうち articles に無い列を ALTER TABLE ... ADD COLUMN で足す。
+// 既にある列は定義が違っても変えない。
+func addMissingArticleColumns(ctx context.Context, conn *sqlx.Conn, cols []columnDef) error {
+	for _, col := range cols {
 		var n int
 		if err := conn.GetContext(ctx, &n, `SELECT COUNT(*) FROM pragma_table_info('articles') WHERE name = ?`, col.name); err != nil {
 			return fmt.Errorf("check articles.%s: %w", col.name, err)
@@ -86,6 +97,30 @@ func addArticleSyncState(ctx context.Context, conn *sqlx.Conn) error {
 		if _, err := conn.ExecContext(ctx, "ALTER TABLE articles ADD COLUMN "+col.name+" "+col.def); err != nil {
 			return fmt.Errorf("add articles.%s: %w", col.name, err)
 		}
+	}
+	return nil
+}
+
+// pageHierarchyColumns は addPageHierarchy が articles に足す列と、その定義。
+var pageHierarchyColumns = []columnDef{
+	{"parent_id", "TEXT"},
+	{"sort_order", "INTEGER NOT NULL DEFAULT 0"},
+}
+
+// addPageHierarchy は固定ページの階層のため、articles に親ページ parent_id と並び順 sort_order が無ければ足し、
+// 子ページの一覧（parent_id で絞って sort_order の順）に使う索引を張る。
+//   - parent_id: 親の固定ページの ID。最上位のページと記事（post）は NULL。外部キーは張らない（同期・取り込みで
+//     親より先に子が届いても保存できるようにする）。親を完全に削除したときは article.Service が NULL に戻す。
+//   - sort_order: 同じ親の中での並び順（小さいほど先）。既存の行は 0 になり、並びはタイトル・作成日時の順のまま。
+//
+// ADD COLUMN は既存の行を書き換えずに済む（NULL・定数の既定値）ため、表の作り直しは要らない。
+// 列が先に足されている DB でも失敗しないよう、pragma_table_info で有無を確かめてから足す。
+func addPageHierarchy(ctx context.Context, conn *sqlx.Conn) error {
+	if err := addMissingArticleColumns(ctx, conn, pageHierarchyColumns); err != nil {
+		return err
+	}
+	if _, err := conn.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_articles_parent_sort ON articles(parent_id, sort_order)`); err != nil {
+		return fmt.Errorf("index articles.parent_id: %w", err)
 	}
 	return nil
 }
