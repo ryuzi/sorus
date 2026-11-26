@@ -20,6 +20,8 @@
 </ul>
 {{end}}
 {{template "front_gallery" $}}
+{{/* 新着記事が無く、メニューに記事の一覧も無いサイト（ドキュメント・固定ページ中心）では、空の欄を出さない（showFrontNews）。 */}}
+{{if .ShowNews}}
 <section class="front-news" aria-labelledby="front-news-title">
   <h2 id="front-news-title" class="page-title">{{if eq $.Lang "en"}}Latest News{{else}}新着記事{{end}}</h2>
   {{if .News}}
@@ -31,5 +33,6 @@
   {{end}}
   <p class="front-news-more"><a href="{{if eq $.Lang "en"}}/en/articles{{else}}/articles{{end}}">{{$.ArticlesAllLabel}}</a></p>
 </section>
+{{end}}
 {{end}}
 {{end}}

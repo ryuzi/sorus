@@ -1,4 +1,4 @@
-// 記事編集画面のスクリプト: リアルタイムプレビュー（数式は KaTeX で描画）、AI 執筆アシスタント（推敲・タイトル提案・
+// 記事編集画面のスクリプト: リアルタイムプレビュー（数式は KaTeX、図は Mermaid で描画）、AI 執筆アシスタント（推敲・タイトル提案・
 // リード文生成）、排他ロックのハートビートと離脱時の解放、画像のドラッグ＆ドロップ・貼り付けアップロード、
 // 校閲・申し送りメモのスレッド、添付資料のアップロード、リビジョン履歴の差分表示と復元。
 (function () {
@@ -35,6 +35,7 @@
       if (seq !== previewSeq) return;
       preview.innerHTML = html;
       if (window.cmsRenderMath) window.cmsRenderMath(preview);
+      if (window.cmsRenderMermaid) window.cmsRenderMermaid(preview);
     }).catch(function () { /* 次の入力で再試行する */ });
   }
   textarea.addEventListener('input', function () {
