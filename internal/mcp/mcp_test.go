@@ -767,8 +767,11 @@ func TestToolsList(t *testing.T) {
 		"cms_publish_site": false, "cms_get_publish_status": true, "cms_check_publish_health": true,
 		"cms_list_themes": true, "cms_install_theme": false, "cms_activate_theme": false, "cms_uninstall_theme": false,
 		"cms_get_translation_status": true, "cms_create_translation": false, "cms_sync_translation": false,
+		"cms_update_site_structure": false, "cms_list_media": true, "cms_unpublish_article": false, "cms_delete_article": false,
 	}
-	wantDestructive := map[string]bool{"cms_uninstall_theme": true}
+	// 公開を取り下げる・ゴミ箱へ移す道具は、クライアントが実行前に確認できるよう destructiveHint を付ける。
+	wantDestructive := map[string]bool{"cms_uninstall_theme": true, "cms_unpublish_article": true, "cms_delete_article": true}
+	wantIdempotent := map[string]bool{"cms_update_site_structure": true, "cms_list_media": true, "cms_unpublish_article": true, "cms_delete_article": true}
 	var names []string
 	for _, tl := range res.Tools {
 		names = append(names, tl.Name)
@@ -781,6 +784,9 @@ func TestToolsList(t *testing.T) {
 		if tl.Annotations.ReadOnlyHint != wantReadOnly[tl.Name] || tl.Annotations.DestructiveHint != wantDestructive[tl.Name] {
 			t.Errorf("%s: annotations = %+v", tl.Name, tl.Annotations)
 		}
+		if want, ok := wantIdempotent[tl.Name]; ok && tl.Annotations.IdempotentHint != want {
+			t.Errorf("%s: idempotentHint = %v, want %v", tl.Name, tl.Annotations.IdempotentHint, want)
+		}
 	}
 	want := []string{
 		"cms_get_site_context", "cms_list_articles", "cms_get_article", "cms_save_draft", "cms_submit_for_review",
@@ -788,6 +794,7 @@ func TestToolsList(t *testing.T) {
 		"cms_approve_and_publish", "cms_publish_site", "cms_get_publish_status", "cms_check_publish_health",
 		"cms_list_themes", "cms_install_theme", "cms_activate_theme", "cms_uninstall_theme",
 		"cms_get_translation_status", "cms_create_translation", "cms_sync_translation",
+		"cms_update_site_structure", "cms_list_media", "cms_unpublish_article", "cms_delete_article",
 	}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)

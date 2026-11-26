@@ -2,6 +2,7 @@ package server
 
 import (
 	"cmp"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -449,15 +450,21 @@ func mediaTagMatchArg(tag string) string {
 
 // searchMedia は q の並び順（既定は撮影日の新しい順）で q に合う画像の 1 ページ分と、条件に合う総数を返す。
 func (s *Server) searchMedia(q mediaQuery) ([]mediaRecord, int, error) {
+	return s.searchMediaRange(context.Background(), q, q.PerPage, (q.Page-1)*q.PerPage)
+}
+
+// searchMediaRange は searchMedia の本体。ページ番号ではなく件数 limit と先頭から飛ばす件数 offset で範囲を決める
+// （MCP の cms_list_media）。q.Page・q.PerPage は使わない。
+func (s *Server) searchMediaRange(ctx context.Context, q mediaQuery, limit, offset int) ([]mediaRecord, int, error) {
 	where, args := q.where()
 	var total int
-	if err := s.db.Get(&total, `SELECT COUNT(*) FROM media m`+where, args...); err != nil {
+	if err := s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM media m`+where, args...); err != nil {
 		return nil, 0, fmt.Errorf("server: count media: %w", err)
 	}
 	rows := []mediaRecord{}
-	err := s.db.Select(&rows, `SELECT `+mediaSelectColumns+` FROM media m LEFT JOIN users u ON u.id = m.uploaded_by`+
+	err := s.db.SelectContext(ctx, &rows, `SELECT `+mediaSelectColumns+` FROM media m LEFT JOIN users u ON u.id = m.uploaded_by`+
 		where+` ORDER BY `+q.orderBy()+` LIMIT ? OFFSET ?`,
-		append(args, q.PerPage, (q.Page-1)*q.PerPage)...)
+		append(args, limit, offset)...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("server: list media: %w", err)
 	}

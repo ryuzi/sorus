@@ -280,7 +280,7 @@ sorus は HTTP ベースの Model Context Protocol (MCP) エンドポイント�
 * **DNS リバインディング・Host**: デスクトップモードは `Host` をループバックと `MCPAllowedOrigins` のホストに限る。サーバーモードは `ALLOWED_HOSTS` が無ければ書式だけを確かめ、あれば一覧外を 403。`Origin` 付きの要求は許可したオリジンからだけ受け付ける。
 
 * **提供ツール一覧**:
-  * `cms_get_site_context`: サイト名、説明、カテゴリ一覧、直近公開記事一覧、`llms.txt` の場所を返し、AI にサイト全体の文脈を即座に把握させます。
+  * `cms_get_site_context`: サイト名、説明、カテゴリ一覧、直近公開記事一覧、`llms.txt` の場所に加え、現在のサイト構成（`site_structure`: ナビゲーションメニュー `site_menu`、フッターのサイトマップ `site_footer_menu`、トップのカード `front_cards`）を返し、AI にサイト全体の文脈を即座に把握させます。
   * `cms_list_articles`: 記事一覧の取得（ステータスやカテゴリで絞り込み可能）。
   * `cms_get_article`: 指定記事（ID またはスラッグ）の本文 Markdown と詳細メタデータの取得。
   * `cms_save_draft`: 記事下書きの新規作成・更新。保存完了時には編集画面の確認用 URL（`edit_url`）を返し、AI が対話上で人間に確認・公開を促すことができます。既存の文章を書き換える更新は変更案になります（下記）。
@@ -291,6 +291,10 @@ sorus は HTTP ベースの Model Context Protocol (MCP) エンドポイント�
   * `cms_install_theme`: GitHub・GitLab のリポジトリ URL・https の `.zip` の URL（`url`）、または Base64 の Zip（`zip_base64`）から独自テーマを取り込む（管理者のみ。適用はしない）。
   * `cms_activate_theme`: 公開サイトに適用するテーマを切り替える（`theme_id`。管理者）。
   * `cms_uninstall_theme`: 独自テーマを削除する（`theme_id`。管理者のみ。ビルトインと適用中のテーマは削除できない）。
+  * `cms_update_site_structure`: `site_menu`・`site_footer_menu`・`front_cards` を部分更新する。指定した項目だけを置き換え、省略した項目は今の値を保つ（空配列 `[]` で空にできる）。編集者・管理者のみ。公開サーバー（管理画面の無いサーバー）では使えない。
+  * `cms_list_media`: メディアライブラリの画像を一覧する読み取り専用のツール。`q`（検索語）・`tag`（タグの完全一致）・`limit`・`offset`（ページング）で絞り込む。画像の登録・変更はできない。
+  * `cms_unpublish_article`: 公開中・予約中・校閲待ちの記事を下書きに戻す（`article_id`・`note`）。公開中・予約中は編集者・管理者だけ、校閲待ちは編集者・管理者と記事の作成者も可。
+  * `cms_delete_article`: 下書き・校閲待ちの記事をゴミ箱へ移す（ソフトデリート。`article_id`・`note`）。編集者・管理者はどの下書き・校閲待ちも、執筆者は自分が作成した下書きだけ移せる。公開中・予約中は先に `cms_unpublish_article` で下書きに戻す。
   * テーマのツールの詳細は「8. 公開サイトのテーマと国際化（i18n）」の「独自テーマ（カスタムテーマ）」を参照。
 * **記事を見られる範囲**: 管理画面と同じく、執筆チーム（ライター・編集者・管理者）は他の人の非公開の記事も一覧・取得でき、下書きなら更新・校閲申請できる（`inTeam`・`checkEditable`）。公開中・予約中・校閲待ちの記事の保護は維持し、同期 API・原稿の書き出し・画像の使用箇所はそれぞれの権限仕様に従う。
 * **既存の内容を置き換える操作は変更案にする**（`internal/mcp/proposal.go`、`internal/server/handlers_proposal.go`）:
@@ -507,6 +511,9 @@ flowchart LR
 | `internal/server/handlers_theme_custom.go` | `/custom-themes/<id>/*` の配信、管理画面の取り込み・削除（`/admin/settings/theme/install-url`・`install-zip`・`uninstall`、管理者のみ）、結果の通知 |
 | `internal/server/export.go` | 静的書き出しで、使うテーマが独自テーマならそのファイルを `dist/custom-themes/<id>/` に書き出す（`exportCustomTheme`） |
 | `internal/mcp/tools_theme.go` | MCP のテーマのツール（`cms_list_themes`・`cms_install_theme`・`cms_activate_theme`・`cms_uninstall_theme`） |
+| `internal/mcp/tools_site.go` | MCP のサイト構成・メディアのツール（`cms_update_site_structure`・`cms_list_media`）。`cms_get_site_context` の `site_structure` の組み立ても含む |
+| `internal/mcp/tools_lifecycle.go` | MCP の記事の状態を戻す・移すツール（`cms_unpublish_article`・`cms_delete_article`） |
+| `internal/server/mcp_bridge.go` | MCP のサイト構成・メディア・記事の取り下げ／ゴミ箱のツールが、管理画面と同じ検査・保存・後処理を使うためのつなぎ（`mcp` パッケージは `server` を参照できないため、`mcp.Config` の関数として渡す） |
 
 * 独自テーマの置き場所は `Config.ThemesDir` です。サーバーモードは環境変数 `THEMES_DIR`（既定は作業ディレクトリの `themes`）、デスクトップモードはサイトのディレクトリの `themes/`（`desktop.SitePaths.Themes`）です。
 * 壊れた独自テーマはカタログに入れずに飛ばし、理由を `Catalog.Skipped()` で返します（1つの壊れたテーマでサイト全体を止めない）。ビルトインが壊れている場合だけ起動に失敗します。名前が `.` で始まるディレクトリ（取り込み中の作業ディレクトリ）は読みません。
@@ -605,6 +612,20 @@ AI エージェントは、MCP からテーマの取り込みから適用まで�
 
 MCP サーバーは管理画面と同じカタログ（`mcp.Config.ThemeCatalog`）を共有するため、MCP で取り込んだテーマはすぐ管理画面にも現れます。エラーは管理画面と同じ種類（`ErrBlockedURL`・`ErrArchiveTooLarge`・`ErrUnsafeArchive`・`ErrBuiltinTheme`・`ErrInvalidTheme`・`ErrUnsupportedURL`）を、AI が次の行動を決められる日本語の文に変えて返します。
 
+#### サイト構成・メディア・記事の状態のツール
+
+サイト構成の変更、メディアの一覧、記事の取り下げとゴミ箱への移動も MCP から行えます。どれも管理画面と同じ権限・検査を使います。
+
+| ツール | 権限 | 引数 | 内容 |
+| --- | --- | --- | --- |
+| `cms_get_site_context` | すべて | なし | サイト情報に加え、`site_structure`（`site_menu`・`site_footer_menu`・`front_cards`）を返す |
+| `cms_update_site_structure` | 編集者・管理者 | `site_menu`・`site_footer_menu`・`front_cards`（省略可。指定した項目だけ置き換える） | 件数・階層・URL・表示名を管理画面の「サイト構成」と同じ規則で検査し、不正なら何も保存しない。公開サーバーでは使えない |
+| `cms_list_media` | すべて | `q`・`tag`・`limit`・`offset`（すべて省略可） | メディアライブラリの画像を撮影日の新しい順に一覧する（読み取り専用） |
+| `cms_unpublish_article` | 公開中・予約中は編集者・管理者。校閲待ちは編集者・管理者と作成者 | `article_id`・`note`（省略可） | 記事を下書きに戻す。公開先も管理画面と同じく更新する |
+| `cms_delete_article` | 編集者・管理者は下書き・校閲待ちすべて。執筆者は自分が作成した下書きだけ | `article_id`・`note`（省略可） | 記事をゴミ箱へ移す（ソフトデリート。30日後に自動で完全に削除される） |
+
+`cms_unpublish_article` と `cms_delete_article` は、PC の sorus で編集中・他の人が管理画面で編集中の記事は扱えません（編集ロックを尊重します）。
+
 #### テスト
 
 | テスト | 検査の内容 |
@@ -619,6 +640,9 @@ MCP サーバーは管理画面と同じカタログ（`mcp.Config.ThemeCatalog`
 | `internal/server/theme_replace_failure_test.go` | 中断のあとの起動で前の版を残し自動では戻さないこと、公開サーバーでテーマが無くなったあと PC から反映し直すと揃い、起動し直しても残った前の版と反映したテーマがそのままであること、`ErrNotRestored` の文言（公開サーバー・管理画面。再起動で戻るとは言わない） |
 | `internal/server/remote_push_confirm_test.go` | 3画面の確認ダイアログの文言（独自テーマ・標準テーマ、日本語・英語） |
 | `internal/mcp/tools_theme_test.go` | MCP のテーマのツールと権限 |
+| `internal/mcp/tools_site_test.go` | MCP のサイト構成・メディアのツールと権限、`site_structure` |
+| `internal/mcp/tools_lifecycle_test.go` | MCP の記事の取り下げ・ゴミ箱へ移すツールと権限 |
+| `internal/server/mcp_bridge_test.go` | MCP のサイト構成・メディア・記事の状態のツールと管理画面の共通処理のつなぎ |
 
 ### 国際化（i18n）
 

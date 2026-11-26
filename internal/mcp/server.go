@@ -119,6 +119,20 @@ type Config struct {
 	CheckPublishHealth func(ctx context.Context) PublishHealthResult
 	// OnArticlePublished is called after an article is approved for immediate publication.
 	OnArticlePublished func()
+	// OnArticleUnpublished は、読者に見えていた（または予約中の）記事を cms_unpublish_article で下書きに戻した後に呼ばれる。
+	// 管理画面で公開中の記事を下書きに戻したときと同じく、静的サイトへの反映と公開サーバーからの取り下げに使う。
+	// 返したエラーは記事の変更を取り消さず、結果の warning として伝える（toolError ならその文言、それ以外は定型文）。
+	OnArticleUnpublished func(ctx context.Context, user *auth.User, articleID string) error
+	// GetSiteStructure は今のサイト構成（メニュー・フッターのサイトマップ・トップのカード）を返す。cms_get_site_context が
+	// site_structure として返す。nil なら返さない。
+	GetSiteStructure func(ctx context.Context) (SiteStructure, error)
+	// UpdateSiteStructure はサイト構成の指定された項目を、管理画面の「サイト構成」と同じ検査を通して保存し、保存後の
+	// サイト構成と、参照先の無い項目の警告を返す。検査で断るときは toolError（NewToolError）を返すこと。
+	// nil なら cms_update_site_structure は使えない。
+	UpdateSiteStructure func(ctx context.Context, upd SiteStructureUpdate) (SiteStructure, []string, error)
+	// ListMedia はメディアライブラリの画像を、管理画面のメディアライブラリと同じ検索・並び順で返す。nil なら
+	// cms_list_media は使えない。
+	ListMedia func(ctx context.Context, q MediaQuery) (MediaList, error)
 	// ThemesDir は独自テーマを保存・読み込むディレクトリ。空なら ThemeCatalog の保存先を使い、それも空なら
 	// cms_install_theme は使えない（一覧・適用はビルトインテーマで動く）。
 	ThemesDir string
