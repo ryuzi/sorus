@@ -139,6 +139,35 @@
         <figcaption class="cms-lightbox-caption" hidden></figcaption>
       </figure>
     </dialog>
+    {{- /* Cmd+K・Ctrl+K で開くサイト内のすばやい検索（static/js/public.js）。公開サーバーでは /search の結果のパーシャルを、
+           静的エクスポートでは検索用インデックス（data-search-index）を static-search.js で絞り込む。JavaScript が無いときは
+           開かれず、ヘッダーの検索窓のフォーム送信（/search）がそのまま使える。結果の文言は data-msg-* から出す。 */}}
+    <dialog id="search-modal" class="search-modal" aria-label="{{if eq .Lang "en"}}Quick search{{else}}すばやく検索{{end}}"
+            {{- with .SearchIndexURL}} data-search-index="{{.}}" data-search-script="{{asset "js/static-search.js"}}"{{end}}
+            data-msg-idle="{{if eq .Lang "en"}}Type keywords to see matching pages instantly.{{else}}キーワードを入力すると、一致するページがすぐに表示されます。{{end}}"
+            data-msg-loading="{{if eq .Lang "en"}}Searching…{{else}}検索しています…{{end}}"
+            data-msg-count="{{if eq .Lang "en"}}{n} results{{else}}{n}件{{end}}"
+            data-msg-none="{{if eq .Lang "en"}}No matching pages found. Try different keywords.{{else}}一致するページは見つかりませんでした。別の言葉で検索してみてください。{{end}}"
+            data-msg-error="{{if eq .Lang "en"}}Search failed. Please try again.{{else}}検索できませんでした。もう一度お試しください。{{end}}"
+            data-msg-all="{{if eq .Lang "en"}}See all results for “{q}”{{else}}「{q}」のすべての検索結果を見る{{end}}">
+      <form class="search-modal-form" action="{{if eq .Lang "en"}}/en/search{{else}}/search{{end}}" method="get" role="search">
+        <span class="search-modal-icon" aria-hidden="true"></span>
+        <label class="visually-hidden" for="search-modal-input">{{if eq .Lang "en"}}Search{{else}}サイト内検索{{end}}</label>
+        <input id="search-modal-input" class="search-modal-input" type="search" name="q" autocomplete="off" spellcheck="false" enterkeyhint="search"
+               placeholder="{{if eq .Lang "en"}}Search this site{{else}}サイト内を検索{{end}}"
+               role="combobox" aria-expanded="false" aria-controls="search-modal-results" aria-autocomplete="list">
+        <button type="button" class="search-modal-close" aria-label="{{if eq .Lang "en"}}Close{{else}}閉じる{{end}}"><kbd class="search-modal-close-key">Esc</kbd><span class="search-modal-close-icon" aria-hidden="true">&times;</span></button>
+      </form>
+      <div class="search-modal-body">
+        <p class="search-modal-status" role="status" aria-live="polite"></p>
+        <ul id="search-modal-results" class="search-modal-results" role="listbox" aria-label="{{if eq .Lang "en"}}Search results{{else}}検索結果{{end}}"></ul>
+      </div>
+      <div class="search-modal-footer" aria-hidden="true">
+        <span><kbd>↑</kbd><kbd>↓</kbd> {{if eq .Lang "en"}}Select{{else}}選ぶ{{end}}</span>
+        <span><kbd>Enter</kbd> {{if eq .Lang "en"}}Open{{else}}開く{{end}}</span>
+        <span><kbd>Esc</kbd> {{if eq .Lang "en"}}Close{{else}}閉じる{{end}}</span>
+      </div>
+    </dialog>
   </footer>
   <script src="{{asset "js/public.js"}}" defer></script>
   {{- /* 行揃え（justified）のフォトギャラリーの行の幅を計算する（static/js/justified_gallery.js）。 */}}

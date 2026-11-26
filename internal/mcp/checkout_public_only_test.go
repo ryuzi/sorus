@@ -244,6 +244,22 @@ func TestEveryMutatingToolRejectsCheckedOutArticle(t *testing.T) {
 			mustExec(t, env.db, `UPDATE articles SET is_outdated = 1 WHERE id = ?`, enID)
 			return enID, map[string]any{"article_id": enID}
 		}},
+		{"unpublish_article published", editor.ID, "cms_unpublish_article", func(env *testEnv) (string, map[string]any) {
+			id := env.seed(article.Article{Title: "公開中", ContentMarkdown: "本文", AuthorID: writerA.ID, Status: article.StatusPublished})
+			return id, map[string]any{"article_id": id}
+		}},
+		{"unpublish_article review by author", writerA.ID, "cms_unpublish_article", func(env *testEnv) (string, map[string]any) {
+			id := env.seed(article.Article{Title: "校閲待ち", ContentMarkdown: "本文", AuthorID: writerA.ID, Status: article.StatusReview})
+			return id, map[string]any{"article_id": id}
+		}},
+		{"delete_article own draft", writerA.ID, "cms_delete_article", func(env *testEnv) (string, map[string]any) {
+			id := env.seed(article.Article{Title: "下書き", ContentMarkdown: "本文", AuthorID: writerA.ID, Status: article.StatusDraft})
+			return id, map[string]any{"article_id": id}
+		}},
+		{"delete_article review by editor", editor.ID, "cms_delete_article", func(env *testEnv) (string, map[string]any) {
+			id := env.seed(article.Article{Title: "校閲待ち", ContentMarkdown: "本文", AuthorID: writerA.ID, Status: article.StatusReview})
+			return id, map[string]any{"article_id": id}
+		}},
 		{"sync_translation published with force", editor.ID, "cms_sync_translation", func(env *testEnv) (string, map[string]any) {
 			_, enID := seedTranslationPair(env)
 			mustExec(t, env.db, `UPDATE articles SET status = ?, published_at = ?, is_outdated = 1 WHERE id = ?`,

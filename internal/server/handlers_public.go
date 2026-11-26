@@ -134,8 +134,14 @@ type publicPage struct {
 	Menu []publicMenuItem
 	// FooterMenu はフッターのサイトマップの列（参照先を解決済み。見出しと、その子項目のリンク）。空なら出さない。
 	FooterMenu []publicMenuItem
-	Categories []publicCategory
-	Query      string
+	// DocNav は固定ページ・記事のドキュメント表示（左のサイドバーと前後のページ送り）。表示中のページがメニューの
+	// 子項目のある項目（セクション）に入っているときだけ renderPublic が埋める（buildDocNav）。nil なら今までどおりの見た目。
+	DocNav *docNav
+	// SearchIndexURL は静的エクスポートの検索用インデックス（/search-index.json）の URL。静的エクスポートのときだけ
+	// renderPublic が埋め、Cmd+K の検索（public.js）はサーバーの /search の代わりにこれを static-search.js で絞り込む。
+	SearchIndexURL string
+	Categories     []publicCategory
+	Query          string
 	// Theme は <html data-theme> に出すテーマ ID。ThemeStylesheet はそのテーマ CSS の版付き URL、
 	// ColorScheme は <meta name="color-scheme"> に出す配色モード。
 	Theme           string
@@ -1823,6 +1829,12 @@ func (s *Server) renderPublic(c echo.Context, code int, name string, p publicPag
 		return err
 	}
 	p.Menu, p.FooterMenu = menu, footer
+	if name == "page" || name == "article" {
+		p.DocNav = buildDocNav(menu)
+	}
+	if isStaticExport(c) {
+		p.SearchIndexURL = searchIndexPath
+	}
 	p.SiteStructure = *st
 	labels := articlesLabels(*st, p.Lang)
 	p.ArticlesLabel, p.ArticlesBackLabel, p.ArticlesAllLabel = labels.Label, labels.Back, labels.All

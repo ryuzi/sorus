@@ -1,5 +1,7 @@
 {{define "content"}}
 {{with .Data}}
+{{- /* メニューのセクションに入っているページは、左にセクションのページの一覧（doc_sidebar）を置く3列の表示にする。 */ -}}
+{{if $.DocNav}}<div class="doc-layout">{{template "doc_sidebar" $}}<div class="doc-main">{{end}}
 <nav class="breadcrumb" aria-label="{{if eq $.Lang "en"}}Breadcrumb{{else}}パンくずリスト{{end}}">
   <ol>
     <li><a href="{{if eq $.Lang "en"}}/en/{{else}}/{{end}}">{{if eq $.Lang "en"}}Home{{else}}ホーム{{end}}</a></li>
@@ -40,8 +42,9 @@
       {{end}}
     </ul>
   </section>
-  {{end}}
-</article>
+  {{end}}{{template "doc_pager" $}}
+</article>{{if $.DocNav}}
+</div></div>{{end}}
 {{end}}
 {{end}}
 

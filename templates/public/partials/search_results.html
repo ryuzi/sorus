@@ -1,6 +1,6 @@
 {{define "search_results"}}
 {{if .Query}}
-<p class="result-count" role="status">{{if eq .Lang "en"}}Search results for &ldquo;{{.Query}}&rdquo;: {{.Result.Total}} results{{else}}「{{.Query}}」の検索結果: {{.Result.Total}}件{{end}}</p>
+<p class="result-count" role="status" data-total="{{.Result.Total}}">{{if eq .Lang "en"}}Search results for &ldquo;{{.Query}}&rdquo;: {{.Result.Total}} results{{else}}「{{.Query}}」の検索結果: {{.Result.Total}}件{{end}}</p>
 {{if .Result.Hits}}
 <ol class="search-hits">
   {{range .Result.Hits}}

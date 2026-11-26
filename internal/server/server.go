@@ -534,6 +534,11 @@ func New(cfg Config) (*Server, error) {
 		GetPublishStatus:   s.mcpGetPublishStatus,
 		CheckPublishHealth: func(ctx context.Context) mcp.PublishHealthResult { return s.mcpCheckPublishHealth(ctx) },
 		OnArticlePublished: func() { s.reflectAfterPublish() },
+		// MCP の記事の取り下げ・サイト構成・メディアライブラリも、管理画面と同じ検査・保存・後処理を使う（mcp_bridge.go）。
+		OnArticleUnpublished: s.mcpArticleUnpublished,
+		GetSiteStructure:     s.mcpSiteStructure,
+		UpdateSiteStructure:  s.mcpUpdateSiteStructure,
+		ListMedia:            s.mcpListMedia,
 		// MCP のテーマ操作も管理画面と同じカタログ・排他を使い、変更後は記事の公開と同じく静的サイトへ反映する。
 		ThemesDir:      cfg.ThemesDir,
 		ThemeCatalog:   s.themes,

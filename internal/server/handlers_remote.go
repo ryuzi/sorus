@@ -802,12 +802,17 @@ func (s *Server) collectRemoteImageBatches(a *article.Article) ([][]SyncImage, e
 // unpublishRemoteArticle はローカルで非公開にした記事を公開サーバーでも下書きに戻す。
 // 公開サーバーに記事が無い場合は、すでに非公開と同等として成功扱いにする。
 func (s *Server) unpublishRemoteArticle(c echo.Context, a *article.Article) error {
+	return s.unpublishRemoteArticleCtx(c.Request().Context(), a)
+}
+
+// unpublishRemoteArticleCtx は unpublishRemoteArticle の本体。要求の無い呼び出し（MCP の cms_unpublish_article）から使う。
+func (s *Server) unpublishRemoteArticleCtx(ctx context.Context, a *article.Article) error {
 	cfg, err := s.requireRemote(auth.CanPublish, "記事の非公開化")
 	if err != nil {
 		return err
 	}
 	var out SyncPublishResponse
-	err = callRemote(c.Request().Context(), cfg, SyncRequest{Action: SyncActionUnpublishArticle, ArticleID: a.ID}, &out)
+	err = callRemote(ctx, cfg, SyncRequest{Action: SyncActionUnpublishArticle, ArticleID: a.ID}, &out)
 	var re *remoteError
 	if errors.As(err, &re) && re.Status == http.StatusNotFound {
 		return nil
@@ -1065,6 +1070,11 @@ func (s *Server) saveRemoteDirtyLocked(items []string) error {
 // いないときは記録しない（接続したときに古い記録が残らないようにする）。記録に失敗しても保存そのものは成功している
 // ため、ログに残すだけにする。
 func (s *Server) markRemoteDirty(c echo.Context, kind string) {
+	s.recordRemoteDirty(c.Logger(), kind)
+}
+
+// recordRemoteDirty は markRemoteDirty の本体。要求の無い呼び出し（MCP のサイト構成の変更など）から使う。
+func (s *Server) recordRemoteDirty(logger echo.Logger, kind string) {
 	if !s.loadRemoteConfig().connected() {
 		return
 	}
@@ -1076,7 +1086,7 @@ func (s *Server) markRemoteDirty(c echo.Context, kind string) {
 		return
 	}
 	if err := s.saveRemoteDirtyLocked(parseRemoteDirty(strings.Join(append(items, kind), ","))); err != nil {
-		c.Logger().Warnf("remote: record unreflected settings %q: %v", kind, err)
+		logger.Warnf("remote: record unreflected settings %q: %v", kind, err)
 	}
 }
 

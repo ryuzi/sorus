@@ -577,4 +577,174 @@
   }
   html:has(.cms-lightbox[open]) { overflow: hidden; }
   ::view-transition-group(cms-lightbox-image) { animation-duration: .3s; animation-timing-function: cubic-bezier(.2, 0, 0, 1); }
+
+  /* ドキュメント表示（templates/public/partials/doc_nav.html）。固定ページ・記事がメニューのセクション（子項目のある項目）に
+     入っているときの3列（左: セクションのページの一覧 .doc-sidebar、中央: 本文、右: 目次 .toc-sidebar）と、本文の後の
+     前後のページ送り（.doc-pager）。1024px 未満では1列にし、サイドバーは本文の上の開閉する一覧（<details>。public.js が
+     閉じた状態にする）になる。--doc-layout-width（3列のときの本文の枠の最大幅）はテーマが上書きしてよい。 */
+  .doc-layout { display: flex; flex-direction: column; }
+  .doc-main { min-width: 0; }
+  .doc-sidebar { margin: 0 0 20px; font-size: .92rem; }
+  .doc-sidebar-collapsible { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+  .doc-sidebar-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 8px 14px; font-weight: 700; cursor: pointer; list-style: none; user-select: none; -webkit-user-select: none; }
+  .doc-sidebar-summary::-webkit-details-marker { display: none; }
+  .doc-sidebar-summary::after { content: ""; flex: none; width: 6px; height: 6px; margin-right: 2px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-25%) rotate(45deg); transition: transform .2s ease; }
+  .doc-sidebar-collapsible[open] > .doc-sidebar-summary::after { transform: translateY(25%) rotate(-135deg); }
+  .doc-sidebar-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-lg); }
+  .doc-sidebar-nav { padding: 6px 10px 12px; border-top: 1px solid var(--border); }
+  .doc-sidebar-title { margin: 4px 0 6px; padding: 4px 10px; color: var(--fg); font-family: var(--font-heading); font-size: .95rem; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+  .doc-sidebar-title a { display: block; margin: -4px -10px; padding: 4px 10px; border-radius: var(--radius); color: inherit; text-decoration: none; }
+  .doc-sidebar-links { margin: 0; padding: 0 0 0 4px; list-style: none; }
+  .doc-sidebar-links a { display: block; padding: 5px 10px 5px 14px; border-left: 2px solid var(--border); color: var(--muted); line-height: 1.55; text-decoration: none; overflow-wrap: anywhere; transition: color .15s ease, border-color .15s ease, background-color .15s ease; }
+  .doc-sidebar-links a:hover { border-left-color: var(--muted); color: var(--fg); }
+  .doc-sidebar-title a:hover { color: var(--accent); }
+  .doc-sidebar a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+  .doc-sidebar-links a[aria-current="page"] { border-left-color: var(--accent); border-radius: 0 var(--radius) var(--radius) 0; }
+  .doc-sidebar a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--radius); }
+  @media (min-width: 1024px) {
+    main.container:has(> .doc-layout) { max-width: var(--doc-layout-width, max(var(--content-width), 1280px)); }
+    .doc-layout { display: grid; grid-template-columns: clamp(200px, 17vw, 250px) minmax(0, 1fr); gap: clamp(28px, 3vw, 48px); align-items: start; }
+    /* 長い一覧は画面の中でスクロールする。ヘッダーを画面の上に固定するテーマでは、その高さ（public.js の --site-header-sticky-h）の分だけ下げる。 */
+    .doc-sidebar { position: sticky; top: calc(var(--site-header-sticky-h, 0px) + 24px); max-height: calc(100vh - var(--site-header-sticky-h, 0px) - 48px); margin: 0; padding: 2px 4px 2px 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    .doc-sidebar-collapsible { border: 0; border-radius: 0; background: none; }
+    .doc-sidebar-summary { display: none; }
+    .doc-sidebar-nav { padding: 0; border-top: 0; }
+    .doc-main > .article, .doc-main > .page { margin-left: 0; }
+    .doc-main > .article:has(.article-layout), .doc-main > .page:has(.article-layout) { max-width: none; }
+    .doc-main .article-layout { grid-template-columns: minmax(0, 1fr) clamp(180px, 15vw, 240px); gap: clamp(24px, 3vw, 40px); }
+  }
+  .doc-pager { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-pager-link { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 14px 18px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); color: var(--fg); text-decoration: none; transition: border-color .15s ease, background-color .15s ease; }
+  .doc-pager-next { grid-column: 2; align-items: flex-end; text-align: right; }
+  .doc-pager-label { color: var(--muted); font-size: .8rem; }
+  .doc-pager-prev .doc-pager-label::before { content: "\2190\00a0"; content: "\2190\00a0" / ""; }
+  .doc-pager-next .doc-pager-label::after { content: "\00a0\2192"; content: "\00a0\2192" / ""; }
+  .doc-pager-title { color: var(--accent); font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+  .doc-pager-link:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .doc-pager-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 640px) {
+    .doc-pager { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .doc-pager-next { grid-column: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) { .doc-sidebar-summary::after, .doc-sidebar-links a, .doc-pager-link { transition: none; } }
+
+  /* 注意書き（Callout。internal/markdown/callout.go の div.callout.callout-<種類>）。種類ごとの色は --callout-color で、
+     テーマが :root の --callout-note・--callout-tip・--callout-important・--callout-warning・--callout-caution で変えてよい
+     （note の既定はテーマのアクセント色）。見出しの文字色は種類の色に本文の色（--fg）を混ぜ、明るい配色・暗い配色の
+     どちらでも読みやすい濃さにする。背景と枠も種類の色を背景色（--bg）・枠の色（--border）に薄く混ぜる。 */
+  .callout { --callout-color: var(--accent); margin: 0 0 1.2em; padding: .8em 1.1em .85em; border: 1px solid var(--border); border-left: 4px solid var(--callout-color); border-radius: var(--radius); background: var(--surface); }
+  .callout-note { --callout-color: var(--callout-note, var(--accent)); }
+  .callout-tip { --callout-color: var(--callout-tip, #1f883d); }
+  .callout-important { --callout-color: var(--callout-important, #8250df); }
+  .callout-warning { --callout-color: var(--callout-warning, #bf8700); }
+  .callout-caution { --callout-color: var(--callout-caution, #cf222e); }
+  .callout .callout-title { display: flex; align-items: center; gap: .45em; margin: 0 0 .35em; color: var(--callout-color); font-family: var(--font-heading); font-size: .92em; font-weight: 700; line-height: 1.5; }
+  .callout-body > :first-child { margin-top: 0; }
+  .callout-body > :last-child { margin-bottom: 0; }
+  @supports (color: color-mix(in srgb, red, blue)) {
+    .callout { border-color: color-mix(in srgb, var(--callout-color) 28%, var(--border)); border-left-color: var(--callout-color); background: color-mix(in srgb, var(--callout-color) 7%, var(--bg)); }
+    .callout .callout-title { color: color-mix(in srgb, var(--callout-color) 62%, var(--fg)); }
+  }
+  /* 見出しの前のアイコン。マスクを使えないブラウザでは出さない（塗りつぶしの四角にしない）。アイコンは外部から読まず、
+     種類ごとの --callout-icon に SVG を data: URI で埋め込む（SVG の名前空間の宣言を含むため Base64 にしてある）。 */
+  @supports (mask-image: none) or (-webkit-mask-image: none) {
+    .callout .callout-title::before { content: ""; flex: none; width: 1.15em; height: 1.15em; background: currentColor; -webkit-mask: var(--callout-icon) center / contain no-repeat; mask: var(--callout-icon) center / contain no-repeat; }
+  }
+  .callout-note { --callout-icon: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PGNpcmNsZSBjeD0nOCcgY3k9JzgnIHI9JzYuNzUnIGZpbGw9J25vbmUnIHN0cm9rZT0nYmxhY2snIHN0cm9rZS13aWR0aD0nMS41Jy8+PHJlY3QgeD0nNy4yNScgeT0nNycgd2lkdGg9JzEuNScgaGVpZ2h0PSc0Ljc1JyByeD0nLjc1Jy8+PGNpcmNsZSBjeD0nOCcgY3k9JzQuNzUnIHI9JzEnLz48L3N2Zz4="); }
+  .callout-tip { --callout-icon: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PHBhdGggZD0nTTggMS4yNWE0Ljc1IDQuNzUgMCAwIDAtMi44NSA4LjU1Yy40LjMuNi42Ni42IDEuMDV2LjY1aDQuNXYtLjY1YzAtLjM5LjItLjc1LjYtMS4wNUE0Ljc1IDQuNzUgMCAwIDAgOCAxLjI1WicgZmlsbD0nbm9uZScgc3Ryb2tlPSdibGFjaycgc3Ryb2tlLXdpZHRoPScxLjUnIHN0cm9rZS1saW5lam9pbj0ncm91bmQnLz48cmVjdCB4PSc1Ljc1JyB5PScxMycgd2lkdGg9JzQuNScgaGVpZ2h0PScxLjUnIHJ4PScuNzUnLz48L3N2Zz4="); }
+  .callout-important { --callout-icon: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PHBhdGggZD0nTTIuNSAxLjc1aDExYy40MSAwIC43NS4zNC43NS43NXY4YzAgLjQxLS4zNC43NS0uNzUuNzVIOC41bC0zLjI1IDN2LTNIMi41YS43NS43NSAwIDAgMS0uNzUtLjc1di04YzAtLjQxLjM0LS43NS43NS0uNzVaJyBmaWxsPSdub25lJyBzdHJva2U9J2JsYWNrJyBzdHJva2Utd2lkdGg9JzEuNScgc3Ryb2tlLWxpbmVqb2luPSdyb3VuZCcvPjxyZWN0IHg9JzcuMjUnIHk9JzMuNzUnIHdpZHRoPScxLjUnIGhlaWdodD0nNCcgcng9Jy43NScvPjxjaXJjbGUgY3g9JzgnIGN5PSc5LjQnIHI9Jy45NScvPjwvc3ZnPg=="); }
+  .callout-warning { --callout-icon: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PHBhdGggZD0nTTcuMTMgMi4yNWExIDEgMCAwIDEgMS43NCAwbDUuOSAxMC41YTEgMSAwIDAgMS0uODcgMS41SDIuMWExIDEgMCAwIDEtLjg3LTEuNVonIGZpbGw9J25vbmUnIHN0cm9rZT0nYmxhY2snIHN0cm9rZS13aWR0aD0nMS41JyBzdHJva2UtbGluZWpvaW49J3JvdW5kJy8+PHJlY3QgeD0nNy4yNScgeT0nNS43NScgd2lkdGg9JzEuNScgaGVpZ2h0PSc0LjI1JyByeD0nLjc1Jy8+PGNpcmNsZSBjeD0nOCcgY3k9JzEyJyByPScuOTUnLz48L3N2Zz4="); }
+  .callout-caution { --callout-icon: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PHBhdGggZD0nTTUuNCAxLjI1aDUuMmw0LjE1IDQuMTV2NS4ybC00LjE1IDQuMTVINS40TDEuMjUgMTAuNlY1LjRaJyBmaWxsPSdub25lJyBzdHJva2U9J2JsYWNrJyBzdHJva2Utd2lkdGg9JzEuNScgc3Ryb2tlLWxpbmVqb2luPSdyb3VuZCcvPjxyZWN0IHg9JzcuMjUnIHk9JzQuMjUnIHdpZHRoPScxLjUnIGhlaWdodD0nNC43NScgcng9Jy43NScvPjxjaXJjbGUgY3g9JzgnIGN5PScxMS4yNScgcj0nLjk1Jy8+PC9zdmc+"); }
+
+  /* タブ（internal/markdown/tabs.go の div.doc-tabs[data-tabs]）。JavaScript が無いときは、すべてのタブの中身を名前
+     （.doc-tab-title）付きで縦に並べて読める。public.js がタブの並び（.doc-tab-list）の hidden を外して .doc-tabs に
+     .is-ready を付け、選んでいないタブの中身と、名前の行を hidden で隠す。選んでいるタブは aria-selected="true"。 */
+  .doc-tabs { margin: 0 0 1.2em; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
+  .doc-tab-list { display: flex; gap: 2px; padding: 0 8px; overflow-x: auto; border-bottom: 1px solid var(--border); border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--surface); scrollbar-width: thin; }
+  .doc-tab { flex: none; margin: 0 0 -1px; padding: .6em .95em; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font: inherit; font-size: .88rem; font-weight: 600; line-height: 1.5; white-space: nowrap; cursor: pointer; transition: color .15s ease, border-color .15s ease; }
+  .doc-tab:hover { color: var(--fg); }
+  .doc-tab[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent); }
+  .doc-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: var(--radius); }
+  .doc-tab-panel { padding: 1em 1.15em; }
+  .doc-tab-panel + .doc-tab-panel { border-top: 1px solid var(--border); }
+  .doc-tabs.is-ready > .doc-tab-panel { border-top: 0; }
+  .doc-tab-panel > :last-child { margin-bottom: 0; }
+  .doc-tab-panel:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-lg); }
+  .doc-tabs .doc-tab-title { margin: 0 0 .6em; color: var(--muted); font-size: .85rem; font-weight: 700; letter-spacing: .03em; }
+  /* 隠したタブはテーマが display を指定しても隠す。 */
+  .doc-tab-list[hidden], .doc-tab-panel[hidden], .doc-tab-title[hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .doc-tab { transition: none; } }
+
+  /* コードブロックのコピーボタンと言語の表示（public.js が .prose pre を div.code-block で包み、右上に .code-block-toolbar を
+     足す）。言語は ```go のように書いたコードブロックの class="language-go" から出す。コピーボタンはポインターを載せたとき・
+     キーボードで選んだときに出し、ポインターを載せられない（タッチの）端末では常に出す。押した結果は .is-copied・.is-failed。 */
+  .code-block { position: relative; }
+  /* 注意書き・タブの中身の最後のコードブロックは、包む前と同じく下の余白を詰める。 */
+  .code-block:last-child > pre { margin-bottom: 0; }
+  .code-block-toolbar { position: absolute; top: 6px; right: 6px; z-index: 1; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+  .code-block-toolbar > * { pointer-events: auto; }
+  .code-block-lang { padding: 1px 4px; color: var(--code-fg); font-family: var(--font-mono); font-size: .72rem; line-height: 1.6; letter-spacing: .04em; opacity: .6; user-select: none; -webkit-user-select: none; }
+  .code-copy { display: inline-flex; align-items: center; min-height: 28px; margin: 0; padding: 2px 10px; border: 1px solid rgb(255 255 255 / .2); border-radius: var(--radius); background: var(--code-bg); color: var(--code-fg); font: inherit; font-family: var(--font-body); font-size: .75rem; font-weight: 600; line-height: 1.4; cursor: pointer; opacity: 0; transition: opacity .15s ease, border-color .15s ease; }
+  @supports (color: color-mix(in srgb, red, blue)) { .code-copy { border-color: color-mix(in srgb, var(--code-fg) 28%, transparent); } }
+  .code-block:hover .code-copy, .code-copy:focus-visible, .code-copy.is-copied, .code-copy.is-failed { opacity: 1; }
+  .code-copy:hover { border-color: var(--code-fg); }
+  .code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .code-copy.is-copied { border-color: #3fb950; color: #7ee787; }
+  .code-copy.is-failed { border-color: #f85149; color: #ffa198; }
+  @media (hover: none) { .code-copy { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .code-copy { transition: none; } }
+
+  /* ヘッダーの検索窓のショートカットの案内（public.js が入力欄を span.search-field で包み、span.search-shortcut を足す）。
+     押すと Cmd+K の検索（.search-modal）を開く。入力欄に文字があるとき・タッチの端末では出さない。 */
+  .search-field { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
+  .search-field > input { flex: 1 1 auto; width: 100%; min-width: 0; }
+  .search-shortcut { position: absolute; top: 50%; right: 8px; display: inline-flex; gap: 3px; transform: translateY(-50%); cursor: pointer; }
+  .search-field > input:not(:placeholder-shown) + .search-shortcut { display: none; }
+  @media (hover: none), (pointer: coarse) { .search-shortcut { display: none; } }
+  .search-shortcut kbd, .search-modal kbd { display: inline-block; min-width: 1.7em; padding: 0 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--bg); color: var(--muted); font-family: var(--font-mono); font-size: .72rem; font-weight: 600; line-height: 1.6; text-align: center; }
+
+  /* Cmd+K・Ctrl+K のすばやい検索（layout.html の <dialog id="search-modal">、public.js）。キーボードで選んでいる結果は
+     .search-modal-result[aria-selected="true"]。狭い画面では画面いっぱいに開く。 */
+  .search-modal { width: min(640px, calc(100vw - 32px)); max-width: none; max-height: min(72vh, 600px); margin: 10vh auto auto; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg); color: var(--fg); box-shadow: 0 24px 60px -12px rgb(15 23 42 / .35); }
+  .search-modal[open] { display: flex; flex-direction: column; }
+  .search-modal::backdrop { background: rgb(15 23 42 / .5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .search-modal-form { display: flex; flex: none; align-items: center; gap: 10px; margin: 0; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--border); }
+  .search-modal-icon { position: relative; flex: none; width: 18px; height: 18px; color: var(--muted); }
+  .search-modal-icon::before { content: ""; position: absolute; top: 1px; left: 1px; width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 50%; }
+  .search-modal-icon::after { content: ""; position: absolute; top: 10.5px; left: 11px; width: 6px; height: 2px; border-radius: 1px; background: currentColor; transform: rotate(45deg); transform-origin: left center; }
+  .search-modal-input { flex: 1 1 auto; min-width: 0; margin: 0; padding: 8px 0; border: 0; background: transparent; color: var(--fg); font: inherit; font-size: 1.05rem; outline: none; }
+  .search-modal-input::placeholder { color: var(--muted); opacity: 1; }
+  /* 入力欄の消去ボタン（×）は閉じるボタンと紛らわしいため出さない。 */
+  .search-modal-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+  .search-modal-close { flex: none; margin: 0; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
+  .search-modal-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .search-modal-close-icon { display: none; padding: 0 6px; color: var(--muted); font-size: 1.7rem; line-height: 1; }
+  .search-modal-body { flex: 1 1 auto; min-height: 0; padding: 8px; overflow-y: auto; overscroll-behavior: contain; }
+  .search-modal-status { margin: 0; padding: 14px 10px; color: var(--muted); font-size: .9rem; text-align: center; }
+  .search-modal-status:empty { display: none; }
+  .search-modal-status.is-count { padding: 2px 12px 6px; font-size: .75rem; text-align: left; }
+  .search-modal-results { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; transition: opacity .15s ease; }
+  .search-modal-results:empty { display: none; }
+  .search-modal.is-loading .search-modal-results { opacity: .55; }
+  .search-modal-result > a { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--radius); color: var(--fg); text-decoration: none; }
+  .search-modal-result[aria-selected="true"] > a { background: var(--accent-soft); }
+  .search-modal-result[aria-selected="true"] .search-modal-result-title { color: var(--accent); }
+  .search-modal-result-title { font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+  .search-modal-result-meta { color: var(--muted); font-size: .75rem; }
+  .search-modal-result-snippet { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: .84rem; line-height: 1.6; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .search-modal-result-all > a { flex-direction: row; justify-content: center; color: var(--accent); font-size: .88rem; font-weight: 600; }
+  .search-modal-footer { display: flex; flex: none; flex-wrap: wrap; gap: 6px 16px; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: .75rem; }
+  .search-modal-footer span { display: inline-flex; align-items: center; gap: 4px; }
+  /* タッチの端末・狭い画面では Esc の案内の代わりに × を出す。 */
+  @media (hover: none), (max-width: 640px) {
+    .search-modal-close-key { display: none; }
+    .search-modal-close-icon { display: inline-block; }
+  }
+  @media (max-width: 640px) {
+    .search-modal { width: 100vw; height: 100vh; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; }
+    .search-modal-footer { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .search-modal-results { transition: none; } }
+  html:has(.search-modal[open]) { overflow: hidden; }
+  @media print { .doc-sidebar, .doc-pager, .code-block-toolbar, .search-modal { display: none !important; } }
 }

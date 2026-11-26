@@ -105,6 +105,31 @@
         <figcaption class="cms-lightbox-caption" hidden></figcaption>
       </figure>
     </dialog>
+    <dialog id="search-modal" class="search-modal" aria-label="すばやく検索"
+            data-msg-idle="キーワードを入力すると、一致するページがすぐに表示されます。"
+            data-msg-loading="検索しています…"
+            data-msg-count="{n}件"
+            data-msg-none="一致するページは見つかりませんでした。別の言葉で検索してみてください。"
+            data-msg-error="検索できませんでした。もう一度お試しください。"
+            data-msg-all="「{q}」のすべての検索結果を見る">
+      <form class="search-modal-form" action="/search" method="get" role="search">
+        <span class="search-modal-icon" aria-hidden="true"></span>
+        <label class="visually-hidden" for="search-modal-input">サイト内検索</label>
+        <input id="search-modal-input" class="search-modal-input" type="search" name="q" autocomplete="off" spellcheck="false" enterkeyhint="search"
+               placeholder="サイト内を検索"
+               role="combobox" aria-expanded="false" aria-controls="search-modal-results" aria-autocomplete="list">
+        <button type="button" class="search-modal-close" aria-label="閉じる"><kbd class="search-modal-close-key">Esc</kbd><span class="search-modal-close-icon" aria-hidden="true">&times;</span></button>
+      </form>
+      <div class="search-modal-body">
+        <p class="search-modal-status" role="status" aria-live="polite"></p>
+        <ul id="search-modal-results" class="search-modal-results" role="listbox" aria-label="検索結果"></ul>
+      </div>
+      <div class="search-modal-footer" aria-hidden="true">
+        <span><kbd>↑</kbd><kbd>↓</kbd> 選ぶ</span>
+        <span><kbd>Enter</kbd> 開く</span>
+        <span><kbd>Esc</kbd> 閉じる</span>
+      </div>
+    </dialog>
   </footer>
   <script src="/static/js/public.js?v=X" defer></script>
   <script src="/static/js/justified_gallery.js?v=X" defer></script>

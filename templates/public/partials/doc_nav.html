@@ -1,0 +1,31 @@
+{{/* ドキュメント表示の部品（固定ページ・記事）。データは publicPage で、.DocNav（internal/server/doc_nav.go）が nil なら何も出さない。
+     テーマが変えてよい公開クラス: .doc-layout・.doc-main・.doc-sidebar・.doc-sidebar-collapsible・.doc-sidebar-summary・
+     .doc-sidebar-nav・.doc-sidebar-title・.doc-sidebar-links・.doc-pager・.doc-pager-link・.doc-pager-prev・.doc-pager-next・
+     .doc-pager-label・.doc-pager-title。表示中のページは aria-current="page"。 */}}
+
+{{/* doc_sidebar は左のサイドバー（同じセクションのページの一覧）。スマートフォンでは開閉する一覧（<details>）で本文の上に置き、
+     PC の幅（1024px 以上）では本文の左に固定する。JavaScript が無くても開いた状態で読める（public.js が狭い画面では閉じる）。 */}}
+{{define "doc_sidebar"}}{{with .DocNav}}
+<aside class="doc-sidebar">
+  <details class="doc-sidebar-collapsible" open>
+    <summary class="doc-sidebar-summary">{{if eq $.Lang "en"}}Pages in this section{{else}}このセクションのページ{{end}}</summary>
+    <nav class="doc-sidebar-nav" aria-label="{{.Title}}">
+      <p class="doc-sidebar-title">{{if .TitleURL}}<a href="{{.TitleURL}}"{{if .TitleCurrent}} aria-current="page"{{end}}>{{.Title}}</a>{{else}}{{.Title}}{{end}}</p>
+      <ul class="doc-sidebar-links">{{range .Links}}
+        <li><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></li>{{end}}
+      </ul>
+    </nav>
+  </details>
+</aside>
+{{end}}{{end}}
+
+{{/* doc_pager は本文の後の「前のページ」「次のページ」。前後のどちらも無ければ出さない。 */}}
+{{define "doc_pager"}}{{with .DocNav}}{{if or .Prev .Next}}
+<nav class="doc-pager" aria-label="{{if eq $.Lang "en"}}Previous and next pages{{else}}前後のページ{{end}}">
+  {{- with .Prev}}
+  <a class="doc-pager-link doc-pager-prev" href="{{.URL}}" rel="prev"><span class="doc-pager-label">{{if eq $.Lang "en"}}Previous{{else}}前のページ{{end}}</span><span class="doc-pager-title">{{.Label}}</span></a>
+  {{- end}}{{with .Next}}
+  <a class="doc-pager-link doc-pager-next" href="{{.URL}}" rel="next"><span class="doc-pager-label">{{if eq $.Lang "en"}}Next{{else}}次のページ{{end}}</span><span class="doc-pager-title">{{.Label}}</span></a>
+  {{- end}}
+</nav>
+{{end}}{{end}}{{end}}

@@ -86,9 +86,10 @@ func (s *Server) newTools() []*tool {
 	tools := []*tool{
 		{
 			info: toolInfo{
-				Name:        "cms_get_site_context",
-				Title:       "サイト情報",
-				Description: "サイト名・説明・カテゴリと最近の公開記事を返します。記事作成前にサイトの文脈を把握するために使ってください。公開記事の一覧は /llms.txt も参照できます。",
+				Name:  "cms_get_site_context",
+				Title: "サイト情報",
+				Description: "サイト名・説明・カテゴリと最近の公開記事、サイト構成（site_structure: ナビゲーションメニュー site_menu・フッターのサイトマップ site_footer_menu・トップのカード front_cards）を返します。" +
+					"記事作成前にサイトの文脈を把握するために使ってください。サイト構成の変更は cms_update_site_structure で行えます。公開記事の一覧は /llms.txt も参照できます。",
 				InputSchema: objectSchema(map[string]any{}),
 				Annotations: &toolAnnotations{Title: "サイト情報", ReadOnlyHint: true, IdempotentHint: true},
 			},
@@ -246,6 +247,8 @@ func (s *Server) newTools() []*tool {
 	}
 	tools = append(tools, s.themeTools()...)
 	tools = append(tools, s.multilingualTools()...)
+	tools = append(tools, s.siteTools()...)
+	tools = append(tools, s.lifecycleTools()...)
 	return tools
 }
 
@@ -904,10 +907,18 @@ func (s *Server) toolGetSiteContext(ctx context.Context, _ *auth.User, _ json.Ra
 	if err != nil {
 		return nil, fmt.Errorf("list recent site articles: %w", err)
 	}
-	return map[string]any{
+	out := map[string]any{
 		"site_name": s.siteName(), "site_description": s.siteDescription(),
 		"categories": categories, "recent_articles": recent, "llms_txt": s.baseURL() + "/llms.txt",
-	}, nil
+	}
+	st, err := s.siteStructure(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if st != nil {
+		out["site_structure"] = st
+	}
+	return out, nil
 }
 
 // applyDraft は cms_save_draft で指定された項目を a に反映する。
