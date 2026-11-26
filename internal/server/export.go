@@ -505,11 +505,17 @@ func (s *Server) exportInto(ctx context.Context, outDir string, override *themeO
 
 	// 5.8 静的ホスティング（Cloudflare Pages / Netlify 等）向けの _headers ファイル出力
 	csp := buildPublicCSP(string(s.getAnalyticsTag()))
-	headersContent := "/*\n  Content-Security-Policy: " + csp + "\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: SAMEORIGIN\n  Referrer-Policy: strict-origin-when-cross-origin\n"
+	headersContent := "/*\n  Content-Security-Policy: " + csp + "\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: SAMEORIGIN\n  Referrer-Policy: strict-origin-when-cross-origin\n" +
+		"/api-data/*.json\n  Content-Type: application/json; charset=utf-8\n"
 	if err := os.WriteFile(filepath.Join(outDir, "_headers"), []byte(headersContent), 0644); err != nil {
 		return fmt.Errorf("export: _headers: %w", err)
 	}
 	rep.FilesCount++
+
+	// 5.9 Headless フロントエンド向けの構造化 JSON データ（api-data/*.json）の書き出し
+	if err := s.writeHeadlessData(ctx, outDir, effectiveBaseURL, now, override, attachments, rep); err != nil {
+		return fmt.Errorf("export: headless data: %w", err)
+	}
 
 	// savePagedLang は一覧 listPath の2ページ目以降を言語ごとに dirParts/page/N/index.html に書き出す。
 	savePagedLang := func(listPath string, categoryID int64, lang string, dirParts ...string) error {

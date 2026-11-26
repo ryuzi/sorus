@@ -93,7 +93,7 @@ func (k Kind) Valid() bool {
 // /<slug> で配信するとそのパスを隠してしまう。同期 API のパスの先頭部分のように設定で変わる語は
 // WithReservedSlugs で Service に加え、Service.IsReservedPageSlug で両方を検査する。
 var reservedPageSlugs = map[string]bool{
-	"admin": true, "api": true, "articles": true, "categories": true, "search": true, "static": true,
+	"admin": true, "api": true, "api-data": true, "articles": true, "categories": true, "search": true, "static": true,
 	"uploads": true, "attachments": true, "og": true, "og-image": true, "feed.xml": true, "sitemap.xml": true,
 	"robots.txt": true, "favicon.ico": true, "llms.txt": true, "llms-full.txt": true, "manifest.json": true,
 	"sw.js": true, "healthz": true, "en": true,
