@@ -346,7 +346,7 @@ flowchart LR
 | :--- | :--- |
 | 対象の要素 | `div` `p` `figure` `figcaption` `img` `ul` `ol` `li` `table` `blockquote` `section` `span` |
 | クラス名 | 英数字・`_`・`-` だけ。空白区切りで複数可（例: `class="profile-card wide"`） |
-| 予約名 | `math-inline` `math-display` `photo-gallery` `masonry-grid` `gallery-item` は数式・フォトギャラリー用。sorus が出力したときだけ残り、生 HTML のクラスに混ぜると `class` 属性ごと消えます |
+| 予約名 | `math-inline` `math-display` `mermaid` `photo-gallery` `masonry-grid` `gallery-item` は数式・Mermaid の図・フォトギャラリー用。sorus が出力したときだけ残り、生 HTML のクラスに混ぜると `class` 属性ごと消えます |
 
 * 規則に合わない値（`md:flex` のような記号入り、日本語、前後の空白、1つでも合わないクラス名を含むもの）は、`class` 属性ごと消えます。要素と中身は残ります。
 * 表にない要素（`a`・`h2`・`td`・`pre`・`code` など）の `class` は消えます。

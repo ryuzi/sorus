@@ -436,6 +436,8 @@ type articleData struct {
 	Headings        []markdown.Heading
 	// HasMath は本文に数式があり、KaTeX を読み込むか。
 	HasMath bool
+	// HasMermaid は本文に Mermaid の図があり、Mermaid を読み込むか。
+	HasMermaid bool
 	// Attachments は記事末尾のダウンロード欄に出す添付資料。
 	Attachments []attachmentView
 	// GeneratedOGImage は og:image がアイキャッチではなく動的 OGP 画像（1200×630 の PNG）か。
@@ -925,6 +927,7 @@ func (s *Server) loadArticleBody(c echo.Context, a publicArticle, p *publicPage,
 		data.HTML = template.HTML(a.ContentHTML)
 	}
 	data.HasMath = markdown.HasMath(string(data.HTML))
+	data.HasMermaid = markdown.HasMermaid(string(data.HTML))
 	data.Attachments = []attachmentView{}
 	if err := s.db.Select(&data.Attachments, `SELECT `+attachmentColumns+` FROM attachments
 		WHERE article_id = ? ORDER BY julianday(created_at), id`, a.ID); err != nil {

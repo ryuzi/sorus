@@ -441,6 +441,11 @@
   /* 数式（KaTeX）。読み込み前・失敗時も TeX のソースが読めるようにし、長い数式は横スクロールさせる。 */
   .prose .math-display { display: block; margin: 0 0 1.2em; overflow-x: auto; text-align: center; }
   .prose .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+  /* Mermaid の図（mermaid.js が pre.mermaid の図の定義を SVG にし、直後の .mermaid-diagram に入れる）。描画前・失敗時は
+     図の定義をコードより控えめな枠で見せる。描いた図は中央に置き、幅の広い図は横スクロールさせる。 */
+  .prose pre.mermaid { background: var(--surface); color: var(--fg); border: 1px solid var(--border); }
+  .prose pre.mermaid.is-rendered { display: none; }
+  .prose .mermaid-diagram { margin: 0 0 1.2em; overflow-x: auto; text-align: center; line-height: 1.5; }
   /* 添付ファイルのダウンロードカード */
   .attachments { margin-top: 40px; padding-top: 20px; border-top: 2px solid var(--border); }
   .attachments-title { font-size: 1.1rem; margin: 0 0 12px; }

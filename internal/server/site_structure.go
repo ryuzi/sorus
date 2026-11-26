@@ -987,6 +987,19 @@ type frontData struct {
 	Cards []publicArticle
 	// News は新着記事（frontNewsCount 件）。
 	News []publicArticle
+	// ShowNews は「新着記事」の欄を出すか（showFrontNews）。
+	ShowNews bool
+}
+
+// showFrontNews はトップに固定ページを出すトップページに「新着記事」の欄を出すかを返す。新着記事が1件以上あるか、
+// メニューに記事の一覧（articles）の項目があるサイトでは出す。記事を書かないサイト（ドキュメントや固定ページ中心の
+// サイト）で、新着記事が無く、メニューからも記事の一覧へ行けないときは、「まだ公開された記事はありません。」だけの欄を出さない。
+func showFrontNews(news []publicArticle, menu []MenuItem) bool {
+	if len(news) > 0 {
+		return true
+	}
+	_, ok := findArticlesMenuItem(menu)
+	return ok
 }
 
 // resolvedFrontPage は st の front_page が公開中のページ（refs で解決済み）ならそのスラッグを、未設定・参照切れなら空を返す。
@@ -1111,6 +1124,7 @@ func (s *Server) renderFront(c echo.Context, p publicPage, front publicArticle, 
 	for i := range data.News {
 		data.News[i].ImageHTML = s.responsiveImage(data.News[i].FeaturedImage, data.News[i].Title, "card-image")
 	}
+	data.ShowNews = showFrontNews(data.News, st.Menu)
 	p.Data = data
 	return s.renderPublic(c, http.StatusOK, "front", p)
 }

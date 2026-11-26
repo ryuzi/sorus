@@ -1,5 +1,5 @@
 // Package markdown は記事本文の Markdown を安全な HTML に変換する。
-// Goldmark (GFM + LaTeX 数式・フォトギャラリー・注意書き・タブ) でパースし、見出しにアンカー ID を付与して目次を抽出した上で、
+// Goldmark (GFM + LaTeX 数式・Mermaid の図・フォトギャラリー・注意書き・タブ) でパースし、見出しにアンカー ID を付与して目次を抽出した上で、
 // Bluemonday で XSS サニタイズする。
 package markdown
 
@@ -40,10 +40,10 @@ var semanticClassElements = []string{
 	"div", "p", "figure", "figcaption", "img", "ul", "ol", "li", "table", "blockquote", "section", "span",
 }
 
-// reservedClassNames は sorus の生成物（数式・フォトギャラリー・タブ）と、それを描画するスクリプト・スタイルが目印に使うクラス。
+// reservedClassNames は sorus の生成物（数式・Mermaid の図・フォトギャラリー・タブ）と、それを描画するスクリプト・スタイルが目印に使うクラス。
 // 生 HTML の汎用クラスには使えず、生成物と同じ要素・同じ値のとき（newPolicy の個別の許可）だけ残す。
 // 注意書き（callout.go）はスクリプトを使わず、生 HTML の callout クラスも今までどおり使えるよう、予約しない。
-var reservedClassNames = append(append([]string{MathInlineClass, MathDisplayClass, GalleryItemClass, GalleryClass, GalleryMasonryGridClass,
+var reservedClassNames = append(append([]string{MathInlineClass, MathDisplayClass, MermaidClass, GalleryItemClass, GalleryClass, GalleryMasonryGridClass,
 	GalleryMoreClass, GalleryCountClass, GalleryMoreButtonClass},
 	galleryLayoutClassNames()...), tabsClassNames...)
 
@@ -167,6 +167,7 @@ func newMarkdown(opts GalleryOptions, tabs *tabsState) goldmark.Markdown {
 			extension.Linkify,
 			extension.TaskList,
 			mathExtension{},
+			mermaidExtension{},
 			galleryExtension{opts: opts},
 			calloutExtension{},
 			tabsExtension{state: tabs},
@@ -185,6 +186,8 @@ func newPolicy() *bluemonday.Policy {
 	p.AllowAttrs("checked", "disabled").Matching(regexp.MustCompile(`^$`)).OnElements("input")
 	// LaTeX 数式（math.go）。KaTeX が描画対象を見分けるクラスだけを許可する。
 	p.AllowAttrs("class").Matching(regexp.MustCompile(`^(` + MathInlineClass + `|` + MathDisplayClass + `)$`)).OnElements("span")
+	// Mermaid の図（mermaid.go）。mermaid.js が描画対象を見分ける pre のクラスだけを許可する。中身はテキストとしてサニタイズされる。
+	p.AllowAttrs("class").Matching(regexp.MustCompile(`^` + MermaidClass + `$`)).OnElements("pre")
 	// フォトギャラリー（gallery.go）。lightbox.js が拡大表示に使う属性だけを許可する。
 	p.AllowElements("figure", "figcaption")
 	p.AllowAttrs("class").Matching(galleryFigureClassPattern).OnElements("figure")

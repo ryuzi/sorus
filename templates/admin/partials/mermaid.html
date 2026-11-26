@@ -1,0 +1,4 @@
+{{define "mermaid_assets"}}
+{{/* Mermaid の図の描画。本体（vendor/mermaid）は大きいため、プレビューに図があるときだけ mermaid.js が読み込む。 */}}
+<script defer src="{{asset "js/mermaid.js"}}" data-mermaid-src="{{asset "vendor/mermaid/mermaid.min.js"}}"></script>
+{{end}}
