@@ -325,8 +325,15 @@ flowchart LR
 | 添付ファイル | `.attachments` `.attachments-title` `.attachment-cards` `.attachment-card` `.attachment-type` `.attachment-name` `.attachment-meta` | |
 | 関連記事 | `.related-articles` `.related-article-grid` `.related-article-card` `.related-article-media` `.related-article-body` | |
 | 固定ページ | `.page` | |
+| ドキュメント表示 | `.doc-layout` `.doc-main` `.doc-sidebar` `.doc-sidebar-collapsible` `.doc-sidebar-summary` `.doc-sidebar-nav` `.doc-sidebar-title` `.doc-sidebar-links` `.doc-pager` `.doc-pager-link` `.doc-pager-prev` `.doc-pager-next` `.doc-pager-label` `.doc-pager-title` | ドキュメントとして並べたページだけに出る。表示中のページは `aria-current="page"`。`.doc-sidebar-collapsible` は `<details>` |
 | トップ（サイト構成） | `.front-hero` `.front-cards` `.front-card` `.front-card-media` `.front-card-body` `.front-card-title` `.front-card-excerpt` `.front-news` `.front-news-more` | 固定ページをトップにしたときに出る |
 | フォトギャラリー | `.front-gallery` `.photo-gallery` `.masonry-grid` `.gallery-item` `.gallery-item img` `.gallery-item figcaption` | |
+| 本文の注意書き | `.callout` `.callout-note` `.callout-tip` `.callout-important` `.callout-warning` `.callout-caution` `.callout-title` `.callout-body` | `> [!NOTE]` などから出る（`div.callout.callout-note > p.callout-title + div.callout-body`） |
+| 本文のタブ | `.doc-tabs` `.doc-tabs.is-ready` `.doc-tab-list` `.doc-tab` `.doc-tab[aria-selected="true"]` `.doc-tab-panel` `.doc-tab-title` | `:::tabs` から出る。JavaScript が無いときはすべての中身が名前（`.doc-tab-title`）付きで縦に並ぶ。切り替えに使う `hidden` 属性の要素を `display` で表示し直さないでください |
+| 本文の図・数式 | `.mermaid` `.mermaid-diagram` `.math-inline` `.math-display` | `pre.mermaid` は図の定義で、描いた図は直後の `.mermaid-diagram` に入る |
+| 本文のカード | `.doc-cards` `.doc-card` | `:::cards` から出る（`div.doc-cards > div.doc-card`）。カードの中は通常の本文（`h3`・`p`・`a` など）。`.doc-cards` を CSS Grid にする想定 |
+| 本文の行動の呼びかけ | `.doc-cta` `.doc-cta-body` `.doc-cta-actions` `.doc-cta-actions a` | `:::cta` から出る（`div.doc-cta > div.doc-cta-body + div.doc-cta-actions`）。どちらかの欄が空なら、その `div` は出ない。リンクは `.doc-cta-actions` の下の `p` か `ul` の中にある |
+| 本文のよくある質問 | `.doc-faq` `.doc-faq-item` `.doc-faq-item[open]` `.doc-faq-q` `.doc-faq-a` | `:::faq` から出る（`div.doc-faq > details.doc-faq-item > summary.doc-faq-q + div.doc-faq-a`）。JavaScript を使わずに開閉する |
 | 検索結果 | `.result-count` `.search-hits` `.search-hit` `.snippet` `mark` | `mark` は `.snippet mark` のように範囲を絞る |
 | 404 | `.not-found` | |
 | フッター | `.site-footer` `.site-footer p` `.site-footer a` | |
@@ -346,7 +353,8 @@ flowchart LR
 | :--- | :--- |
 | 対象の要素 | `div` `p` `figure` `figcaption` `img` `ul` `ol` `li` `table` `blockquote` `section` `span` |
 | クラス名 | 英数字・`_`・`-` だけ。空白区切りで複数可（例: `class="profile-card wide"`） |
-| 予約名 | `math-inline` `math-display` `mermaid` `photo-gallery` `masonry-grid` `gallery-item` は数式・Mermaid の図・フォトギャラリー用。sorus が出力したときだけ残り、生 HTML のクラスに混ぜると `class` 属性ごと消えます |
+| 予約名 | `math-inline` `math-display` `mermaid` `photo-gallery` `masonry-grid` `gallery-item` `gallery-more` `gallery-count` `gallery-more-button` `gallery-layout-*` `doc-tabs` `doc-tab-list` `doc-tab` `doc-tab-panel` `doc-tab-title` は数式・Mermaid の図・フォトギャラリー・タブ用（スクリプトが目印に使う）。sorus が出力したときだけ残り、生 HTML のクラスに混ぜると `class` 属性ごと消えます |
+| 予約しない部品のクラス | 注意書き（`callout` など）・カード（`doc-cards` `doc-card`）・行動の呼びかけ（`doc-cta` など）・よくある質問（`doc-faq` など）はスクリプトを使わないため、生 HTML の `div` にも書けます。`details` には `doc-faq-item`、`summary` には `doc-faq-q` だけが残ります |
 
 * 規則に合わない値（`md:flex` のような記号入り、日本語、前後の空白、1つでも合わないクラス名を含むもの）は、`class` 属性ごと消えます。要素と中身は残ります。
 * 表にない要素（`a`・`h2`・`td`・`pre`・`code` など）の `class` は消えます。
