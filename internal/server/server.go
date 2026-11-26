@@ -41,6 +41,7 @@ import (
 	"sorus/internal/search"
 	"sorus/internal/social"
 	"sorus/internal/theme"
+	"sorus/internal/version"
 	"sorus/static"
 	"sorus/templates"
 )
@@ -528,6 +529,8 @@ func New(cfg Config) (*Server, error) {
 		LockTTL:            cfg.LockTTL,
 		// 管理画面の無い公開サーバーでは、開けない編集画面の URL を返さず、変更案は PC の sorus で確かめるよう案内する。
 		PublicOnly: cfg.PublicOnly,
+		// initialize の serverInfo.version には、管理画面に表示するのと同じリリース版を返す。
+		Version: version.Version,
 		// MCP で保存・校閲申請した記事も、管理画面で保存したときと同じく検索インデックスと RAG に反映する。
 		OnArticleChanged:   func(id string) { s.reindex(e.Logger, id) },
 		PublishSite:        s.mcpPublishSite,

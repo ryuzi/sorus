@@ -14,6 +14,7 @@ import (
 	"sorus/internal/article"
 	"sorus/internal/auth"
 	"sorus/internal/mcp"
+	"sorus/internal/version"
 )
 
 // mcpToolJSON はローカルの MCP サーバーのツールを呼び、ツールのエラーでなければ structuredContent を out に読む。
@@ -307,5 +308,28 @@ func TestMCPUnpublishWithdrawsFromPublicServer(t *testing.T) {
 	}
 	if a := env.remote.mustGetArticle(id); a.Status != article.StatusDraft {
 		t.Fatalf("remote status after MCP unpublish = %q", a.Status)
+	}
+}
+
+// CMS に組み込んだ MCP サーバーは、initialize の serverInfo.version にリリース版（version.Version）を返す。
+// mcp パッケージの既定値（Config.Version を省略したときの値）ではないことを、埋め込みを模した版で確かめる。
+func TestMCPInitializeReturnsReleaseVersion(t *testing.T) {
+	prev := version.Version
+	version.Version = "v9.8.7-test"
+	t.Cleanup(func() { version.Version = prev })
+
+	env := newTestEnv(t)
+	tok, _, err := mcp.IssueToken(context.Background(), env.db, admin.ID, "version", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, out := env.mcpCall(tok, "initialize", map[string]any{
+		"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
+		"clientInfo": map[string]any{"name": "test", "version": "1.0"},
+	})
+	result, _ := out["result"].(map[string]any)
+	info, _ := result["serverInfo"].(map[string]any)
+	if got := info["version"]; got != "v9.8.7-test" {
+		t.Fatalf("serverInfo.version = %v, want %q (response %v)", got, "v9.8.7-test", out)
 	}
 }
