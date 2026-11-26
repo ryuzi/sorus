@@ -101,6 +101,11 @@ del.diff-del { background: #ffe4e6; color: #9f1239; text-decoration: line-throug
 /* プレビュー内の数式。KaTeX の読み込み前・失敗時も TeX のソースが読めるようにする。 */
 .prose-preview .math-display { display: block; overflow-x: auto; margin: 1em 0; text-align: center; }
 .prose-preview .katex-display { overflow-x: auto; overflow-y: hidden; }
+/* プレビュー内の Mermaid の図（mermaid.js が直後の .mermaid-diagram に SVG を描く）。描画前・定義の誤りは定義のテキストを
+   控えめな枠で見せ、描いた図は中央に置く。 */
+.prose-preview pre.mermaid { background: var(--admin-surface); color: var(--admin-ink); border: 1px solid var(--admin-line); }
+.prose-preview pre.mermaid.is-rendered { display: none; }
+.prose-preview .mermaid-diagram { margin: 1em 0; overflow-x: auto; text-align: center; line-height: 1.5; }
 /* プレビュー内のフォトギャラリー（:::gallery）。公開サイト（public.css のギャラリー節）と同じ3つの並べ方を、figure の
    class（gallery-layout-justified・-masonry・-cards）で切り替えて、スクリプトなしの簡易表示で見せる。
    列の数と行の高さはプレビュー欄の幅で決める。 */

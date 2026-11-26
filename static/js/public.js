@@ -223,12 +223,12 @@
   }
 })();
 
-// 本文のコードブロック（.prose pre）のコピーボタンと言語の表示。pre を div.code-block で包み、右上に言語（```go のように
+// 本文のコードブロック（.prose pre。Mermaid の図の pre.mermaid は除く）のコピーボタンと言語の表示。pre を div.code-block で包み、右上に言語（```go のように
 // 書いたときの class="language-go"）とコピーボタンを置く。押すとコードをクリップボードに写し、ボタンの文字で
 // 「コピーしました」と知らせる（読み上げは画面に出ない role="status" で伝える）。JavaScript が無いときはコードだけを出す。
 (function () {
   "use strict";
-  var blocks = document.querySelectorAll(".prose pre");
+  var blocks = document.querySelectorAll(".prose pre:not(.mermaid)");
   if (!blocks.length) return;
   var en = (document.documentElement.getAttribute("lang") || "ja").toLowerCase().indexOf("en") === 0;
   var LABELS = en

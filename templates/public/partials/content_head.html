@@ -1,4 +1,4 @@
-{{/* 記事・ページの <head> の追加分。Data は articleData（OGP 画像の代替テキスト・動的 OGP 画像・数式の KaTeX）。 */}}
+{{/* 記事・ページの <head> の追加分。Data は articleData（OGP 画像の代替テキスト・動的 OGP 画像・数式の KaTeX・Mermaid の図）。 */}}
 {{define "content_head"}}{{with .OGImage}}
   <meta property="og:image:alt" content="{{$.Data.Article.Title}}">
   <meta name="twitter:image" content="{{.}}">{{end}}{{if .Data.GeneratedOGImage}}
@@ -11,4 +11,7 @@
   <script defer src="{{asset "vendor/katex/katex.min.js"}}"></script>
   <script defer src="{{asset "vendor/katex/auto-render.min.js"}}"></script>
   <script defer src="{{asset "js/math.js"}}"></script>
+{{end}}{{if .Data.HasMermaid}}
+  {{/* Mermaid の図のある記事だけ読み込む。本体（ローカル同梱の vendor/mermaid）は大きいため、mermaid.js が後から読み込む。 */}}
+  <script defer src="{{asset "js/mermaid.js"}}" data-mermaid-src="{{asset "vendor/mermaid/mermaid.min.js"}}"></script>
 {{end}}{{end}}

@@ -656,7 +656,7 @@
 </div>
 {{end}}
 
-{{define "scripts"}}{{$ja := ne .Lang "en"}}{{template "katex_assets"}}<script src="{{asset "js/offline_draft.js"}}" defer></script><script src="{{asset "js/editor.js"}}"></script><script src="{{asset "js/social.js"}}"></script>{{if not .Data.ReadOnly}}<script src="{{asset "js/media_picker.js"}}"></script><script src="{{asset "js/gallery_modal.js"}}"></script>{{end}}{{if .Data.RemoteSync.CanSubmit}}{{template "remote_sync_assets"}}{{end}}
+{{define "scripts"}}{{$ja := ne .Lang "en"}}{{template "katex_assets"}}{{template "mermaid_assets"}}<script src="{{asset "js/offline_draft.js"}}" defer></script><script src="{{asset "js/editor.js"}}"></script><script src="{{asset "js/social.js"}}"></script>{{if not .Data.ReadOnly}}<script src="{{asset "js/media_picker.js"}}"></script><script src="{{asset "js/gallery_modal.js"}}"></script>{{end}}{{if .Data.RemoteSync.CanSubmit}}{{template "remote_sync_assets"}}{{end}}
 <script>
 // 「日時を決めて予約」の入力欄は、開いているときだけ送る。「この日時に予約する」以外のボタン（「公開する」など）で
 // 送るときは外し、日時を入れたまま「公開する」を押しても今すぐ公開する。

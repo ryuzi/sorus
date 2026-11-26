@@ -372,7 +372,7 @@ func TestPublicDocsScript(t *testing.T) {
 		{"aria-selected を切り替える", `p.tab.setAttribute("aria-selected", on ? "true" : "false");`},
 		{"右の矢印キー", `e.key === "ArrowRight"`},
 		{"左の矢印キー", `e.key === "ArrowLeft"`},
-		{"コードブロックを探す", `document.querySelectorAll(".prose pre")`},
+		{"コードブロックを探す（Mermaid の図は除く）", `document.querySelectorAll(".prose pre:not(.mermaid)")`},
 		{"言語のクラス", `language-([A-Za-z0-9_+#.-]{1,32})`},
 		{"クリップボードに写す", `navigator.clipboard.writeText(text)`},
 		{"コピーできたことを知らせる", `"コピーしました"`},
