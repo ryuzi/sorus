@@ -100,9 +100,9 @@ func TestRemoteSettingsPushSyncsTopGalleryMedia(t *testing.T) {
 	env.local.insertMedia("0000000000000000000000000000beef", "lost.webp", "ファイルの無い画像", "", "学校")
 
 	form := structureForm(nil, "")
-	form.Set("top_gallery_tag", "学校")
-	form.Set("top_gallery_limit", "6")
-	form.Set("top_gallery_title", "学校の写真")
+	setGalleryFormField(form, "tag", "学校")
+	setGalleryFormField(form, "limit", "6")
+	setGalleryFormField(form, "title", "学校の写真")
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure")
 	expectNotContains(t, env.remote.get("/").Body.String(), `data-gallery-tag="学校"`)
 
@@ -111,7 +111,7 @@ func TestRemoteSettingsPushSyncsTopGalleryMedia(t *testing.T) {
 		Settings SyncSettingsValues `json:"settings"`
 	}
 	expectStatus(t, adm.postJSON("/admin/remote/settings/push", nil, &out), http.StatusOK)
-	if out.Settings.TopGalleryTag != "学校" || strings.Contains(out.Message, "フォトギャラリー") {
+	if frontSectionGalleryTag(out.Settings.FrontSections) != "学校" || strings.Contains(out.Message, "フォトギャラリー") {
 		t.Fatalf("push = %+v", out)
 	}
 	for _, m := range []mediaResponse{gate, hall} {
@@ -196,7 +196,7 @@ func TestRemoteSettingsPushGalleryMediaOldServer(t *testing.T) {
 	expectStatus(t, adm.postAPI("/admin/api/media/bulk-tags", "application/json",
 		strings.NewReader(`{"media_ids":["`+m.ID+`"],"add_tags":["学校"]}`)), http.StatusOK)
 	form := structureForm(nil, "")
-	form.Set("top_gallery_tag", "学校")
+	setGalleryFormField(form, "tag", "学校")
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure")
 
 	var out struct {
@@ -209,7 +209,7 @@ func TestRemoteSettingsPushGalleryMediaOldServer(t *testing.T) {
 	if proxy.mediaCalls.Load() == 0 {
 		t.Error("sync_media was not tried")
 	}
-	if got := env.remote.server.loadSiteStructure(t.Context()).TopGalleryTag; got != "学校" {
+	if got := frontSectionGalleryTag(env.remote.server.loadSiteStructure(t.Context()).FrontSections); got != "学校" {
 		t.Errorf("remote top gallery tag = %q, want 学校", got)
 	}
 	if dirty := env.local.server.remoteDirty(); !reflect.DeepEqual(dirty, []string{remoteDirtyMedia}) {

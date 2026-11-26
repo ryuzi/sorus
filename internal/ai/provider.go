@@ -66,7 +66,6 @@ const (
 // TranslateOptions は翻訳時のオプション。
 type TranslateOptions struct {
 	Glossary      map[string]string // 専門用語辞書（例: "人工知能": "Artificial Intelligence"）
-	Academic      bool              // 後方互換性用（学術エディトリアルトーンの強制）
 	WritingStyle  string            // 文章トーン＆スタイル（"standard", "academic", "business", "creative"）
 	Style         string            // "professional", "friendly", "compelling", "concise", "natural"
 	Instruction   string            // ユーザーからの追加こだわり指示（任意）

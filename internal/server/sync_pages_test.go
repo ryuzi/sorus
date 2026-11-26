@@ -170,17 +170,15 @@ func TestSyncAPISyncSettingsStructure(t *testing.T) {
 	tag, title := "学校", "写真"
 	limit := 8
 	structure := func() SiteStructure { return env.server.loadSiteStructure(t.Context()) }
-	wantStructure := SiteStructure{Menu: menu, FrontPage: "research", FrontCards: cards,
-		TopGalleryTag: tag, TopGalleryLimit: limit, TopGalleryTitle: title, TopGalleryLayout: galleryLayoutJustified}
+	sections := []FrontSection{{Type: FrontSectionCards, Pages: cards}, {Type: FrontSectionGallery, Tag: tag, Limit: limit, Title: title, Layout: galleryLayoutJustified}}
+	wantStructure := SiteStructure{Menu: menu, FrontPage: "research", FrontSections: sections}
 
 	rec := env.call(adminToken, SyncRequest{Action: SyncActionSyncSettings, Settings: &SyncSettings{
-		SiteMenu: &menu, FrontPage: strPtr(" research "), FrontCards: &cards,
-		TopGalleryTag: &tag, TopGalleryLimit: &limit, TopGalleryTitle: &title,
+		SiteMenu: &menu, FrontPage: strPtr(" research "), FrontSections: &sections,
 	}})
 	expectSyncStatus(t, rec, http.StatusOK)
 	res := decodeSync[SyncSettingsResponse](t, rec)
-	if !reflect.DeepEqual(res.Settings.SiteMenu, menu) || res.Settings.FrontPage != "research" || !reflect.DeepEqual(res.Settings.FrontCards, cards) ||
-		res.Settings.TopGalleryTag != tag || res.Settings.TopGalleryLimit != limit || res.Settings.TopGalleryTitle != title {
+	if !reflect.DeepEqual(res.Settings.SiteMenu, menu) || res.Settings.FrontPage != "research" || !reflect.DeepEqual(res.Settings.FrontSections, sections) {
 		t.Errorf("response = %+v", res.Settings)
 	}
 	if got := structure(); !reflect.DeepEqual(got, wantStructure) {
@@ -209,14 +207,14 @@ func TestSyncAPISyncSettingsStructure(t *testing.T) {
 
 	t.Run("invalid structure changes nothing", func(t *testing.T) {
 		siteName := env.setting("site_name")
-		tooManyCards := []string{"a", "b", "c", "d", "e", "f", "g"}
+		tooManyCards := []FrontSection{{Type: FrontSectionCards, Pages: []string{"a", "b", "c", "d", "e", "f", "g"}}}
 		for name, tc := range map[string]struct {
 			settings SyncSettings
 			want     string
 		}{
 			"script url":      {SyncSettings{SiteMenu: &[]MenuItem{{Label: "x", Type: MenuItemURL, Target: "javascript:alert(1)"}}}, "メニューの1番目の項目: URL は"},
 			"unknown type":    {SyncSettings{SiteMenu: &[]MenuItem{{Type: MenuItemArticles}, {Label: "x", Type: "widget", Target: "x"}}}, "メニューの2番目の項目: 種類「widget」"},
-			"too many cards":  {SyncSettings{FrontCards: &tooManyCards}, "トップのカードは最大"},
+			"too many cards":  {SyncSettings{FrontSections: &tooManyCards}, "トップのカードは最大"},
 			"slug with slash": {SyncSettings{FrontPage: strPtr("a/b")}, "スラッグ「a/b」"},
 			"with basic settings": {SyncSettings{SiteName: strPtr("変わらないはず"),
 				SiteMenu: &[]MenuItem{{Type: MenuItemPage}}}, "リンク先を選んでください"},
@@ -238,14 +236,14 @@ func TestSyncAPISyncSettingsStructure(t *testing.T) {
 
 	t.Run("empty arrays clear the menu and cards", func(t *testing.T) {
 		rec := env.call(adminToken, SyncRequest{Action: SyncActionSyncSettings, Settings: &SyncSettings{
-			SiteMenu: &[]MenuItem{}, FrontCards: &[]string{},
+			SiteMenu: &[]MenuItem{}, FrontSections: &[]FrontSection{},
 		}})
 		expectSyncStatus(t, rec, http.StatusOK)
 		res := decodeSync[SyncSettingsResponse](t, rec)
-		if res.Settings.SiteMenu == nil || len(res.Settings.SiteMenu) != 0 || res.Settings.FrontCards == nil || len(res.Settings.FrontCards) != 0 {
+		if res.Settings.SiteMenu == nil || len(res.Settings.SiteMenu) != 0 || len(res.Settings.FrontSections) != 0 {
 			t.Errorf("response = %+v, want empty arrays", res.Settings)
 		}
-		if got := structure(); len(got.Menu) != 0 || len(got.FrontCards) != 0 || got.FrontPage != "research" {
+		if got := structure(); len(got.Menu) != 0 || len(got.FrontSections) != 0 || got.FrontPage != "research" {
 			t.Errorf("structure = %+v", got)
 		}
 	})
@@ -268,7 +266,7 @@ func TestRemoteSettingsPushStructure(t *testing.T) {
 		Status: article.StatusPublished, PublishedAt: ago(time.Minute)})
 	local := SiteStructure{
 		Menu:      []MenuItem{{Type: MenuItemPage, Target: "research"}, {Label: "大学", Type: MenuItemURL, Target: "https://www.example.ac.jp/"}},
-		FrontPage: "research", TopGalleryLimit: 6,
+		FrontPage: "research", FrontSections: []FrontSection{{Type: FrontSectionHero}, {Type: FrontSectionArticleList}},
 	}
 	if err := env.local.server.saveSiteStructure(t.Context(), local); err != nil {
 		t.Fatal(err)
@@ -284,8 +282,6 @@ func TestRemoteSettingsPushStructure(t *testing.T) {
 		t.Errorf("message = %q", out.Message)
 	}
 	want := local
-	want.FrontCards = []string{}
-	want.TopGalleryLayout = galleryLayoutJustified // 保存していない並べ方は既定の行揃えとして送る
 	if got := env.remote.server.loadSiteStructure(t.Context()); !reflect.DeepEqual(got, want) {
 		t.Errorf("remote structure = %+v, want %+v", got, want)
 	}

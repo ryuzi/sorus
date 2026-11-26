@@ -1,7 +1,7 @@
-{{define "content"}}
+{{define "content"}}{{if .Data.SimpleListing}}
 <h1 class="page-title">{{if eq $.Lang "en"}}Latest Articles{{else}}新着記事{{end}}</h1>
 
-{{template "front_gallery" $}}{{with .Data}}
+{{with .Data}}
 {{if .Articles}}
 <div class="card-grid{{if eq $.Layout.ArticleList "list"}} card-grid--list{{else if eq $.Layout.ArticleList "magazine"}} card-grid--magazine{{end}}">
   {{range .Articles}}{{template "article_card" .}}{{end}}
@@ -11,4 +11,16 @@
 <p class="empty">{{if eq $.Lang "en"}}No articles published yet.{{else}}まだ公開された記事はありません。{{end}}</p>
 {{end}}
 {{end}}
+{{else}}{{with .Data}}
+{{range $section := .Sections}}
+{{if eq $section.Type "gallery"}}{{template "front_section_gallery" $section}}{{else if eq $section.Type "article_list"}}
+{{if $section.Index}}
+<h1 {{if ne $section.ID "front-news-title"}}id="{{$section.ID}}" {{end}}class="page-title">{{if eq $.Lang "en"}}Latest Articles{{else}}新着記事{{end}}</h1>
+{{if $section.IndexArticles}}
+<div class="card-grid{{if eq $.Layout.ArticleList "list"}} card-grid--list{{else if eq $.Layout.ArticleList "magazine"}} card-grid--magazine{{end}}">{{range $section.IndexArticles}}{{template "article_card" .}}{{end}}</div>
+{{template "pagination" $section.Pagination}}
+{{else}}<p class="empty">{{if eq $.Lang "en"}}No articles published yet.{{else}}まだ公開された記事はありません。{{end}}</p>{{end}}
 {{end}}
+{{end}}
+{{end}}
+{{end}}{{end}}{{end}}

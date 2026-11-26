@@ -431,18 +431,8 @@ type SyncSettings struct {
 	// 出さなくする。知らない古い公開サーバーは無視する（応答の SyncSettingsValues.SiteFooterMenu が nil）。
 	SiteFooterMenu *[]MenuItem `json:"site_footer_menu,omitempty"`
 	// FrontPage はトップに出すページのスラッグ。空文字は解除（トップは記事の一覧）。
-	FrontPage *string `json:"front_page,omitempty"`
-	// FrontCards はトップに並べるページのスラッグ。空の配列はカードを出さない。
-	FrontCards      *[]string `json:"front_cards,omitempty"`
-	TopGalleryTag   *string   `json:"top_gallery_tag,omitempty"`
-	TopGalleryLimit *int      `json:"top_gallery_limit,omitempty"`
-	TopGalleryTitle *string   `json:"top_gallery_title,omitempty"`
-	// TopGalleryLayout はトップページのフォトギャラリーの並べ方（justified・masonry・cards）、TopGalleryLinkURL・
-	// TopGalleryLinkLabel はその下の「すべて見る」リンクの行き先と文言（空文字はリンクを出さない・既定の文言）。
-	// 知らない古い公開サーバーはこれらを無視する（応答の SyncSettingsValues.TopGalleryLayout が nil）。
-	TopGalleryLayout    *string `json:"top_gallery_layout,omitempty"`
-	TopGalleryLinkURL   *string `json:"top_gallery_link_url,omitempty"`
-	TopGalleryLinkLabel *string `json:"top_gallery_link_label,omitempty"`
+	FrontPage     *string         `json:"front_page,omitempty"`
+	FrontSections *[]FrontSection `json:"front_sections,omitempty"`
 	// ShowFrontCardImages・ShowArticleCardImages・ShowRelatedCardImages は公開カード3種の
 	// アイキャッチ画像を表示するか（テーマ設定画面の「公開カードのアイキャッチ画像表示」）。
 	ShowFrontCardImages   *bool `json:"show_front_card_images,omitempty"`
@@ -673,22 +663,13 @@ type SyncSettingsValues struct {
 	Copyright       string `json:"copyright"`
 	AnalyticsTag    string `json:"analytics_tag"`
 	Theme           string `json:"theme"`
-	// SiteMenu・FrontCards は空でも空の配列で返す。サイト構成を知らない古い公開サーバーの応答には無く、
-	// 読んだ側では nil になる（ローカル CMS は反映されなかったことを利用者に伝える）。
+	// SiteMenu は空でも空の配列で返す。
 	SiteMenu []MenuItem `json:"site_menu"`
 	// SiteFooterMenu は反映後のフッターのサイトマップ（空でも空の配列）。メニューの子項目とフッターのサイトマップを
 	// 知らない古い公開サーバーの応答には無い（nil）。
-	SiteFooterMenu  *[]MenuItem `json:"site_footer_menu,omitempty"`
-	FrontPage       string      `json:"front_page"`
-	FrontCards      []string    `json:"front_cards"`
-	TopGalleryTag   string      `json:"top_gallery_tag"`
-	TopGalleryLimit int         `json:"top_gallery_limit"`
-	TopGalleryTitle string      `json:"top_gallery_title"`
-	// TopGalleryLayout・TopGalleryLinkURL・TopGalleryLinkLabel は反映後のフォトギャラリーの並べ方と「すべて見る」リンク。
-	// これらを知らない古い公開サーバーの応答には無い（nil）。
-	TopGalleryLayout    *string `json:"top_gallery_layout,omitempty"`
-	TopGalleryLinkURL   *string `json:"top_gallery_link_url,omitempty"`
-	TopGalleryLinkLabel *string `json:"top_gallery_link_label,omitempty"`
+	SiteFooterMenu *[]MenuItem    `json:"site_footer_menu,omitempty"`
+	FrontPage      string         `json:"front_page"`
+	FrontSections  []FrontSection `json:"front_sections"`
 	// MultilingualEnabled は反映後の多言語対応の ON/OFF。多言語対応の設定を知らない古い公開サーバーの応答には無い（nil）。
 	MultilingualEnabled *bool `json:"multilingual_enabled,omitempty"`
 	// ShowAuthor は記事や一覧に執筆者名を表示するか。この項目を知らない古い公開サーバーの応答には無く、

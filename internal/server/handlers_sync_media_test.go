@@ -105,7 +105,7 @@ func TestSyncAPISyncMedia(t *testing.T) {
 
 	// 4. 公開サーバーのトップページのギャラリーに出る。
 	rec = env.call(env.token("root", auth.RoleAdmin), SyncRequest{Action: SyncActionSyncSettings,
-		Settings: &SyncSettings{TopGalleryTag: strPtr("学校"), TopGalleryTitle: strPtr("学校の写真")}})
+		Settings: &SyncSettings{FrontSections: &[]FrontSection{{Type: FrontSectionGallery, Tag: "学校", Title: "学校の写真"}}}})
 	expectSyncStatus(t, rec, http.StatusOK)
 	front := env.get("/")
 	expectSyncStatus(t, front, http.StatusOK)

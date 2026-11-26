@@ -26,7 +26,7 @@ type headlessSiteData struct {
 	SiteMenu        []headlessMenuItem `json:"site_menu"`
 	SiteFooterMenu  []headlessMenuItem `json:"site_footer_menu"`
 	FrontPage       string             `json:"front_page"`
-	FrontCards      []string           `json:"front_cards"`
+	FrontSections   []FrontSection     `json:"front_sections"`
 	Categories      []headlessCategory `json:"categories"`
 }
 
@@ -161,22 +161,25 @@ func (s *Server) buildHeadlessSiteData(ctx context.Context, baseURL string, now 
 		foot = foot[:maxFooterColumns]
 	}
 	refs, err := s.resolveStructureRefs(ctx, SiteStructure{
-		Menu:       header,
-		FooterMenu: foot,
-		FrontPage:  st.FrontPage,
-		FrontCards: st.FrontCards,
+		Menu:          header,
+		FooterMenu:    foot,
+		FrontPage:     st.FrontPage,
+		FrontSections: st.FrontSections,
 	})
 	if err != nil {
 		return headlessSiteData{}, err
 	}
 	front := resolvedFrontPage(st, refs)
-	cards := make([]string, 0, len(st.FrontCards))
-	for _, slug := range st.FrontCards {
-		if _, ok := refs.Pages[slug]; ok && !slices.Contains(cards, slug) {
-			cards = append(cards, slug)
-		}
-		if len(cards) >= maxFrontCards {
-			break
+	sections := slices.Clone(st.FrontSections)
+	for i := range sections {
+		if sections[i].Type == FrontSectionCards {
+			pages := sections[i].Pages[:0]
+			for _, slug := range sections[i].Pages {
+				if _, ok := refs.Pages[slug]; ok && !slices.Contains(pages, slug) && len(pages) < maxFrontCards {
+					pages = append(pages, slug)
+				}
+			}
+			sections[i].Pages = pages
 		}
 	}
 
@@ -202,7 +205,7 @@ func (s *Server) buildHeadlessSiteData(ctx context.Context, baseURL string, now 
 		SiteMenu:        resolveHeadlessMenu(header, refs, front),
 		SiteFooterMenu:  resolveHeadlessMenu(foot, refs, front),
 		FrontPage:       front,
-		FrontCards:      cards,
+		FrontSections:   sections,
 		Categories:      cats,
 	}, nil
 }

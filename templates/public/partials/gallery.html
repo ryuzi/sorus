@@ -16,14 +16,18 @@
 {{end}}
 {{end}}
 
-{{/* トップページ（front.html・index.html）のフォトギャラリーの節。受け取る値は publicPage で、サイト構成の top_gallery_*
-     （タグ・枚数・見出し・並べ方・「すべて見る」リンク）に従う。タグが空・写真が無ければ何も出さない。
-     リンクの行き先は保存・読み込みで "/" 始まりか http(s):// に限っている（validGalleryLinkURL）。 */}}
-{{define "front_gallery"}}{{$p := .}}{{with .SiteStructure}}{{if .TopGalleryTag}}{{$st := .}}
-{{with galleryImages $p .TopGalleryTag .TopGalleryLimit "latest" .TopGalleryLayout}}{{if .Images}}
-<section class="front-gallery" aria-labelledby="front-gallery-title">
-  <h2 id="front-gallery-title" class="page-title">{{if $st.TopGalleryTitle}}{{$st.TopGalleryTitle}}{{else if eq $p.Lang "en"}}Photo Gallery{{else}}フォトギャラリー{{end}}</h2>
+{{define "front_section_gallery"}}
+{{$section := .}}
+{{$page := .Page}}
+{{if $section.Tag}}
+{{with galleryImages $page $section.Tag $section.Limit "latest" $section.Layout}}
+{{if .Images}}
+<section class="front-gallery" aria-labelledby="{{$section.ID}}">
+  <h2 id="{{$section.ID}}" class="page-title">{{if $section.Title}}{{$section.Title}}{{else if eq $page.Lang "en"}}Photo Gallery{{else}}フォトギャラリー{{end}}</h2>
   {{template "gallery" .}}
-  {{with $st.TopGalleryLinkURL}}<p class="front-gallery-more"><a href="{{.}}">{{if $st.TopGalleryLinkLabel}}{{$st.TopGalleryLinkLabel}}{{else if eq $p.Lang "en"}}View all{{else}}すべて見る{{end}}</a></p>{{end}}
+  {{with $section.LinkURL}}<p class="front-gallery-more"><a href="{{.}}">{{if $section.LinkLabel}}{{$section.LinkLabel}}{{else if eq $page.Lang "en"}}View all{{else}}すべて見る{{end}}</a></p>{{end}}
 </section>
-{{end}}{{end}}{{end}}{{end}}{{end}}
+{{end}}
+{{end}}
+{{end}}
+{{end}}

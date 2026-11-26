@@ -21,11 +21,11 @@ func TestMultilingual_AISettings(t *testing.T) {
 	// 1. 設定保存
 	form := url.Values{
 		"provider":             {"gemini"},
-		"api_key":              {"AQ.Ab8RN6-test"},
+		"api_key_gemini":       {"AQ.Ab8RN6-test"},
 		"translation_provider": {"deepl"},
-		"deepl_api_key":        {"test-deepl-key:fx"},
+		"api_key_deepl":        {"test-deepl-key:fx"},
 		"glossary":             {"sorus=sorus CMS\nGo=Golang"},
-		"academic_style":       {"1"},
+		"writing_style":        {"academic"},
 	}
 	res := adm.postForm("/admin/settings/ai", form)
 	if res.StatusCode != http.StatusSeeOther && res.StatusCode != http.StatusFound && res.StatusCode != http.StatusOK {
@@ -40,20 +40,19 @@ func TestMultilingual_AISettings(t *testing.T) {
 	if saved.TranslationProvider != "deepl" {
 		t.Errorf("saved.TranslationProvider = %q, want 'deepl'", saved.TranslationProvider)
 	}
-	if saved.DeepLAPIKey != "test-deepl-key:fx" {
-		t.Errorf("saved.DeepLAPIKey = %q, want 'test-deepl-key:fx'", saved.DeepLAPIKey)
+	if saved.Providers["deepl"].APIKey != "test-deepl-key:fx" {
+		t.Errorf("saved.Providers[deepl].APIKey = %q, want 'test-deepl-key:fx'", saved.Providers["deepl"].APIKey)
 	}
 	if !strings.Contains(saved.Glossary, "sorus=sorus CMS") {
 		t.Errorf("saved.Glossary missing term: %q", saved.Glossary)
 	}
-	if !saved.AcademicStyle {
-		t.Errorf("saved.AcademicStyle = false, want true")
+	if saved.WritingStyle != "academic" {
+		t.Errorf("saved.WritingStyle = %q, want 'academic'", saved.WritingStyle)
 	}
 
 	// 3. AI接続テスト（APIキー未設定エラー）
 	testForm := url.Values{
-		"provider": {"deepl"},
-		"api_key":  {""},
+		"provider": {"openai"},
 	}
 	testRes := adm.postForm("/admin/settings/ai/test", testForm)
 	if testRes.StatusCode != http.StatusOK {

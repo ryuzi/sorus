@@ -318,7 +318,7 @@ func TestSyncSettingsRejectsBadThemePackages(t *testing.T) {
 		{"built-in id", SyncSettings{Theme: strPtr("modern"), ThemePackage: builtinPkg}, "標準テーマと同じ ID"},
 		{"id differs from theme", SyncSettings{Theme: strPtr("other"), ThemePackage: themePackage(t, "paper", v2)}, "一致しません"},
 		{"package without theme", SyncSettings{SiteName: strPtr("変えない"), ThemePackage: themePackage(t, "paper", v2)}, "theme も指定"},
-		{"invalid structure", SyncSettings{Theme: strPtr("paper"), ThemePackage: themePackage(t, "paper", v2), TopGalleryLimit: intPtr(-1)}, "サイト構成"},
+		{"invalid structure", SyncSettings{Theme: strPtr("paper"), ThemePackage: themePackage(t, "paper", v2), FrontSections: &[]FrontSection{{Type: FrontSectionGallery, Limit: -1}}}, "サイト構成"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			settings := tc.settings

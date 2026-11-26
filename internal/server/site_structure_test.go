@@ -19,6 +19,38 @@ import (
 	"sorus/internal/theme"
 )
 
+func frontGallery(st SiteStructure) FrontSection {
+	for _, section := range st.FrontSections {
+		if section.Type == FrontSectionGallery {
+			return section
+		}
+	}
+	return FrontSection{}
+}
+
+func setGalleryFormField(form url.Values, field, value string) {
+	types := form["section_type"]
+	index := -1
+	for i, typ := range types {
+		if typ == string(FrontSectionGallery) {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		form.Add("section_type", string(FrontSectionGallery))
+		types = form["section_type"]
+		index = len(types) - 1
+	}
+	for _, key := range []string{"pages", "tag", "title", "limit", "layout", "link_url", "link_label", "article_tag"} {
+		name := "section_" + key
+		for len(form[name]) < len(types) {
+			form.Add(name, "")
+		}
+	}
+	form["section_"+field][index] = value
+}
+
 func TestValidateSiteStructure(t *testing.T) {
 	items := func(n int) []MenuItem {
 		m := make([]MenuItem, n)
@@ -40,21 +72,21 @@ func TestValidateSiteStructure(t *testing.T) {
 		wantKey string // 空なら有効
 	}{
 		{"empty", SiteStructure{}, ""},
-		{"gallery settings", SiteStructure{TopGalleryTag: "campus", TopGalleryLimit: 16, TopGalleryTitle: "Photos"}, ""},
-		{"gallery limit too large", SiteStructure{TopGalleryLimit: maxTopGalleryLimit + 1}, "structure_err_gallery_limit"},
-		{"gallery tag control", SiteStructure{TopGalleryTag: "bad\ntag"}, "structure_err_gallery_tag"},
+		{"gallery settings", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Tag: "campus", Limit: 16, Title: "Photos"}}}, ""},
+		{"gallery limit too large", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Limit: maxTopGalleryLimit + 1}}}, "structure_err_gallery_limit"},
+		{"gallery tag control", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Tag: "bad\ntag"}}}, "structure_err_gallery_tag"},
 		{"all types", SiteStructure{Menu: []MenuItem{
 			{Type: MenuItemPage, Target: "research"},
 			{Label: "サークル", Type: MenuItemCategory, Target: "circle"},
 			{Type: MenuItemArticles},
 			{Label: "大学", Type: MenuItemURL, Target: "https://www.example.ac.jp/about?x=1#top"},
 			{Label: "検索", Type: MenuItemURL, Target: "/search?q=研究"},
-		}, FrontPage: "research", FrontCards: []string{"members", "メンバー"}}, ""},
+		}, FrontPage: "research", FrontSections: []FrontSection{{Type: FrontSectionCards, Pages: []string{"members", "メンバー"}}}}, ""},
 		{"max menu", SiteStructure{Menu: items(maxMenuItems)}, ""},
 		{"too many menu items", SiteStructure{Menu: items(maxMenuItems + 1)}, "structure_err_menu_count"},
-		{"max cards", SiteStructure{FrontCards: slugs(maxFrontCards)}, ""},
-		{"too many cards", SiteStructure{FrontCards: slugs(maxFrontCards + 1)}, "structure_err_cards_count"},
-		{"empty card", SiteStructure{FrontCards: []string{""}}, "structure_err_target_required"},
+		{"max cards", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionCards, Pages: slugs(maxFrontCards)}}}, ""},
+		{"too many cards", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionCards, Pages: slugs(maxFrontCards + 1)}}}, "structure_err_cards_count"},
+		{"empty card", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionCards, Pages: []string{""}}}}, "structure_err_target_required"},
 		{"unknown type", SiteStructure{Menu: []MenuItem{{Label: "x", Type: "script", Target: "x"}}}, "structure_err_type"},
 		{"empty type", SiteStructure{Menu: []MenuItem{{Label: "x"}}}, "structure_err_type"},
 		{"page without target", SiteStructure{Menu: []MenuItem{{Type: MenuItemPage}}}, "structure_err_target_required"},
@@ -77,7 +109,7 @@ func TestValidateSiteStructure(t *testing.T) {
 		{"url control", SiteStructure{Menu: []MenuItem{{Label: "x", Type: MenuItemURL, Target: "/a\tb"}}}, "structure_err_url"},
 		{"target slash", SiteStructure{Menu: []MenuItem{{Type: MenuItemPage, Target: "a/b"}}}, "structure_err_slug"},
 		{"front page slash", SiteStructure{FrontPage: "../x"}, "structure_err_slug"},
-		{"front card control", SiteStructure{FrontCards: []string{"a\rb"}}, "structure_err_control"},
+		{"front card control", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionCards, Pages: []string{"a\rb"}}}}, "structure_err_control"},
 		{"long slug", SiteStructure{FrontPage: strings.Repeat("a", maxStructureSlugRunes+1)}, "structure_err_slug_long"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -125,12 +157,22 @@ func structureForm(rows [][3]string, front string, cards ...string) url.Values {
 		f.Add("menu_url", u)
 		f.Add("menu_label", r[2])
 	}
-	for i := range maxFrontCards {
-		v := ""
-		if i < len(cards) {
-			v = cards[i]
+	if front != "" {
+		f.Add("section_type", string(FrontSectionHero))
+		f.Add("section_pages", "")
+	}
+	if len(cards) > 0 {
+		f.Add("section_type", string(FrontSectionCards))
+		f.Add("section_pages", strings.Join(cards, ", "))
+	}
+	if front != "" || len(cards) == 0 {
+		f.Add("section_type", string(FrontSectionArticleList))
+		f.Add("section_pages", "")
+	}
+	for i := 0; i < len(f["section_type"]); i++ {
+		for _, key := range []string{"tag", "title", "limit", "layout", "link_url", "link_label", "article_tag"} {
+			f.Add("section_"+key, "")
 		}
-		f.Add("front_card", v)
 	}
 	return f
 }
@@ -393,7 +435,7 @@ func TestLoadSiteStructureToleratesBrokenSettings(t *testing.T) {
 		}
 	}
 	st := env.server.loadSiteStructure(context.Background())
-	if st.Menu != nil || st.FrontCards != nil || st.FrontPage != "research" {
+	if st.Menu != nil || len(st.FrontSections) != 2 || st.FrontSections[0].Type != FrontSectionHero || st.FrontSections[1].Type != FrontSectionArticleList || st.FrontPage != "research" {
 		t.Errorf("loadSiteStructure = %#v", st)
 	}
 	// 壊れたメニューはカテゴリの一覧に戻る。
@@ -435,8 +477,8 @@ func TestFrontPageComposition(t *testing.T) {
 		t.Errorf("front_page = %q", got)
 	}
 	// 重複は除き、選んだ順に保存する。
-	if got := env.setting("front_cards"); got != `["access","メンバー","draft-page","nope"]` {
-		t.Errorf("front_cards = %s", got)
+	if got := env.setting(settingFrontSections); !strings.Contains(got, `"pages":["access","メンバー","draft-page","nope"]`) {
+		t.Errorf("front_sections = %s", got)
 	}
 	expectContains(t, adm.get("/admin/settings/structure").Body,
 		html.EscapeString("トップのカードに選んだページ「draft-page」が見つからないか"),
@@ -511,18 +553,18 @@ func TestTopGallerySettingsPersistAndRenderOnFrontPage(t *testing.T) {
 	env.insertMedia("gallery-two", "gallery-two.webp", "図書館", "図書館の入口", "学校")
 
 	form := structureForm(nil, "research")
-	form.Set("top_gallery_tag", "学校")
-	form.Set("top_gallery_limit", "4")
-	form.Set("top_gallery_title", "キャンパスの写真")
+	setGalleryFormField(form, "tag", "学校")
+	setGalleryFormField(form, "limit", "4")
+	setGalleryFormField(form, "title", "キャンパスの写真")
 	adm := env.loggedIn(admin)
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure?flash=structure_saved")
 
 	got := env.server.loadSiteStructure(t.Context())
-	if got.TopGalleryTag != "学校" || got.TopGalleryLimit != 4 || got.TopGalleryTitle != "キャンパスの写真" {
-		t.Fatalf("top gallery settings = (%q, %d, %q)", got.TopGalleryTag, got.TopGalleryLimit, got.TopGalleryTitle)
+	if frontGallery(got).Tag != "学校" || frontGallery(got).Limit != 4 || frontGallery(got).Title != "キャンパスの写真" {
+		t.Fatalf("top gallery settings = (%q, %d, %q)", frontGallery(got).Tag, frontGallery(got).Limit, frontGallery(got).Title)
 	}
 	settings := adm.get("/admin/settings/structure")
-	expectContains(t, settings.Body, `id="top-gallery-tag"`, `value="学校"`, `value="4" selected`, `value="キャンパスの写真"`, `id="top-gallery-tags"`)
+	expectContains(t, settings.Body, `name="section_tag"`, `value="学校"`, `value="4"`, `name="section_title"`, `value="キャンパスの写真"`)
 
 	front := env.newClient().get("/")
 	expectStatus(t, front, http.StatusOK)
@@ -539,9 +581,7 @@ func TestTopGallerySettingsPersistAndRenderOnFrontPage(t *testing.T) {
 func TestTopGalleryRendersOnDefaultIndex(t *testing.T) {
 	env := newTestEnv(t)
 	env.insertMedia("index-gallery", "index-gallery.webp", "校舎", "春の校舎", "学校")
-	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{
-		TopGalleryTag: "学校", TopGalleryTitle: "学校の写真", TopGalleryLimit: 4,
-	}); err != nil {
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionArticleList}, {Type: FrontSectionGallery, Tag: "学校", Title: "学校の写真", Limit: 4}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -552,6 +592,75 @@ func TestTopGalleryRendersOnDefaultIndex(t *testing.T) {
 		`<section class="front-gallery" aria-labelledby="front-gallery-title">`,
 		`<h2 id="front-gallery-title" class="page-title">学校の写真</h2>`,
 		`data-gallery-tag="学校"`, `alt="校舎"`, `春の校舎`)
+}
+
+func TestIndexArticleTagFiltersCategoryAndLanguage(t *testing.T) {
+	env := newTestEnv(t)
+	categoryID := seedCategory(t, env.db, "ニュース", "news", "")
+	for _, a := range []article.Article{
+		{Title: "日本語ニュース", Slug: "ja-news", CategoryID: categoryID, Lang: "ja", ContentMarkdown: "本文", Status: article.StatusPublished, PublishedAt: ago(time.Hour)},
+		{Title: "English news", Slug: "en-news", CategoryID: categoryID, Lang: "en", ContentMarkdown: "Body", Status: article.StatusPublished, PublishedAt: ago(time.Hour)},
+		{Title: "別カテゴリ", Slug: "other-news", CategoryID: 1, Lang: "ja", ContentMarkdown: "本文", Status: article.StatusPublished, PublishedAt: ago(time.Hour)},
+	} {
+		seedArticle(t, env.db, a)
+	}
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionArticleList, ArticleTag: "news"}}}); err != nil {
+		t.Fatal(err)
+	}
+	ja := env.newClient().get("/")
+	expectStatus(t, ja, http.StatusOK)
+	expectContains(t, ja.Body, "日本語ニュース")
+	expectNotContainsAny(t, "Japanese tagged index", ja.Body, "English news", "別カテゴリ")
+	en := env.newClient().get("/en/")
+	expectStatus(t, en, http.StatusOK)
+	expectContains(t, en.Body, "English news")
+	expectNotContainsAny(t, "English tagged index", en.Body, "日本語ニュース", "別カテゴリ")
+}
+
+func TestFrontPageArticleTagFiltersLanguage(t *testing.T) {
+	env := newPagesEnv(t, Config{})
+	categoryID := seedCategory(t, env.db, "ニュース", "news", "")
+	group := "front-translation"
+	if _, err := env.db.Exec(`UPDATE articles SET translation_group_id = ? WHERE slug = 'research'`, group); err != nil {
+		t.Fatal(err)
+	}
+	seedPage(t, env.db, article.Article{Title: "Research", Slug: "research-en", Lang: "en", TranslationGroupID: group,
+		ContentMarkdown: "Research page", Status: article.StatusPublished, PublishedAt: ago(time.Hour)})
+	for _, a := range []article.Article{
+		{Title: "日本語ニュース", Slug: "ja-front-news", CategoryID: categoryID, Lang: "ja", ContentMarkdown: "本文", Status: article.StatusPublished, PublishedAt: ago(time.Hour)},
+		{Title: "English news", Slug: "en-front-news", CategoryID: categoryID, Lang: "en", ContentMarkdown: "Body", Status: article.StatusPublished, PublishedAt: ago(time.Hour)},
+		{Title: "別カテゴリ", Slug: "other-front-news", CategoryID: 1, Lang: "ja", ContentMarkdown: "本文", Status: article.StatusPublished, PublishedAt: ago(time.Hour)},
+	} {
+		seedArticle(t, env.db, a)
+	}
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontPage: "research", FrontSections: []FrontSection{{Type: FrontSectionArticleList, ArticleTag: "news"}}}); err != nil {
+		t.Fatal(err)
+	}
+	ja := env.newClient().get("/")
+	expectStatus(t, ja, http.StatusOK)
+	expectContains(t, ja.Body, "日本語ニュース")
+	expectNotContainsAny(t, "Japanese front", ja.Body, "English news", "別カテゴリ")
+	en := env.newClient().get("/en/")
+	expectStatus(t, en, http.StatusOK)
+	expectContains(t, en.Body, "English news")
+	expectNotContainsAny(t, "English front", en.Body, "日本語ニュース", "別カテゴリ")
+}
+
+func TestIndexArticleTagPaginationUsesFilteredCount(t *testing.T) {
+	env := newTestEnv(t)
+	tagged := seedCategory(t, env.db, "ニュース", "news", "")
+	for i := 0; i < 1; i++ {
+		seedArticle(t, env.db, article.Article{Title: fmt.Sprintf("tagged-%02d", i), Slug: fmt.Sprintf("tagged-%02d", i), CategoryID: tagged,
+			ContentMarkdown: "本文", Status: article.StatusPublished, PublishedAt: ago(time.Duration(i+1) * time.Minute)})
+	}
+	for i := 0; i < publicPerPage; i++ {
+		seedArticle(t, env.db, article.Article{Title: fmt.Sprintf("other-%02d", i), Slug: fmt.Sprintf("other-%02d", i), CategoryID: 1,
+			ContentMarkdown: "本文", Status: article.StatusPublished, PublishedAt: ago(time.Duration(i+50) * time.Minute)})
+	}
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionArticleList, ArticleTag: "news"}}}); err != nil {
+		t.Fatal(err)
+	}
+	expectStatus(t, env.newClient().get("/?page=2"), http.StatusNotFound)
 }
 
 func TestFrontPageMustBePage(t *testing.T) {
@@ -596,7 +705,7 @@ func TestExportWritesFrontPageAndMenu(t *testing.T) {
 	env := newFrontEnv(t)
 	if err := env.server.saveSiteStructure(context.Background(), SiteStructure{
 		Menu:      []MenuItem{{Type: MenuItemPage, Target: "research"}, {Type: MenuItemArticles}},
-		FrontPage: "research", FrontCards: []string{"access"},
+		FrontPage: "research", FrontSections: []FrontSection{{Type: FrontSectionHero}, {Type: FrontSectionCards, Pages: []string{"access"}}, {Type: FrontSectionArticleList}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -656,9 +765,9 @@ func TestSitemapListsArticlesOnlyWithPages(t *testing.T) {
 func TestFrontPageHasOneURL(t *testing.T) {
 	env := newFrontEnv(t)
 	if err := env.server.saveSiteStructure(context.Background(), SiteStructure{
-		Menu:       []MenuItem{{Type: MenuItemPage, Target: "research"}, {Type: MenuItemPage, Target: "access"}, {Type: MenuItemArticles}},
-		FrontPage:  "research",
-		FrontCards: []string{"research", "access"},
+		Menu:          []MenuItem{{Type: MenuItemPage, Target: "research"}, {Type: MenuItemPage, Target: "access"}, {Type: MenuItemArticles}},
+		FrontPage:     "research",
+		FrontSections: []FrontSection{{Type: FrontSectionCards, Pages: []string{"research", "access"}}},
 	}); err != nil {
 		t.Fatal(err)
 	}

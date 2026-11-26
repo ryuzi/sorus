@@ -544,7 +544,7 @@ func TestSyncAPISyncSettingsNestedMenu(t *testing.T) {
 // PC のドロップダウンとフッターのサイトマップを公開サーバーへ反映する。古い公開サーバーには更新を促す。
 func TestRemoteSettingsPushNestedMenu(t *testing.T) {
 	env := newRemoteEnv(t)
-	local := SiteStructure{Menu: nestedMenu(), FooterMenu: nestedFooter(), TopGalleryLimit: 6}
+	local := SiteStructure{Menu: nestedMenu(), FooterMenu: nestedFooter()}
 	if err := env.local.server.saveSiteStructure(t.Context(), local); err != nil {
 		t.Fatal(err)
 	}

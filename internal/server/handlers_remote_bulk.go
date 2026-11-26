@@ -208,7 +208,7 @@ func (s *Server) runRemoteBulkSync(cfg remoteConfig, ids []string) {
 	}
 
 	// 1. フォトギャラリーの写真（トップページのギャラリーと、公開中の記事の :::gallery のタグ）。
-	tags, err := s.remoteGalleryTags(ctx, s.loadSiteStructure(ctx).TopGalleryTag)
+	tags, err := s.remoteGalleryTags(ctx, frontSectionGalleryTag(s.loadSiteStructure(ctx).FrontSections))
 	if err == nil && len(tags) > 0 {
 		s.remoteBulk.update(func(st *remoteBulkStatus) { st.Current = "" })
 		var res remoteMediaResult

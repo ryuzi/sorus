@@ -1041,6 +1041,7 @@ func TestArticleEditorLocalPublishVsRemoteServer(t *testing.T) {
 	en := c.get("/admin/articles/" + pubID + "/edit").Body
 	expectContains(t, en, "Update and publish on this PC", "It does not appear on the publish server's site.", "Submit manuscript as draft")
 }
+
 // trashedArticle は writer で記事を作って添付資料を1つ付け、ゴミ箱に移す。記事 ID と添付資料の保存先を返す。
 func trashedArticle(t *testing.T, env *testEnv, writer *client, title string) (id, attachmentFile string) {
 	t.Helper()

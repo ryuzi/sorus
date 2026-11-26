@@ -93,7 +93,7 @@ func TestServerExport_OnlyPublicImages(t *testing.T) {
 	writeTestFile(t, filepath.Join(env.uploadDir, "favicon-fedcba9876543210.png"), "SECRET-IMAGE old favicon")
 	writeTestFile(t, filepath.Join(env.uploadDir, ".upload-tmp"), "SECRET-IMAGE unfinished upload")
 	env.setCardImageSetting("favicon_url", "/uploads/favicon-0123456789abcdef.png")
-	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{TopGalleryTag: "トップ", TopGalleryTitle: "写真", TopGalleryLimit: 4}); err != nil {
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Tag: "トップ", Title: "写真", Limit: 4}}}); err != nil {
 		t.Fatal(err)
 	}
 

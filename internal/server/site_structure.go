@@ -55,27 +55,41 @@ type MenuItem struct {
 	Children []MenuItem `json:"children,omitempty"`
 }
 
-// SiteStructure はサイト構成（メニュー・フッターのサイトマップ・トップページ・トップのカードとギャラリー）。
+// FrontSectionType はトップページに表示するセクションの種類。
+type FrontSectionType string
+
+const (
+	FrontSectionHero        FrontSectionType = "hero"
+	FrontSectionCards       FrontSectionType = "cards"
+	FrontSectionGallery     FrontSectionType = "gallery"
+	FrontSectionArticleList FrontSectionType = "article_list"
+	maxFrontSections                         = 12
+)
+
+// FrontSection はトップページの1つのセクション。
+type FrontSection struct {
+	Type       FrontSectionType `json:"type"`
+	Pages      []string         `json:"pages,omitempty"`
+	Tag        string           `json:"tag,omitempty"`
+	Limit      int              `json:"limit,omitempty"`
+	Title      string           `json:"title,omitempty"`
+	Layout     string           `json:"layout,omitempty"`
+	LinkURL    string           `json:"link_url,omitempty"`
+	LinkLabel  string           `json:"link_label,omitempty"`
+	ArticleTag string           `json:"article_tag,omitempty"`
+}
+
+// SiteStructure はサイト構成（メニュー・フッターのサイトマップ・トップページ）。
 type SiteStructure struct {
 	Menu []MenuItem
 	// FooterMenu はフッターのサイトマップ。最上位の項目が列（見出し）で、その子項目が列のリンク。空ならサイトマップを
 	// 出さない。読み込んだ値は、空なら nil。
-	FooterMenu      []MenuItem
-	FrontPage       string
-	FrontCards      []string
-	TopGalleryTag   string
-	TopGalleryLimit int
-	TopGalleryTitle string
-	// TopGalleryLayout はトップページのフォトギャラリーの並べ方（galleryLayouts のどれか）。読み込んだ値は空にならず、
-	// 保存していなければ既定の行揃え（galleryLayoutJustified）。
-	TopGalleryLayout string
-	// TopGalleryLinkURL はギャラリーの下に出す「すべて見る」リンクの行き先（"/" 始まりのサイト内パスか http(s):// の
-	// URL。validGalleryLinkURL）。空ならリンクを出さない。TopGalleryLinkLabel はその文言で、空なら「すべて見る」。
-	TopGalleryLinkURL   string
-	TopGalleryLinkLabel string
+	FooterMenu    []MenuItem
+	FrontPage     string
+	FrontSections []FrontSection
 }
 
-// フォトギャラリーの並べ方（トップページのギャラリーの top_gallery_layout、テンプレート partials/gallery.html の Layout）。
+// フォトギャラリーの並べ方（トップページの gallery セクションと partials/gallery.html の Layout）。
 const (
 	// galleryLayoutJustified は写真の縦横比を保ったまま行の高さをそろえる行揃え（既定・おすすめ）。
 	galleryLayoutJustified = "justified"
@@ -124,22 +138,23 @@ const (
 
 	settingSiteMenu = "site_menu"
 	// settingSiteFooterMenu はフッターのサイトマップ（MenuItem の JSON の配列）。
-	settingSiteFooterMenu  = "site_footer_menu"
-	settingFrontPage       = "front_page"
-	settingFrontCards      = "front_cards"
-	settingTopGalleryTag   = "top_gallery_tag"
-	settingTopGalleryLimit = "top_gallery_limit"
-	settingTopGalleryTitle = "top_gallery_title"
-	// settingTopGalleryLayout・settingTopGalleryLinkURL・settingTopGalleryLinkLabel はトップページのフォトギャラリーの
-	// 並べ方と「すべて見る」リンク。
-	settingTopGalleryLayout    = "top_gallery_layout"
-	settingTopGalleryLinkURL   = "top_gallery_link_url"
-	settingTopGalleryLinkLabel = "top_gallery_link_label"
+	settingSiteFooterMenu = "site_footer_menu"
+	settingFrontPage      = "front_page"
+	settingFrontSections  = "front_sections"
 )
 
 // topGalleryLimitOptions はサイト構成の画面で選べる、トップページのフォトギャラリーの枚数（小さい順）。最後は
 // サーバーの上限 maxTopGalleryLimit と同じにし、画面で選べる枚数と保存できる枚数をそろえる。
 var topGalleryLimitOptions = []int{4, 6, 8, 12, 16, maxTopGalleryLimit}
+
+func frontSectionGalleryTag(sections []FrontSection) string {
+	for _, section := range sections {
+		if section.Type == FrontSectionGallery {
+			return section.Tag
+		}
+	}
+	return ""
+}
 
 // siteStructureError はサイト構成の検証エラー。管理画面は Key を表示言語で翻訳して出し、Error は日本語の文言を返す。
 type siteStructureError struct {
@@ -176,26 +191,47 @@ func structureErr(key string, args ...any) error { return &siteStructureError{Ke
 // validateSiteStructure はサイト構成の形を検査する（件数・既知の種類・URL・表示名・制御文字）。
 // 参照先のページ・カテゴリがあるかは描画時に確かめ、無ければ公開側に出さない（ここではエラーにしない）。
 func validateSiteStructure(st SiteStructure) error {
-	if st.TopGalleryTag != "" {
-		if utf8.RuneCountInString(st.TopGalleryTag) > maxGalleryTagRunes || hasControl(st.TopGalleryTag) {
+	if len(st.FrontSections) > maxFrontSections {
+		return structureErr("structure_err_sections_count", maxFrontSections)
+	}
+	for _, section := range st.FrontSections {
+		switch section.Type {
+		case FrontSectionHero, FrontSectionCards, FrontSectionGallery, FrontSectionArticleList:
+		default:
+			return structureErr("structure_err_section_type")
+		}
+		if len(section.Pages) > maxFrontCards {
+			return structureErr("structure_err_cards_count", maxFrontCards)
+		}
+		for _, slug := range section.Pages {
+			if slug == "" {
+				return structureErr("structure_err_target_required")
+			}
+			if err := validateStructureSlug(slug); err != nil {
+				return err
+			}
+		}
+		if section.Tag != "" && (utf8.RuneCountInString(section.Tag) > maxGalleryTagRunes || hasControl(section.Tag)) {
 			return structureErr("structure_err_gallery_tag")
 		}
-	}
-	if st.TopGalleryLimit < 0 || st.TopGalleryLimit > maxTopGalleryLimit {
-		return structureErr("structure_err_gallery_limit", maxTopGalleryLimit)
-	}
-	if utf8.RuneCountInString(st.TopGalleryTitle) > maxGalleryTitleRunes || hasControl(st.TopGalleryTitle) {
-		return structureErr("structure_err_gallery_title", maxGalleryTitleRunes)
-	}
-	// 空は既定（行揃え）として受け付ける。古い PC からの同期・手入力の保存値で知らない値は断る。
-	if st.TopGalleryLayout != "" && !slices.Contains(galleryLayouts, st.TopGalleryLayout) {
-		return structureErr("structure_err_gallery_layout")
-	}
-	if st.TopGalleryLinkURL != "" && !validGalleryLinkURL(st.TopGalleryLinkURL) {
-		return structureErr("structure_err_gallery_link_url")
-	}
-	if utf8.RuneCountInString(st.TopGalleryLinkLabel) > maxGalleryLinkLabelRunes || hasControl(st.TopGalleryLinkLabel) {
-		return structureErr("structure_err_gallery_link_label", maxGalleryLinkLabelRunes)
+		if section.Type == FrontSectionGallery && (section.Limit < 0 || section.Limit > maxTopGalleryLimit) {
+			return structureErr("structure_err_gallery_limit", maxTopGalleryLimit)
+		}
+		if utf8.RuneCountInString(section.Title) > maxGalleryTitleRunes || hasControl(section.Title) {
+			return structureErr("structure_err_gallery_title", maxGalleryTitleRunes)
+		}
+		if section.Layout != "" && !slices.Contains(galleryLayouts, section.Layout) {
+			return structureErr("structure_err_gallery_layout")
+		}
+		if section.LinkURL != "" && !validGalleryLinkURL(section.LinkURL) {
+			return structureErr("structure_err_gallery_link_url")
+		}
+		if utf8.RuneCountInString(section.LinkLabel) > maxGalleryLinkLabelRunes || hasControl(section.LinkLabel) {
+			return structureErr("structure_err_gallery_link_label", maxGalleryLinkLabelRunes)
+		}
+		if section.ArticleTag != "" && (utf8.RuneCountInString(section.ArticleTag) > maxGalleryTagRunes || hasControl(section.ArticleTag)) {
+			return structureErr("structure_err_gallery_tag")
+		}
 	}
 	if err := validateMenuTree(st.Menu, false); err != nil {
 		return err
@@ -205,17 +241,6 @@ func validateSiteStructure(st SiteStructure) error {
 	}
 	if st.FrontPage != "" {
 		if err := validateStructureSlug(st.FrontPage); err != nil {
-			return err
-		}
-	}
-	if len(st.FrontCards) > maxFrontCards {
-		return structureErr("structure_err_cards_count", maxFrontCards)
-	}
-	for _, slug := range st.FrontCards {
-		if slug == "" {
-			return structureErr("structure_err_target_required")
-		}
-		if err := validateStructureSlug(slug); err != nil {
 			return err
 		}
 	}
@@ -369,49 +394,45 @@ func (s *Server) loadSiteStructure(ctx context.Context) SiteStructure {
 		Value string `db:"value"`
 	}
 	var st SiteStructure
-	st.TopGalleryLimit = 6
-	st.TopGalleryLayout = galleryLayoutJustified
-	if err := s.db.SelectContext(ctx, &rows, `SELECT key, value FROM settings WHERE key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		settingSiteMenu, settingFrontPage, settingFrontCards, settingTopGalleryTag, settingTopGalleryLimit, settingTopGalleryTitle,
-		settingTopGalleryLayout, settingTopGalleryLinkURL, settingTopGalleryLinkLabel, settingSiteFooterMenu); err != nil {
+	if err := s.db.SelectContext(ctx, &rows, `SELECT key, value FROM settings WHERE key IN (?, ?, ?, ?)`, settingSiteMenu, settingSiteFooterMenu, settingFrontPage, settingFrontSections); err != nil {
 		return st
 	}
 	for _, r := range rows {
 		switch r.Key {
 		case settingSiteMenu:
-			if err := json.Unmarshal([]byte(r.Value), &st.Menu); err != nil {
+			if json.Unmarshal([]byte(r.Value), &st.Menu) != nil {
 				st.Menu = nil
 			}
 		case settingSiteFooterMenu:
-			// 壊れた JSON・空の配列はサイトマップなし（nil）として読む。
-			if err := json.Unmarshal([]byte(r.Value), &st.FooterMenu); err != nil || len(st.FooterMenu) == 0 {
+			if json.Unmarshal([]byte(r.Value), &st.FooterMenu) != nil || len(st.FooterMenu) == 0 {
 				st.FooterMenu = nil
 			}
 		case settingFrontPage:
 			st.FrontPage = strings.TrimSpace(r.Value)
-		case settingFrontCards:
-			if err := json.Unmarshal([]byte(r.Value), &st.FrontCards); err != nil {
-				st.FrontCards = nil
+		case settingFrontSections:
+			if json.Unmarshal([]byte(r.Value), &st.FrontSections) != nil {
+				st.FrontSections = nil
+			} else {
+				for i := range st.FrontSections {
+					section := &st.FrontSections[i]
+					if section.Type == FrontSectionGallery && (section.Layout == "" || !slices.Contains(galleryLayouts, section.Layout)) {
+						section.Layout = galleryLayoutJustified
+					}
+					if section.LinkURL != "" && !validGalleryLinkURL(section.LinkURL) {
+						section.LinkURL = ""
+					}
+					if hasControl(section.LinkLabel) || utf8.RuneCountInString(section.LinkLabel) > maxGalleryLinkLabelRunes {
+						section.LinkLabel = ""
+					}
+				}
 			}
-		case settingTopGalleryTag:
-			st.TopGalleryTag = strings.TrimSpace(r.Value)
-		case settingTopGalleryLimit:
-			if limit, err := strconv.Atoi(r.Value); err == nil && limit > 0 && limit <= maxTopGalleryLimit {
-				st.TopGalleryLimit = limit
-			}
-		case settingTopGalleryTitle:
-			st.TopGalleryTitle = strings.TrimSpace(r.Value)
-		case settingTopGalleryLayout:
-			st.TopGalleryLayout = normalizeGalleryLayout(r.Value)
-		case settingTopGalleryLinkURL:
-			// 改ざんされた保存値（javascript: など）は公開側に出さない。
-			if u := strings.TrimSpace(r.Value); validGalleryLinkURL(u) {
-				st.TopGalleryLinkURL = u
-			}
-		case settingTopGalleryLinkLabel:
-			if label := strings.TrimSpace(r.Value); !hasControl(label) && utf8.RuneCountInString(label) <= maxGalleryLinkLabelRunes {
-				st.TopGalleryLinkLabel = label
-			}
+		}
+	}
+	if st.FrontSections == nil {
+		if st.FrontPage != "" {
+			st.FrontSections = []FrontSection{{Type: FrontSectionHero}, {Type: FrontSectionArticleList}}
+		} else {
+			st.FrontSections = []FrontSection{{Type: FrontSectionArticleList}}
 		}
 	}
 	return st
@@ -432,51 +453,52 @@ func (st SiteStructure) usesNestedMenus() bool {
 
 // saveSiteStructureTx はサイト構成を検査し、指定されたトランザクション内でキーを保存する。
 func (s *Server) saveSiteStructureTx(ctx context.Context, tx *sqlx.Tx, st SiteStructure) error {
+	if st.FrontSections == nil {
+		if st.FrontPage != "" {
+			st.FrontSections = []FrontSection{{Type: FrontSectionHero}, {Type: FrontSectionArticleList}}
+		} else {
+			st.FrontSections = []FrontSection{{Type: FrontSectionArticleList}}
+		}
+	}
 	if err := validateSiteStructure(st); err != nil {
 		return err
 	}
-	menu := st.Menu
+	for i := range st.FrontSections {
+		section := &st.FrontSections[i]
+		section.Tag = strings.TrimSpace(section.Tag)
+		section.Title = strings.TrimSpace(section.Title)
+		if section.Type == FrontSectionGallery {
+			section.Layout = normalizeGalleryLayout(section.Layout)
+		}
+		section.LinkURL = strings.TrimSpace(section.LinkURL)
+		section.LinkLabel = strings.TrimSpace(section.LinkLabel)
+		section.ArticleTag = strings.TrimSpace(section.ArticleTag)
+	}
+	menu, footer := st.Menu, st.FooterMenu
 	if menu == nil {
 		menu = []MenuItem{}
 	}
-	footer := st.FooterMenu
 	if footer == nil {
 		footer = []MenuItem{}
 	}
-	cards := st.FrontCards
-	if cards == nil {
-		cards = []string{}
+	sections := st.FrontSections
+	if sections == nil {
+		sections = []FrontSection{}
 	}
-	menuJSON, err := json.Marshal(menu)
+	mj, err := json.Marshal(menu)
 	if err != nil {
 		return err
 	}
-	footerJSON, err := json.Marshal(footer)
+	fj, err := json.Marshal(footer)
 	if err != nil {
 		return err
 	}
-	cardsJSON, err := json.Marshal(cards)
+	sj, err := json.Marshal(sections)
 	if err != nil {
 		return err
 	}
-	limit := st.TopGalleryLimit
-	if limit == 0 {
-		limit = 6
-	}
-	for _, kv := range [][2]string{
-		{settingSiteMenu, string(menuJSON)},
-		{settingSiteFooterMenu, string(footerJSON)},
-		{settingFrontPage, st.FrontPage},
-		{settingFrontCards, string(cardsJSON)},
-		{settingTopGalleryTag, strings.TrimSpace(st.TopGalleryTag)},
-		{settingTopGalleryLimit, strconv.Itoa(limit)},
-		{settingTopGalleryTitle, strings.TrimSpace(st.TopGalleryTitle)},
-		{settingTopGalleryLayout, normalizeGalleryLayout(st.TopGalleryLayout)},
-		{settingTopGalleryLinkURL, strings.TrimSpace(st.TopGalleryLinkURL)},
-		{settingTopGalleryLinkLabel, strings.TrimSpace(st.TopGalleryLinkLabel)},
-	} {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
-			ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`, kv[0], kv[1]); err != nil {
+	for _, kv := range [][2]string{{settingSiteMenu, string(mj)}, {settingSiteFooterMenu, string(fj)}, {settingFrontPage, st.FrontPage}, {settingFrontSections, string(sj)}} {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`, kv[0], kv[1]); err != nil {
 			return err
 		}
 	}
@@ -542,7 +564,9 @@ func (s *Server) resolveStructureRefs(ctx context.Context, st SiteStructure) (st
 	if st.FrontPage != "" {
 		pageSlugs = append(pageSlugs, st.FrontPage)
 	}
-	pageSlugs = append(pageSlugs, st.FrontCards...)
+	for _, section := range st.FrontSections {
+		pageSlugs = append(pageSlugs, section.Pages...)
+	}
 
 	if len(pageSlugs) > 0 {
 		type pageRow struct {
@@ -983,12 +1007,44 @@ func findArticlesMenuItem(items []MenuItem) (MenuItem, bool) {
 // 埋め込んだ articleData はトップに出すページ（アイキャッチ・タイトル・本文）で、content_head もこれを読む。
 type frontData struct {
 	articleData
-	// Cards は front_cards のページのカード（公開中のものだけ、設定の順）。
+	Sections []renderedFrontSection
+	// Cards は cards セクションで参照された固定ページ（公開中のものだけ、設定順）。
 	Cards []publicArticle
 	// News は新着記事（frontNewsCount 件）。
 	News []publicArticle
 	// ShowNews は「新着記事」の欄を出すか（showFrontNews）。
 	ShowNews bool
+}
+
+type renderedFrontSection struct {
+	Type          FrontSectionType
+	Page          publicPage
+	Hero          articleData
+	Cards         []publicArticle
+	News          []publicArticle
+	ShowNews      bool
+	Tag           string
+	Limit         int
+	Title         string
+	Layout        string
+	LinkURL       string
+	LinkLabel     string
+	Index         bool
+	ID            string
+	IndexArticles []publicArticle
+	Pagination    pagination
+}
+
+func sectionID(kind FrontSectionType, occurrence int) string {
+	name := string(kind)
+	if kind == FrontSectionArticleList {
+		name = "news"
+	}
+	base := "front-" + name + "-title"
+	if occurrence <= 1 {
+		return base
+	}
+	return fmt.Sprintf("%s-%d", base, occurrence)
 }
 
 // showFrontNews はトップに固定ページを出すトップページに「新着記事」の欄を出すかを返す。新着記事が1件以上あるか、
@@ -1057,6 +1113,7 @@ func (s *Server) frontPage(st SiteStructure) (publicArticle, bool, error) {
 // renderFront はトップに固定ページ front を出すトップページを描画する。<title>・description・JSON-LD はサイトのトップのまま。
 func (s *Server) renderFront(c echo.Context, p publicPage, front publicArticle, st SiteStructure) error {
 	ctx := c.Request().Context()
+	p.GalleryQueryResolver = s.galleryQueryResolver()
 	var scratch publicPage
 	body, err := s.loadArticleBody(c, front, &scratch, s.baseURL(c))
 	if err != nil {
@@ -1069,18 +1126,20 @@ func (s *Server) renderFront(c echo.Context, p publicPage, front publicArticle, 
 	body.GeneratedOGImage = false
 	data := frontData{articleData: body}
 
-	refs, err := s.resolveStructureRefs(ctx, SiteStructure{FrontCards: st.FrontCards})
+	refs, err := s.resolveStructureRefs(ctx, SiteStructure{FrontSections: st.FrontSections})
 	if err != nil {
 		return err
 	}
 	var cardSlugs []string
-	for _, slug := range st.FrontCards {
-		if _, ok := refs.Pages[slug]; ok && slug != front.Slug && !slices.Contains(cardSlugs, slug) {
-			cardSlugs = append(cardSlugs, slug)
+	for _, section := range st.FrontSections {
+		if section.Type != FrontSectionCards {
+			continue
 		}
-	}
-	if len(cardSlugs) > maxFrontCards {
-		cardSlugs = cardSlugs[:maxFrontCards]
+		for _, slug := range section.Pages {
+			if _, ok := refs.Pages[slug]; ok && slug != front.Slug && !slices.Contains(cardSlugs, slug) {
+				cardSlugs = append(cardSlugs, slug)
+			}
+		}
 	}
 	var lookupSlugs []string
 	for _, slug := range cardSlugs {
@@ -1125,6 +1184,60 @@ func (s *Server) renderFront(c echo.Context, p publicPage, front publicArticle, 
 		data.News[i].ImageHTML = s.responsiveImage(data.News[i].FeaturedImage, data.News[i].Title, "card-image")
 	}
 	data.ShowNews = showFrontNews(data.News, st.Menu)
+	sectionOccurrences := map[FrontSectionType]int{}
+	for _, section := range st.FrontSections {
+		sectionOccurrences[section.Type]++
+		layout := section.Layout
+		if section.Type == FrontSectionGallery {
+			layout = normalizeGalleryLayout(layout)
+		}
+		limit := section.Limit
+		if section.Type == FrontSectionGallery && limit <= 0 {
+			limit = 6
+		}
+		view := renderedFrontSection{Type: section.Type, Page: p, Hero: body, Tag: section.Tag, Limit: limit, Title: section.Title, Layout: layout, LinkURL: section.LinkURL, LinkLabel: section.LinkLabel, ID: sectionID(section.Type, sectionOccurrences[section.Type])}
+		switch section.Type {
+		case FrontSectionCards:
+			for _, slug := range section.Pages {
+				if slug == front.Slug {
+					continue
+				}
+				targetSlug := slug
+				if p.Lang == "en" {
+					if ref, ok := refs.EnPages[slug]; ok && ref.Slug != "" {
+						targetSlug = ref.Slug
+					}
+				}
+				for _, card := range data.Cards {
+					if card.Slug == targetSlug {
+						view.Cards = append(view.Cards, card)
+						break
+					}
+				}
+			}
+		case FrontSectionArticleList:
+			view.News = data.News
+			if section.ArticleTag != "" {
+				categoryID, err := s.articleTagCategoryID(section.ArticleTag)
+				if err != nil {
+					return err
+				}
+				view.News = []publicArticle{}
+				langCondition := ` AND (a.lang = 'ja' OR a.lang = '' OR a.lang IS NULL)`
+				if p.Lang == "en" {
+					langCondition = ` AND a.lang = 'en'`
+				}
+				if err := s.db.SelectContext(ctx, &view.News, `SELECT `+publicArticleColumns+publicArticleFrom+`WHERE `+postKindCondition+langCondition+` AND a.category_id = ? AND `+publishedCondition+` ORDER BY julianday(a.published_at) DESC, a.id LIMIT ?`, categoryID, article.StatusPublished, clockNow().UTC(), frontNewsCount); err != nil {
+					return err
+				}
+				for i := range view.News {
+					view.News[i].ImageHTML = s.responsiveImage(view.News[i].FeaturedImage, view.News[i].Title, "card-image")
+				}
+			}
+			view.ShowNews = showFrontNews(view.News, st.Menu)
+		}
+		data.Sections = append(data.Sections, view)
+	}
 	p.Data = data
 	return s.renderPublic(c, http.StatusOK, "front", p)
 }
@@ -1197,15 +1310,17 @@ type structureSelect struct {
 }
 
 type structureSettingsData struct {
-	Rows            []structureRow
-	FrontPage       structureSelect
-	FrontCards      []structureSelect
-	Pages           []structureOption
-	Categories      []structureOption
-	GalleryTags     []string
-	TopGalleryTag   string
-	TopGalleryLimit int
-	TopGalleryTitle string
+	Sections          []frontSectionForm
+	FrontSectionTypes []FrontSectionType
+	Rows              []structureRow
+	FrontPage         structureSelect
+	FrontCards        []structureSelect
+	Pages             []structureOption
+	Categories        []structureOption
+	GalleryTags       []string
+	TopGalleryTag     string
+	TopGalleryLimit   int
+	TopGalleryTitle   string
 	// TopGalleryLimitOptions は表示枚数の選択肢（topGalleryLimitOptions。保存済みの枚数が選択肢に無ければ足す）。
 	TopGalleryLimitOptions []int
 	// TopGalleryCount は TopGalleryTag の付いた写真の枚数。TopGalleryStatus はその案内の文（表示言語に翻訳済み。
@@ -1237,6 +1352,12 @@ type structureSettingsData struct {
 	JustSaved        bool
 }
 
+type frontSectionForm struct {
+	FrontSection
+	Index     int
+	PagesText string
+}
+
 func (s *Server) handleStructureSettings(c echo.Context) error {
 	st := s.loadSiteStructure(c.Request().Context())
 	return s.renderStructure(c, http.StatusOK, st, false, "")
@@ -1251,7 +1372,9 @@ func (s *Server) handleStructureSettingsSave(c echo.Context) error {
 	}
 	op := c.FormValue("op")
 	if op != "" && op != "save" {
-		if rest, ok := strings.CutPrefix(op, footerOpPrefix); ok {
+		if strings.HasPrefix(op, "section-") {
+			st.FrontSections = applyFrontSectionOp(st.FrontSections, op)
+		} else if rest, ok := strings.CutPrefix(op, footerOpPrefix); ok {
 			st.FooterMenu = applyRowOp(st.FooterMenu, rest, maxFooterColumns)
 		} else {
 			st.Menu = applyRowOp(st.Menu, op, maxMenuItems)
@@ -1278,6 +1401,40 @@ func (s *Server) handleStructureSettingsSave(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/admin/settings/structure?flash="+flash)
 }
 
+func applyFrontSectionOp(sections []FrontSection, op string) []FrontSection {
+	if op == "section-add" {
+		if len(sections) < maxFrontSections {
+			sections = append(sections, FrontSection{Type: FrontSectionArticleList})
+		}
+		return sections
+	}
+	name, raw, ok := strings.Cut(op, "section-")
+	if !ok {
+		return sections
+	}
+	name, raw, ok = strings.Cut(raw, ":")
+	if !ok {
+		return sections
+	}
+	i, err := strconv.Atoi(raw)
+	if err != nil || i < 0 || i >= len(sections) {
+		return sections
+	}
+	switch name {
+	case "delete":
+		return slices.Delete(sections, i, i+1)
+	case "up":
+		if i > 0 {
+			sections[i-1], sections[i] = sections[i], sections[i-1]
+		}
+	case "down":
+		if i < len(sections)-1 {
+			sections[i], sections[i+1] = sections[i+1], sections[i]
+		}
+	}
+	return sections
+}
+
 // footerOpPrefix はフッターのサイトマップの行の操作（op）の値の接頭辞（footer-add・footer-delete:<i> など）。
 const footerOpPrefix = "footer-"
 
@@ -1292,23 +1449,31 @@ func structureFromForm(c echo.Context) (SiteStructure, error) {
 	st.Menu = menuFromForm(form, "menu", maxMenuItems)
 	st.FooterMenu = menuFromForm(form, "footer", maxFooterColumns)
 	st.FrontPage = strings.TrimSpace(form.Get("front_page"))
-	st.TopGalleryTag = strings.TrimSpace(form.Get("top_gallery_tag"))
-	st.TopGalleryTitle = strings.TrimSpace(form.Get("top_gallery_title"))
-	st.TopGalleryLayout = strings.TrimSpace(form.Get("top_gallery_layout"))
-	st.TopGalleryLinkURL = strings.TrimSpace(form.Get("top_gallery_link_url"))
-	st.TopGalleryLinkLabel = strings.TrimSpace(form.Get("top_gallery_link_label"))
-	if raw := strings.TrimSpace(form.Get("top_gallery_limit")); raw != "" {
-		limit, err := strconv.Atoi(raw)
-		if err != nil {
-			return SiteStructure{}, echo.NewHTTPError(http.StatusBadRequest, "invalid form")
+	types := form["section_type"]
+	for i, rawType := range types {
+		section := FrontSection{Type: FrontSectionType(strings.TrimSpace(rawType))}
+		at := func(key string) string {
+			if i < len(form["section_"+key]) {
+				return strings.TrimSpace(form["section_"+key][i])
+			}
+			return ""
 		}
-		st.TopGalleryLimit = limit
-	}
-	for _, slug := range form["front_card"] {
-		slug = strings.TrimSpace(slug)
-		if slug != "" && !slices.Contains(st.FrontCards, slug) {
-			st.FrontCards = append(st.FrontCards, slug)
+		section.Tag, section.Title, section.Layout, section.LinkURL, section.LinkLabel, section.ArticleTag = at("tag"), at("title"), at("layout"), at("link_url"), at("link_label"), at("article_tag")
+		if raw := at("limit"); raw != "" {
+			limit, err := strconv.Atoi(raw)
+			if err != nil {
+				return SiteStructure{}, echo.NewHTTPError(http.StatusBadRequest, "invalid form")
+			}
+			section.Limit = limit
 		}
+		if i < len(form["section_pages"]) {
+			for _, slug := range strings.Split(form["section_pages"][i], ",") {
+				if slug = strings.TrimSpace(slug); slug != "" && !slices.Contains(section.Pages, slug) {
+					section.Pages = append(section.Pages, slug)
+				}
+			}
+		}
+		st.FrontSections = append(st.FrontSections, section)
 	}
 	return st, nil
 }
@@ -1540,26 +1705,34 @@ func (s *Server) renderStructure(c echo.Context, code int, st SiteStructure, uns
 	ctx := c.Request().Context()
 	lang := string(language(c))
 	remote := s.remoteSettingsData(c, s.loadRemoteConfig())
+	gallery := FrontSection{Type: FrontSectionGallery, Limit: 6, Layout: galleryLayoutJustified}
+	for _, section := range st.FrontSections {
+		if section.Type == FrontSectionGallery {
+			gallery = section
+			break
+		}
+	}
 	d := structureSettingsData{
-		Types:            menuItemTypes,
-		Unsaved:          unsaved,
-		CanAddRow:        len(st.Menu) < maxMenuItems,
-		MaxMenuItems:     maxMenuItems,
-		MaxMenuChildren:  maxMenuChildren,
-		MaxFooterColumns: maxFooterColumns,
-		MaxFrontCards:    maxFrontCards,
-		MaxLabelRunes:    maxMenuLabelRunes,
-		CanPushSettings:  remote.CanPushSettings,
-		PushConfirm:      remote.PushConfirm,
-		JustSaved:        c.QueryParam("flash") == "structure_saved",
-		TopGalleryTag:    st.TopGalleryTag,
-		TopGalleryLimit:  st.TopGalleryLimit,
-		TopGalleryTitle:  st.TopGalleryTitle,
+		FrontSectionTypes: []FrontSectionType{FrontSectionHero, FrontSectionCards, FrontSectionGallery, FrontSectionArticleList},
+		Types:             menuItemTypes,
+		Unsaved:           unsaved,
+		CanAddRow:         len(st.Menu) < maxMenuItems,
+		MaxMenuItems:      maxMenuItems,
+		MaxMenuChildren:   maxMenuChildren,
+		MaxFooterColumns:  maxFooterColumns,
+		MaxFrontCards:     maxFrontCards,
+		MaxLabelRunes:     maxMenuLabelRunes,
+		CanPushSettings:   remote.CanPushSettings,
+		PushConfirm:       remote.PushConfirm,
+		JustSaved:         c.QueryParam("flash") == "structure_saved",
+		TopGalleryTag:     gallery.Tag,
+		TopGalleryLimit:   gallery.Limit,
+		TopGalleryTitle:   gallery.Title,
 		// 検証で戻した画面では入力したままの値を出す（知らない並べ方は既定の行揃えを選んだ表示にする）。
-		TopGalleryLayout:         normalizeGalleryLayout(st.TopGalleryLayout),
+		TopGalleryLayout:         normalizeGalleryLayout(gallery.Layout),
 		TopGalleryLayouts:        galleryLayouts,
-		TopGalleryLinkURL:        st.TopGalleryLinkURL,
-		TopGalleryLinkLabel:      st.TopGalleryLinkLabel,
+		TopGalleryLinkURL:        gallery.LinkURL,
+		TopGalleryLinkLabel:      gallery.LinkLabel,
 		MaxGalleryLinkLabelRunes: maxGalleryLinkLabelRunes,
 	}
 	if d.TopGalleryLimit == 0 {
@@ -1570,13 +1743,13 @@ func (s *Server) renderStructure(c echo.Context, code int, st SiteStructure, uns
 		d.TopGalleryLimitOptions = append(d.TopGalleryLimitOptions, d.TopGalleryLimit)
 		slices.Sort(d.TopGalleryLimitOptions)
 	}
-	if st.TopGalleryTag != "" {
-		where, args := mediaWhere("", st.TopGalleryTag)
+	if gallery.Tag != "" {
+		where, args := mediaWhere("", gallery.Tag)
 		if err := s.db.GetContext(ctx, &d.TopGalleryCount, `SELECT COUNT(*) FROM media m`+where, args...); err != nil {
 			return err
 		}
 	}
-	d.TopGalleryStatus = topGalleryStatus(lang, st.TopGalleryTag, d.TopGalleryCount, d.TopGalleryLimit)
+	d.TopGalleryStatus = topGalleryStatus(lang, gallery.Tag, d.TopGalleryCount, d.TopGalleryLimit)
 	if err := s.db.SelectContext(ctx, &d.Pages, `SELECT a.slug, a.title FROM articles a WHERE a.kind = 'page' AND `+
 		publishedCondition+` ORDER BY a.title, a.slug`, article.StatusPublished, clockNow().UTC()); err != nil {
 		return err
@@ -1623,20 +1796,17 @@ func (s *Server) renderStructure(c echo.Context, code int, st SiteStructure, uns
 		d.FrontPage.Missing = st.FrontPage
 		d.Warnings = append(d.Warnings, i18n.Translate(lang, "structure_warn_front_page", st.FrontPage))
 	}
-	if st.TopGalleryTag != "" && d.TopGalleryCount == 0 {
+	if gallery.Tag != "" && d.TopGalleryCount == 0 {
 		// 打ち間違い・まだ写真にタグを付けていないタグでは、トップページにギャラリーが出ない。
-		d.Warnings = append(d.Warnings, i18n.Translate(lang, "structure_warn_gallery_empty", st.TopGalleryTag))
+		d.Warnings = append(d.Warnings, i18n.Translate(lang, "structure_warn_gallery_empty", gallery.Tag))
 	}
-	for i := range maxFrontCards {
-		sel := structureSelect{Number: i + 1}
-		if i < len(st.FrontCards) {
-			sel.Value = st.FrontCards[i]
-			if _, ok := refs.Pages[sel.Value]; !ok {
-				sel.Missing = sel.Value
-				d.Warnings = append(d.Warnings, i18n.Translate(lang, "structure_warn_front_card", sel.Value))
+	for i, section := range st.FrontSections {
+		d.Sections = append(d.Sections, frontSectionForm{FrontSection: section, Index: i, PagesText: strings.Join(section.Pages, ", ")})
+		for _, slug := range section.Pages {
+			if _, ok := refs.Pages[slug]; !ok {
+				d.Warnings = append(d.Warnings, i18n.Translate(lang, "structure_warn_front_card", slug))
 			}
 		}
-		d.FrontCards = append(d.FrontCards, sel)
 	}
 	title := i18n.Translate(lang, "structure_title")
 	if errMsg != "" {

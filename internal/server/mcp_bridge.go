@@ -30,16 +30,18 @@ func (s *Server) mcpUpdateSiteStructure(ctx context.Context, upd mcp.SiteStructu
 	if upd.SiteFooterMenu != nil {
 		st.FooterMenu = fromMCPMenu(*upd.SiteFooterMenu)
 	}
-	if upd.FrontCards != nil {
-		// 管理画面のフォーム（structureFromForm）と同じく前後の空白を除き、重なったスラッグは1つにする。空のスラッグは
-		// 検査で断る（黙って捨てない）。
-		cards := []string{}
-		for _, slug := range *upd.FrontCards {
-			if slug = strings.TrimSpace(slug); slug == "" || !slices.Contains(cards, slug) {
-				cards = append(cards, slug)
+	if upd.FrontSections != nil {
+		st.FrontSections = make([]FrontSection, 0, len(*upd.FrontSections))
+		for _, section := range *upd.FrontSections {
+			pages := make([]string, 0, len(section.Pages))
+			for _, slug := range section.Pages {
+				slug = strings.TrimSpace(slug)
+				if slug == "" || !slices.Contains(pages, slug) {
+					pages = append(pages, slug)
+				}
 			}
+			st.FrontSections = append(st.FrontSections, FrontSection{Type: FrontSectionType(strings.TrimSpace(section.Type)), Pages: pages, Tag: strings.TrimSpace(section.Tag), Limit: section.Limit, Title: strings.TrimSpace(section.Title), Layout: strings.TrimSpace(section.Layout), LinkURL: strings.TrimSpace(section.LinkURL), LinkLabel: strings.TrimSpace(section.LinkLabel), ArticleTag: strings.TrimSpace(section.ArticleTag)})
 		}
-		st.FrontCards = cards
 	}
 	if err := s.saveSiteStructure(ctx, st); err != nil {
 		var se *siteStructureError
@@ -78,9 +80,11 @@ func (s *Server) siteStructureWarnings(ctx context.Context, st SiteStructure) ([
 		e := &structureMenuEditor{Lang: lang, Footer: ed.footer, MaxTop: ed.maxTop}
 		out = append(out, structureRowWarnings(lang, structureRows(e, ed.items, refs), ed.footer)...)
 	}
-	for _, slug := range st.FrontCards {
-		if _, ok := refs.Pages[slug]; !ok {
-			out = append(out, i18n.Translate(lang, "structure_warn_front_card", slug))
+	for _, section := range st.FrontSections {
+		for _, slug := range section.Pages {
+			if _, ok := refs.Pages[slug]; !ok {
+				out = append(out, i18n.Translate(lang, "structure_warn_front_card", slug))
+			}
 		}
 	}
 	return out, nil
@@ -88,11 +92,11 @@ func (s *Server) siteStructureWarnings(ctx context.Context, st SiteStructure) ([
 
 // toMCPSiteStructure はサイト構成のうち MCP で扱う項目を、空でも空の配列にして返す。
 func toMCPSiteStructure(st SiteStructure) mcp.SiteStructure {
-	cards := slices.Clone(st.FrontCards)
-	if cards == nil {
-		cards = []string{}
+	sections := make([]mcp.FrontSection, 0, len(st.FrontSections))
+	for _, section := range st.FrontSections {
+		sections = append(sections, mcp.FrontSection{Type: string(section.Type), Pages: slices.Clone(section.Pages), Tag: section.Tag, Limit: section.Limit, Title: section.Title, Layout: section.Layout, LinkURL: section.LinkURL, LinkLabel: section.LinkLabel, ArticleTag: section.ArticleTag})
 	}
-	return mcp.SiteStructure{SiteMenu: toMCPMenu(st.Menu), SiteFooterMenu: toMCPMenu(st.FooterMenu), FrontCards: cards}
+	return mcp.SiteStructure{SiteMenu: toMCPMenu(st.Menu), SiteFooterMenu: toMCPMenu(st.FooterMenu), FrontSections: sections}
 }
 
 func toMCPMenu(items []MenuItem) []mcp.SiteMenuItem {

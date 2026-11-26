@@ -460,7 +460,7 @@ func TestAIToggleKeepsSavedAIConfig(t *testing.T) {
 	t.Setenv(AIEnvVar, "")
 	env := newTestEnvWith(t, Config{ThemesDir: t.TempDir()}, nil)
 	adm := env.loggedIn(admin)
-	const savedConfig = `{"provider":"openai","api_key":"sk-test-keep-0123456789","model":"gpt-keep-model"}`
+	const savedConfig = `{"provider":"openai","providers":{"openai":{"api_key":"sk-test-keep-0123456789","model":"gpt-keep-model"}}}`
 	if _, err := env.db.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)`, aiSettingKey, savedConfig); err != nil {
 		t.Fatal(err)
 	}

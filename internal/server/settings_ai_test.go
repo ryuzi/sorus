@@ -121,10 +121,10 @@ func TestAISettingsRolePermissions(t *testing.T) {
 
 		// スタイル設定を保存
 		postRes := c.postForm(aiSettingsPath, url.Values{
-			"provider":      {"malicious_provider"},
-			"api_key":       {"evil_key"},
-			"writing_style": {"creative"},
-			"glossary":      {"AI=Artificial Intelligence"},
+			"provider":       {"malicious_provider"},
+			"api_key_gemini": {"evil_key"},
+			"writing_style":  {"creative"},
+			"glossary":       {"AI=Artificial Intelligence"},
 		})
 		expectRedirect(t, postRes, aiSettingsPath+"?flash=ai_saved")
 
@@ -133,7 +133,7 @@ func TestAISettingsRolePermissions(t *testing.T) {
 		if !ok || saved.WritingStyle != "creative" || !strings.Contains(saved.Glossary, "AI=Artificial Intelligence") {
 			t.Errorf("user %s should be able to save writing style: %+v", u.Username, saved)
 		}
-		if saved.Provider == "malicious_provider" || saved.APIKey == "evil_key" {
+		if saved.Provider == "malicious_provider" || saved.Providers[ai.KindGemini].APIKey == "evil_key" {
 			t.Errorf("non-admin %s must not tamper with provider or api_key: %+v", u.Username, saved)
 		}
 
@@ -150,10 +150,10 @@ func TestAISettingsSaveSwapsProvider(t *testing.T) {
 	env := newTestEnv(t)
 	adm := env.loggedIn(admin)
 
-	res := adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url": {mock.URL + "/v1/"}, "model": {"llama3.1:8b"}})
+	res := adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url_custom": {mock.URL + "/v1/"}, "model_custom": {"llama3.1:8b"}})
 	expectRedirect(t, res, aiSettingsPath+"?flash=ai_saved")
 	saved, ok := savedAI(t, env)
-	if !ok || saved.Provider != ai.KindCustom || saved.BaseURL != mock.URL+"/v1" || saved.Model != "llama3.1:8b" || saved.APIKey != "" {
+	if !ok || saved.Provider != ai.KindCustom || saved.Providers[ai.KindCustom].BaseURL != mock.URL+"/v1" || saved.Providers[ai.KindCustom].Model != "llama3.1:8b" || saved.Providers[ai.KindCustom].APIKey != "" {
 		t.Fatalf("saved = %+v", saved)
 	}
 	writer := env.loggedIn(studentA)
@@ -167,10 +167,10 @@ func TestAISettingsSaveSwapsProvider(t *testing.T) {
 	}
 
 	// Gemini に切り替えると、送られてきたベース URL は保存しない。
-	res = adm.postForm(aiSettingsPath, url.Values{"provider": {"gemini"}, "api_key": {"AQ.Ab8RN6-test"}, "base_url": {"https://evil.example/v1"}})
+	res = adm.postForm(aiSettingsPath, url.Values{"provider": {"gemini"}, "api_key_gemini": {"AQ.Ab8RN6-test"}, "base_url_gemini": {"https://evil.example/v1"}})
 	expectRedirect(t, res, aiSettingsPath+"?flash=ai_saved")
 	saved, _ = savedAI(t, env)
-	if saved.Provider != ai.KindGemini || saved.BaseURL != "" || saved.APIKey != "AQ.Ab8RN6-test" {
+	if saved.Provider != ai.KindGemini || saved.Providers[ai.KindGemini].BaseURL != "" || saved.Providers[ai.KindGemini].APIKey != "AQ.Ab8RN6-test" {
 		t.Fatalf("saved = %+v", saved)
 	}
 	if name := env.server.aiProvider().Name(); name != "Gemini ("+ai.DefaultGeminiModel+")" {
@@ -198,12 +198,12 @@ func TestAISettingsValidation(t *testing.T) {
 		form url.Values
 		msg  string
 	}{
-		{url.Values{"provider": {"unknown"}, "api_key": {"k"}}, "使うAIの種類を選んでください"},
+		{url.Values{"provider": {"unknown"}, "api_key_gemini": {"k"}}, "使うAIの種類を選んでください"},
 		{url.Values{"provider": {"custom"}}, "ベースURLを入力してください"},
-		{url.Values{"provider": {"custom"}, "base_url": {"ftp://example.jp"}}, "http:// または https://"},
-		{url.Values{"provider": {"custom"}, "base_url": {"http://user:pass@example.jp/v1"}}, "http:// または https://"},
-		{url.Values{"provider": {"gemini"}, "api_key": {"k"}, "model": {"bad model"}}, "モデル名は半角の英数字"},
-		{url.Values{"provider": {"gemini"}, "api_key": {"two words"}}, "空白や改行"},
+		{url.Values{"provider": {"custom"}, "base_url_custom": {"ftp://example.jp"}}, "http:// または https://"},
+		{url.Values{"provider": {"custom"}, "base_url_custom": {"http://user:pass@example.jp/v1"}}, "http:// または https://"},
+		{url.Values{"provider": {"gemini"}, "api_key_gemini": {"k"}, "model_gemini": {"bad model"}}, "モデル名は半角の英数字"},
+		{url.Values{"provider": {"gemini"}, "api_key_gemini": {"two words"}}, "空白や改行"},
 		// キーがどこにも無い設定は保存しない（保存すると AI が使えなくなる）。
 		{url.Values{"provider": {"openai"}}, "APIキーを入力してください"},
 	} {
@@ -231,10 +231,10 @@ func TestAISettingsBlankKeyKeepsEnvKey(t *testing.T) {
 	env := newTestEnvWith(t, Config{AI: envAI}, nil)
 	adm := env.loggedIn(admin)
 
-	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"gemini"}, "api_key": {""}, "model": {"gemini-3.5-flash-lite"}}),
+	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"gemini"}, "api_key_gemini": {""}, "model_gemini": {"gemini-3.5-flash-lite"}}),
 		aiSettingsPath+"?flash=ai_saved")
 	saved, _ := savedAI(t, env)
-	if saved.APIKey != "" {
+	if saved.Providers[ai.KindGemini].APIKey != "" {
 		t.Fatalf("blank key must not be stored: %+v", saved)
 	}
 	if !ai.IsConfigured(env.server.aiProvider()) {
@@ -272,19 +272,19 @@ func TestAISettingsKeyIsNotSentToAnotherDestination(t *testing.T) {
 	env := newTestEnv(t)
 	adm := env.loggedIn(admin)
 
-	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url": {first.URL}, "api_key": {"secret-first"}}),
+	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url_custom": {first.URL}, "api_key_custom": {"secret-first"}}),
 		aiSettingsPath+"?flash=ai_saved")
 	// 同じ送り先なら、空欄のまま保存してもキーを引き継ぐ。
-	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url": {first.URL}, "model": {"qwen2.5"}}),
+	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url_custom": {first.URL}, "model_custom": {"qwen2.5"}}),
 		aiSettingsPath+"?flash=ai_saved")
-	if saved, _ := savedAI(t, env); saved.APIKey != "secret-first" || saved.Model != "qwen2.5" {
+	if saved, _ := savedAI(t, env); saved.Providers[ai.KindCustom].APIKey != "secret-first" || saved.Providers[ai.KindCustom].Model != "qwen2.5" {
 		t.Fatalf("same destination must keep the key: %+v", saved)
 	}
 
 	// 接続テスト（保存前）で別の送り先を試しても、保存済みのキーは送らない。
 	var tr aiTestResponse
 	res := adm.postAPI(aiSettingsTestPath, "application/x-www-form-urlencoded",
-		strings.NewReader(url.Values{"provider": {"custom"}, "base_url": {second.URL}}.Encode()))
+		strings.NewReader(url.Values{"provider": {"custom"}, "base_url_custom": {second.URL}}.Encode()))
 	expectStatus(t, res, http.StatusOK)
 	if err := json.Unmarshal([]byte(res.Body), &tr); err != nil || !tr.OK {
 		t.Fatalf("test = %s (%v)", res.Body, err)
@@ -294,8 +294,8 @@ func TestAISettingsKeyIsNotSentToAnotherDestination(t *testing.T) {
 	}
 
 	// 別の送り先で保存すると、キーは引き継がない。
-	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url": {second.URL}}), aiSettingsPath+"?flash=ai_saved")
-	if saved, _ := savedAI(t, env); saved.APIKey != "" || saved.BaseURL != second.URL {
+	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url_custom": {second.URL}}), aiSettingsPath+"?flash=ai_saved")
+	if saved, _ := savedAI(t, env); saved.Providers[ai.KindCustom].APIKey != "" || saved.Providers[ai.KindCustom].BaseURL != second.URL {
 		t.Fatalf("another destination must not inherit the key: %+v", saved)
 	}
 	env.loggedIn(studentA).postAI("suggest-titles", "本文")
@@ -306,18 +306,18 @@ func TestAISettingsKeyIsNotSentToAnotherDestination(t *testing.T) {
 	}
 
 	// 別のプロバイダーに切り替えたときも、保存済みのキーを使わない（キーが無いので保存しない）。
-	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url": {first.URL}, "api_key": {"secret-first"}}),
+	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url_custom": {first.URL}, "api_key_custom": {"secret-first"}}),
 		aiSettingsPath+"?flash=ai_saved")
 	res = adm.postForm(aiSettingsPath, url.Values{"provider": {"openai"}})
 	expectStatus(t, res, http.StatusUnprocessableEntity)
-	if saved, _ := savedAI(t, env); saved.Provider != ai.KindCustom || saved.APIKey != "secret-first" {
+	if saved, _ := savedAI(t, env); saved.Provider != ai.KindCustom || saved.Providers[ai.KindCustom].APIKey != "secret-first" {
 		t.Fatalf("rejected save must keep the previous settings: %+v", saved)
 	}
 	// 「保存済みのキーを消す」。
-	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url": {first.URL}, "clear_api_key": {"1"}}),
+	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url_custom": {first.URL}, "clear_key_custom": {"1"}}),
 		aiSettingsPath+"?flash=ai_saved")
-	if saved, _ := savedAI(t, env); saved.APIKey != "" {
-		t.Fatalf("clear_api_key must remove the key: %+v", saved)
+	if saved, _ := savedAI(t, env); saved.Providers[ai.KindCustom].APIKey != "" {
+		t.Fatalf("clear_key_custom must remove the key: %+v", saved)
 	}
 }
 
@@ -331,11 +331,11 @@ func TestResolveAIConfigPriority(t *testing.T) {
 		saved              savedAIConfig
 		key, src, base, md string
 	}{
-		{"saved key wins", savedAIConfig{Provider: ai.KindGemini, APIKey: "db-key"}, "db-key", "saved", "http://proxy.example", "env-model"},
+		{"saved key wins", savedAIConfig{Provider: ai.KindGemini, Providers: map[string]savedProviderConfig{ai.KindGemini: {APIKey: "db-key"}}}, "db-key", "saved", "http://proxy.example", "env-model"},
 		{"env key fallback", savedAIConfig{Provider: ai.KindGemini}, "env-key", "GEMINI_API_KEY", "http://proxy.example", "env-model"},
-		{"provider env var", savedAIConfig{Provider: ai.KindOpenAI, Model: "m"}, "openai-env", "OPENAI_API_KEY", "", "m"},
+		{"provider env var", savedAIConfig{Provider: ai.KindOpenAI, Providers: map[string]savedProviderConfig{ai.KindOpenAI: {Model: "m"}}}, "openai-env", "OPENAI_API_KEY", "", "m"},
 		{"no key", savedAIConfig{Provider: ai.KindClaude}, "", "", "", ""},
-		{"custom ignores other env", savedAIConfig{Provider: ai.KindCustom, BaseURL: "http://localhost:11434/v1"}, "", "", "http://localhost:11434/v1", ""},
+		{"custom ignores other env", savedAIConfig{Provider: ai.KindCustom, Providers: map[string]savedProviderConfig{ai.KindCustom: {BaseURL: "http://localhost:11434/v1"}}}, "", "", "http://localhost:11434/v1", ""},
 	}
 	for _, tc := range cases {
 		cfg, src := resolveAIConfig(tc.saved, env, getenv)
@@ -345,10 +345,10 @@ func TestResolveAIConfigPriority(t *testing.T) {
 	}
 	// custom の環境変数のキーは、同じ送り先のときだけ使う。
 	customEnv := ai.Config{Kind: ai.KindCustom, APIKey: "custom-env", BaseURL: "https://llm.example/v1/"}
-	if cfg, _ := resolveAIConfig(savedAIConfig{Provider: ai.KindCustom, BaseURL: "https://llm.example/v1"}, customEnv, getenv); cfg.APIKey != "custom-env" {
+	if cfg, _ := resolveAIConfig(savedAIConfig{Provider: ai.KindCustom, Providers: map[string]savedProviderConfig{ai.KindCustom: {BaseURL: "https://llm.example/v1"}}}, customEnv, getenv); cfg.APIKey != "custom-env" {
 		t.Errorf("same custom destination: key = %q", cfg.APIKey)
 	}
-	if cfg, _ := resolveAIConfig(savedAIConfig{Provider: ai.KindCustom, BaseURL: "https://other.example/v1"}, customEnv, getenv); cfg.APIKey != "" {
+	if cfg, _ := resolveAIConfig(savedAIConfig{Provider: ai.KindCustom, Providers: map[string]savedProviderConfig{ai.KindCustom: {BaseURL: "https://other.example/v1"}}}, customEnv, getenv); cfg.APIKey != "" {
 		t.Errorf("another custom destination must not get the env key: %q", cfg.APIKey)
 	}
 }
@@ -374,7 +374,7 @@ func TestAISettingsConnectionTest(t *testing.T) {
 	}
 
 	ok := newCompatMock(t, "<img src=x onerror=alert(1)>\n読書会のお知らせ")
-	out := post(url.Values{"provider": {"custom"}, "base_url": {ok.URL}, "model": {"llama3.1"}})
+	out := post(url.Values{"provider": {"custom"}, "base_url_custom": {ok.URL}, "model_custom": {"llama3.1"}})
 	if !out.OK || len(out.Titles) != 2 || out.ElapsedMS < 0 || !strings.Contains(out.Provider, "llama3.1") {
 		t.Fatalf("ok test = %+v", out)
 	}
@@ -387,7 +387,7 @@ func TestAISettingsConnectionTest(t *testing.T) {
 	bad := geminiMock(t, http.StatusBadRequest, geminiKeyInvalidBody, nil)
 	t.Setenv("AI_PROVIDER", "gemini")
 	t.Setenv("AI_BASE_URL", bad.URL)
-	out = post(url.Values{"provider": {"gemini"}, "api_key": {"AQ.invalid-key"}})
+	out = post(url.Values{"provider": {"gemini"}, "api_key_gemini": {"AQ.invalid-key"}})
 	if out.OK || out.Message != aiAuthErrorMessage {
 		t.Fatalf("invalid key test = %+v", out)
 	}
@@ -457,7 +457,7 @@ func TestAISettingsConcurrentSwap(t *testing.T) {
 		}()
 	}
 	for j := 0; j < 5; j++ {
-		adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url": {mock.URL}, "model": {fmt.Sprintf("m%d", j)}})
+		adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url_custom": {mock.URL}, "model_custom": {fmt.Sprintf("m%d", j)}})
 	}
 	wg.Wait()
 	if name := env.server.aiProvider().Name(); !strings.Contains(name, "m4") {
@@ -493,14 +493,14 @@ func TestSettingsAI_WritingStylePresetsAndGlossary(t *testing.T) {
 
 	// 2. 新しい writing_style の保存
 	postData := url.Values{
-		"provider":      {"custom"},
-		"base_url":      {mock.URL + "/v1"},
-		"writing_style": {"business"},
-		"glossary":      {"人工知能=AI\n深層学習=Deep Learning"},
+		"provider":        {"custom"},
+		"base_url_custom": {mock.URL + "/v1"},
+		"writing_style":   {"business"},
+		"glossary":        {"人工知能=AI\n深層学習=Deep Learning"},
 	}
 	expectRedirect(t, adm.postForm(aiSettingsPath, postData), aiSettingsPath+"?flash=ai_saved")
 	saved, ok := savedAI(t, env)
-	if !ok || saved.WritingStyle != "business" || saved.AcademicStyle {
+	if !ok || saved.WritingStyle != "business" {
 		t.Fatalf("saved writing_style want business, got %+v", saved)
 	}
 	if !strings.Contains(saved.Glossary, "人工知能=AI") {
@@ -511,37 +511,33 @@ func TestSettingsAI_WritingStylePresetsAndGlossary(t *testing.T) {
 	postData.Set("writing_style", "creative")
 	expectRedirect(t, adm.postForm(aiSettingsPath, postData), aiSettingsPath+"?flash=ai_saved")
 	saved, _ = savedAI(t, env)
-	if saved.WritingStyle != "creative" || saved.AcademicStyle {
+	if saved.WritingStyle != "creative" {
 		t.Fatalf("saved writing_style want creative, got %+v", saved)
 	}
 
-	// 4. 後方互換性テスト: academic_style=1 のみ送信した場合
-	postLegacy := url.Values{
-		"provider":       {"custom"},
-		"base_url":       {mock.URL + "/v1"},
-		"academic_style": {"1"},
-	}
-	expectRedirect(t, adm.postForm(aiSettingsPath, postLegacy), aiSettingsPath+"?flash=ai_saved")
+	// 4. academic スタイルの保存
+	postData.Set("writing_style", "academic")
+	expectRedirect(t, adm.postForm(aiSettingsPath, postData), aiSettingsPath+"?flash=ai_saved")
 	saved, _ = savedAI(t, env)
-	if saved.WritingStyle != "academic" || !saved.AcademicStyle {
-		t.Fatalf("legacy academic_style want academic/true, got %+v", saved)
+	if saved.WritingStyle != "academic" {
+		t.Fatalf("saved writing_style want academic, got %+v", saved)
 	}
 
 	// 5. standard スタイルの保存
 	postData.Set("writing_style", "standard")
 	expectRedirect(t, adm.postForm(aiSettingsPath, postData), aiSettingsPath+"?flash=ai_saved")
 	saved, _ = savedAI(t, env)
-	if saved.WritingStyle != "standard" || saved.AcademicStyle {
-		t.Fatalf("saved writing_style want standard/false, got %+v", saved)
+	if saved.WritingStyle != "standard" {
+		t.Fatalf("saved writing_style want standard, got %+v", saved)
 	}
 
-	// 6. DB上の古い JSON（academic_style: true のみで writing_style が空）の読み込み互換性
-	oldJSON := `{"provider":"custom","base_url":"` + mock.URL + `/v1","academic_style":true}`
-	if err := upsertSetting(env.db, aiSettingKey, oldJSON); err != nil {
+	// 6. DB上の JSON（writing_style が空のときは standard になる）の読み込み
+	rawJSON := `{"provider":"custom","providers":{"custom":{"base_url":"` + mock.URL + `/v1"}}}`
+	if err := upsertSetting(env.db, aiSettingKey, rawJSON); err != nil {
 		t.Fatal(err)
 	}
 	loaded, ok := env.server.loadAIConfig()
-	if !ok || loaded.WritingStyle != "academic" || !loaded.AcademicStyle {
-		t.Fatalf("loaded old JSON want academic/true, got %+v", loaded)
+	if !ok || loaded.WritingStyle != "standard" {
+		t.Fatalf("loaded JSON without writing_style want standard, got %+v", loaded)
 	}
 }

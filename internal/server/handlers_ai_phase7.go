@@ -60,7 +60,7 @@ func (s *Server) handleAIAcademic(c echo.Context) error {
 		case ai.ActionTranslate:
 			targetLang := c.FormValue("target_lang")
 			var translated string
-			translated, err = p.Translate(ctx, text, "", targetLang, ai.TranslateOptions{Academic: true})
+			translated, err = p.Translate(ctx, text, "", targetLang, ai.TranslateOptions{WritingStyle: ai.WritingStyleAcademic})
 			if err == nil {
 				res.Text = translated
 				target := targetLang

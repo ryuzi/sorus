@@ -238,8 +238,8 @@ func TestAudit_M3_SyncSettingsAtomicTransaction(t *testing.T) {
 	req := SyncRequest{
 		Action: SyncActionSyncSettings,
 		Settings: &SyncSettings{
-			SiteName:   strPtr("New Site Name Attempt"),
-			FrontCards: &badCards,
+			SiteName:      strPtr("New Site Name Attempt"),
+			FrontSections: &[]FrontSection{{Type: FrontSectionCards, Pages: badCards}},
 		},
 	}
 	rec := env.call(adminTok, req)
@@ -311,7 +311,7 @@ func TestAudit_L1_TranslationProviderValidation(t *testing.T) {
 	// 2. AI 設定保存で不正な translation_provider を指定するとエラー
 	saveRes := adm.postForm("/admin/settings/ai", url.Values{
 		"provider":             {"gemini"},
-		"api_key":              {"test-key-1234"},
+		"api_key_gemini":       {"test-key-1234"},
 		"translation_provider": {"invalid_provider"},
 	})
 	expectStatus(t, saveRes, http.StatusUnprocessableEntity)
@@ -381,4 +381,3 @@ func TestAudit_L3_SyncThemeMuLock(t *testing.T) {
 		t.Errorf("saved theme = %q, want 'tech'", got)
 	}
 }
-

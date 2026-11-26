@@ -31,15 +31,26 @@ type SiteMenuItem struct {
 type SiteStructure struct {
 	SiteMenu       []SiteMenuItem `json:"site_menu"`
 	SiteFooterMenu []SiteMenuItem `json:"site_footer_menu"`
-	// FrontCards はトップページに並べる固定ページのスラッグ（設定の順）。
-	FrontCards []string `json:"front_cards"`
+	FrontSections  []FrontSection `json:"front_sections"`
+}
+
+type FrontSection struct {
+	Type       string   `json:"type"`
+	Pages      []string `json:"pages,omitempty"`
+	Tag        string   `json:"tag,omitempty"`
+	Limit      int      `json:"limit,omitempty"`
+	Title      string   `json:"title,omitempty"`
+	Layout     string   `json:"layout,omitempty"`
+	LinkURL    string   `json:"link_url,omitempty"`
+	LinkLabel  string   `json:"link_label,omitempty"`
+	ArticleTag string   `json:"article_tag,omitempty"`
 }
 
 // SiteStructureUpdate はサイト構成の部分的な更新。nil の項目は今の値を保つ。
 type SiteStructureUpdate struct {
 	SiteMenu       *[]SiteMenuItem
 	SiteFooterMenu *[]SiteMenuItem
-	FrontCards     *[]string
+	FrontSections  *[]FrontSection
 }
 
 // MediaQuery は cms_list_media の検索条件。
@@ -84,7 +95,7 @@ func (s *Server) siteTools() []*tool {
 			info: toolInfo{
 				Name:  "cms_update_site_structure",
 				Title: "サイト構成の変更",
-				Description: "公開サイトのナビゲーションメニュー（site_menu）・フッターのサイトマップ（site_footer_menu）・トップページのカード（front_cards）を保存します。" +
+				Description: "公開サイトのナビゲーションメニュー（site_menu）・フッターのサイトマップ（site_footer_menu）・トップページのセクション（front_sections）を保存します。" +
 					"指定した項目だけを置き換え、省略した項目は今の値を保ちます（空配列 [] で空にできます）。今の値は cms_get_site_context の site_structure で確認してください。" +
 					"件数（メニュー最大8項目・フッター最大6列・子項目は1項目に最大10・カード最大6）・階層（子項目は1階層まで）・種類・URL・表示名は管理画面の「サイト構成」と同じ規則で検査し、" +
 					"不正なら何も保存せずに理由を返します。参照先のページが無い・未公開の項目は保存したうえで warnings で知らせます（公開サイトには表示されません）。" +
@@ -93,10 +104,7 @@ func (s *Server) siteTools() []*tool {
 				InputSchema: objectSchema(map[string]any{
 					"site_menu":        menuArraySchema("ナビゲーションメニュー（最上位の項目の配列）。"+menuDesc, true),
 					"site_footer_menu": menuArraySchema("フッターのサイトマップ。最上位の項目が列（見出し）で、その children が列のリンク。"+menuDesc, true),
-					"front_cards": map[string]any{
-						"type": "array", "description": "トップページにカードとして並べる公開中の固定ページのスラッグ（表示順）",
-						"items": map[string]any{"type": "string"},
-					},
+					"front_sections":   map[string]any{"type": "array", "description": "トップページの表示順セクション。type は hero/cards/gallery/article_list", "items": objectSchema(map[string]any{"type": enumProp("種類", "hero", "cards", "gallery", "article_list"), "pages": map[string]any{"type": "array", "items": map[string]any{"type": "string"}}, "tag": stringProp("画像タグ"), "limit": integerProp("表示件数", 0, 24), "title": stringProp("見出し"), "layout": enumProp("並べ方", "justified", "masonry", "cards"), "link_url": stringProp("リンク先"), "link_label": stringProp("リンク文言"), "article_tag": stringProp("記事タグ")}, "type")},
 				}),
 				Annotations: &toolAnnotations{Title: "サイト構成の変更", IdempotentHint: true},
 			},
@@ -140,12 +148,12 @@ func menuArraySchema(desc string, withChildren bool) map[string]any {
 type updateSiteStructureArgs struct {
 	SiteMenu       *[]SiteMenuItem `json:"site_menu"`
 	SiteFooterMenu *[]SiteMenuItem `json:"site_footer_menu"`
-	FrontCards     *[]string       `json:"front_cards"`
+	FrontSections  *[]FrontSection `json:"front_sections"`
 }
 
 type updateSiteStructureResult struct {
 	SiteStructure SiteStructure `json:"site_structure"`
-	// Updated は置き換えた項目の名前（site_menu・site_footer_menu・front_cards）。
+	// Updated は置き換えた項目の名前（site_menu・site_footer_menu・front_sections）。
 	Updated  []string `json:"updated"`
 	Warnings []string `json:"warnings,omitempty"`
 	Message  string   `json:"message"`
@@ -166,7 +174,7 @@ func (s *Server) toolUpdateSiteStructure(ctx context.Context, user *auth.User, r
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
-	upd := SiteStructureUpdate{SiteMenu: args.SiteMenu, SiteFooterMenu: args.SiteFooterMenu, FrontCards: args.FrontCards}
+	upd := SiteStructureUpdate{SiteMenu: args.SiteMenu, SiteFooterMenu: args.SiteFooterMenu, FrontSections: args.FrontSections}
 	var updated []string
 	if upd.SiteMenu != nil {
 		updated = append(updated, "site_menu")
@@ -174,11 +182,11 @@ func (s *Server) toolUpdateSiteStructure(ctx context.Context, user *auth.User, r
 	if upd.SiteFooterMenu != nil {
 		updated = append(updated, "site_footer_menu")
 	}
-	if upd.FrontCards != nil {
-		updated = append(updated, "front_cards")
+	if upd.FrontSections != nil {
+		updated = append(updated, "front_sections")
 	}
 	if len(updated) == 0 {
-		return nil, toolErrorf("site_menu・site_footer_menu・front_cards のうち、変更する項目を指定してください")
+		return nil, toolErrorf("site_menu・site_footer_menu・front_sections のうち、変更する項目を指定してください")
 	}
 	saved, warnings, err := s.cfg.UpdateSiteStructure(ctx, upd)
 	if err != nil {
@@ -260,8 +268,8 @@ func (s *Server) siteStructure(ctx context.Context) (*SiteStructure, error) {
 	if st.SiteFooterMenu == nil {
 		st.SiteFooterMenu = []SiteMenuItem{}
 	}
-	if st.FrontCards == nil {
-		st.FrontCards = []string{}
+	if st.FrontSections == nil {
+		st.FrontSections = []FrontSection{}
 	}
 	return &st, nil
 }

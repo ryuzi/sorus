@@ -71,24 +71,14 @@ func (s *Server) registerAISettingsRoutes(authed *echo.Group, adminOnly echo.Mid
 	authed.POST("/settings/ai/reset", s.handleAISettingsReset, aiOnly, adminOnly)
 }
 
-// savedAIConfig は画面で保存した AI の設定。APIKey が空なら環境変数のキーを使う（resolveAIConfig）。
-//
-// Provider はメインのプロバイダー（既定で使う AI）。プロバイダーごとの設定は Providers に持ち、APIKey・Model・BaseURL・
-// DeepLAPIKey は、Providers のメインのプロバイダー・DeepL の設定を写した値（旧形式。古い版の sorus でも読めるよう
-// 保存し続ける）。旧形式だけの保存データは loadAIConfig が Providers に補完する（normalizeSavedAI）。
+// savedAIConfig は画面で保存した AI の設定。プロバイダーごとの設定は Providers に持つ。
 type savedAIConfig struct {
 	Provider string `json:"provider"`
-	APIKey   string `json:"api_key,omitempty"`
-	Model    string `json:"model,omitempty"`
-	// BaseURL は Provider が custom のときだけ保存する（それ以外は常に空）。
-	BaseURL string `json:"base_url,omitempty"`
 	// Providers はプロバイダー（gemini・openai・claude・custom・deepl）ごとの設定。
 	Providers map[string]savedProviderConfig `json:"providers,omitempty"`
 	// 多言語・翻訳専用設定
 	TranslationProvider string `json:"translation_provider,omitempty"`
-	DeepLAPIKey         string `json:"deepl_api_key,omitempty"`
 	Glossary            string `json:"glossary,omitempty"`
-	AcademicStyle       bool   `json:"academic_style,omitempty"`
 	WritingStyle        string `json:"writing_style,omitempty"`
 }
 
@@ -249,64 +239,42 @@ func (s *Server) loadAIConfig() (savedAIConfig, bool) {
 		return savedAIConfig{}, false
 	}
 	normalizeSavedAI(&cfg)
-	// 下位互換性: AcademicStyle または ai_academic_style "1"
 	if cfg.WritingStyle == "" {
-		if cfg.AcademicStyle {
-			cfg.WritingStyle = ai.WritingStyleAcademic
-		} else {
-			cfg.WritingStyle = ai.WritingStyleStandard
-		}
-	} else if cfg.WritingStyle == "1" {
-		cfg.WritingStyle = ai.WritingStyleAcademic
-	}
-	if cfg.WritingStyle == ai.WritingStyleAcademic {
-		cfg.AcademicStyle = true
+		cfg.WritingStyle = ai.WritingStyleStandard
 	}
 	return cfg, true
 }
 
-// normalizeSavedAI は旧形式（Provider・APIKey・Model・BaseURL・DeepLAPIKey だけ）の保存データを Providers に補完し、
-// Providers のメインのプロバイダー・DeepL の設定を旧形式の項目に写す。知らないプロバイダーの設定と、custom 以外の
-// ベース URL は捨てる。
+// normalizeSavedAI は知らないプロバイダーの設定と、custom 以外のベース URL、空の設定を Providers から取り除く。
 func normalizeSavedAI(cfg *savedAIConfig) {
-	providers := make(map[string]savedProviderConfig, len(cfg.Providers)+2)
+	providers := make(map[string]savedProviderConfig, len(cfg.Providers))
 	for k, pc := range cfg.Providers {
-		if _, ok := aiProviderOptionFor(k); ok {
-			providers[k] = pc
+		if _, ok := aiProviderOptionFor(k); !ok {
+			continue
 		}
-	}
-	if _, ok := providers[cfg.Provider]; !ok && cfg.Provider != "" {
-		pc := savedProviderConfig{APIKey: cfg.APIKey, Model: cfg.Model, BaseURL: cfg.BaseURL}
-		if cfg.Provider == ai.KindDeepL && pc.APIKey == "" {
-			pc.APIKey = cfg.DeepLAPIKey
-		}
-		providers[cfg.Provider] = pc
-	}
-	if _, ok := providers[ai.KindDeepL]; !ok && cfg.DeepLAPIKey != "" {
-		providers[ai.KindDeepL] = savedProviderConfig{APIKey: cfg.DeepLAPIKey}
-	}
-	for k, pc := range providers {
 		if k != ai.KindCustom {
 			pc.BaseURL = ""
 		}
 		if pc == (savedProviderConfig{}) {
-			delete(providers, k)
 			continue
 		}
 		providers[k] = pc
 	}
 	cfg.Providers = providers
-	main := providers[cfg.Provider]
-	cfg.APIKey, cfg.Model, cfg.BaseURL = main.APIKey, main.Model, main.BaseURL
-	cfg.DeepLAPIKey = providers[ai.KindDeepL].APIKey
 }
 
-// savedAIFor は saved のうち kind の設定だけを、メインのプロバイダーの形（Provider・APIKey・Model・BaseURL）にして返す。
+// savedAIFor は saved のうち kind をメインのプロバイダーにした設定を返す。
 // 文章スタイルは全体の設定を使う。resolveAIConfig・buildAIProvider に渡してプロバイダーを作る。
 func savedAIFor(saved savedAIConfig, kind string) savedAIConfig {
-	pc := saved.Providers[kind]
-	return savedAIConfig{Provider: kind, APIKey: pc.APIKey, Model: pc.Model, BaseURL: pc.BaseURL,
-		WritingStyle: saved.WritingStyle, AcademicStyle: saved.AcademicStyle}
+	var providers map[string]savedProviderConfig
+	if pc, ok := saved.Providers[kind]; ok && pc != (savedProviderConfig{}) {
+		providers = map[string]savedProviderConfig{kind: pc}
+	}
+	return savedAIConfig{
+		Provider:     kind,
+		Providers:    providers,
+		WritingStyle: saved.WritingStyle,
+	}
 }
 
 // resolveAIConfig は画面で保存した設定 saved に環境変数 env を合わせて、プロバイダーを作る設定と、使うキーの
@@ -314,16 +282,13 @@ func savedAIFor(saved savedAIConfig, kind string) savedAIConfig {
 // 環境変数のキーは、そのキーが向けられたプロバイダー（custom なら同じベース URL）にだけ使い、別の送り先には送らない。
 func resolveAIConfig(saved savedAIConfig, env ai.Config, getenv func(string) string) (ai.Config, string) {
 	kind := saved.Provider
-	cfg := ai.Config{Kind: kind, Model: saved.Model, MissingKeyEnv: ai.KeyEnvName(kind)}
-	cfg.WritingStyle = saved.WritingStyle
-	if cfg.WritingStyle == "" && saved.AcademicStyle {
-		cfg.WritingStyle = ai.WritingStyleAcademic
-	}
+	pc := saved.Providers[kind]
+	cfg := ai.Config{Kind: kind, Model: pc.Model, MissingKeyEnv: ai.KeyEnvName(kind), WritingStyle: saved.WritingStyle}
 	sameAsEnv := env.Kind == kind
 	if kind == ai.KindCustom {
-		cfg.BaseURL = saved.BaseURL
+		cfg.BaseURL = pc.BaseURL
 		// custom の環境変数のキーは、環境変数で指定したのと同じ送り先のときだけ使う。
-		sameAsEnv = sameAsEnv && strings.TrimRight(env.BaseURL, "/") == saved.BaseURL
+		sameAsEnv = sameAsEnv && strings.TrimRight(env.BaseURL, "/") == pc.BaseURL
 	} else if sameAsEnv {
 		// 環境変数で同じプロバイダーにプロキシ（AI_BASE_URL）を指定していれば、それを使う。
 		cfg.BaseURL = env.BaseURL
@@ -333,8 +298,8 @@ func resolveAIConfig(saved savedAIConfig, env ai.Config, getenv func(string) str
 	}
 	source := ""
 	switch {
-	case saved.APIKey != "":
-		cfg.APIKey, source = saved.APIKey, "saved"
+	case pc.APIKey != "":
+		cfg.APIKey, source = pc.APIKey, "saved"
 	case sameAsEnv && env.APIKey != "":
 		cfg.APIKey, source = env.APIKey, ai.KeyEnvName(kind)
 		if strings.TrimSpace(getenv("AI_API_KEY")) != "" {
@@ -470,9 +435,7 @@ func aiFormMessages(errs []aiFormError) []string {
 // サーバーにキーを送らない）。custom 以外ではベース URL を保存しない。入力の誤りは利用者に見せる文で返す。
 //
 // プロバイダーごとの欄（api_key_<種類>・model_<種類>・base_url_<種類>・clear_key_<種類>）を受け付ける。送られて
-// こなかったプロバイダーの設定は保存済みのまま残す。従来の1組の欄（api_key・model・base_url・clear_api_key）は
-// メインのプロバイダー mainProvider の欄、deepl_api_key・clear_deepl_api_key は DeepL の欄として扱う（同じ
-// プロバイダーの種類ごとの欄があれば、そちらを使う）。
+// こなかったプロバイダーの設定は保存済みのまま残す。
 func (s *Server) aiForm(c echo.Context, saved savedAIConfig, hasSaved bool, mainProvider string) (savedAIConfig, []aiFormError) {
 	var errs []aiFormError
 	form, _ := c.FormParams()
@@ -497,8 +460,8 @@ func (s *Server) aiForm(c echo.Context, saved savedAIConfig, hasSaved bool, main
 		prev := saved.Providers[kind]
 		pc := savedProviderConfig{Model: prev.Model, BaseURL: prev.BaseURL}
 
-		if name := pickField(has, "model_"+kind, isMain, "model"); name != "" {
-			pc.Model = strings.TrimSpace(c.FormValue(name))
+		if has("model_" + kind) {
+			pc.Model = strings.TrimSpace(c.FormValue("model_" + kind))
 			switch {
 			case len(pc.Model) > maxAIModelLength:
 				fail("モデル名が長すぎます（100文字まで）")
@@ -508,8 +471,8 @@ func (s *Server) aiForm(c echo.Context, saved savedAIConfig, hasSaved bool, main
 		}
 
 		if kind == ai.KindCustom {
-			if name := pickField(has, "base_url_"+kind, isMain, "base_url"); name != "" {
-				raw := c.FormValue(name)
+			if has("base_url_" + kind) {
+				raw := c.FormValue("base_url_" + kind)
 				if strings.TrimSpace(raw) == "" && !isMain {
 					// メインでないローカル LLM は、ベース URL を空にすれば使わない設定になる。
 					pc.BaseURL = ""
@@ -537,15 +500,7 @@ func (s *Server) aiForm(c echo.Context, saved savedAIConfig, hasSaved bool, main
 		}
 
 		key := strings.TrimSpace(c.FormValue("api_key_" + kind))
-		if key == "" && isMain {
-			key = strings.TrimSpace(c.FormValue("api_key"))
-		}
-		if key == "" && kind == ai.KindDeepL {
-			key = strings.TrimSpace(c.FormValue("deepl_api_key"))
-		}
-		clear := c.FormValue("clear_key_"+kind) != "" ||
-			(isMain && c.FormValue("clear_api_key") != "") ||
-			(kind == ai.KindDeepL && c.FormValue("clear_deepl_api_key") != "")
+		clear := c.FormValue("clear_key_"+kind) != ""
 		switch {
 		case len(key) > maxAIKeyLength:
 			fail("APIキーが長すぎます")
@@ -582,28 +537,12 @@ func (s *Server) aiForm(c echo.Context, saved savedAIConfig, hasSaved bool, main
 	}
 
 	ws := strings.TrimSpace(c.FormValue("writing_style"))
-	if ws == "" {
-		ws = strings.TrimSpace(c.FormValue("ai_writing_style"))
-	}
-	acadVal := c.FormValue("academic_style")
-	if acadVal == "" {
-		acadVal = c.FormValue("ai_academic_style")
-	}
-	isAcad := acadVal == "1" || acadVal == "true" || acadVal == "on"
-	if ws == "1" {
-		ws = ai.WritingStyleAcademic
-	}
 	switch ws {
 	case ai.WritingStyleStandard, ai.WritingStyleAcademic, ai.WritingStyleBusiness, ai.WritingStyleCreative:
 		next.WritingStyle = ws
 	default:
-		if isAcad {
-			next.WritingStyle = ai.WritingStyleAcademic
-		} else {
-			next.WritingStyle = ai.WritingStyleStandard
-		}
+		next.WritingStyle = ai.WritingStyleStandard
 	}
-	next.AcademicStyle = (next.WritingStyle == ai.WritingStyleAcademic)
 
 	normalizeSavedAI(&next)
 	return next, errs
@@ -623,18 +562,6 @@ func validateGlossary(g string) string {
 		return r != '\n' && r != '\r' && r != '\t' && unicode.IsControl(r)
 	}) {
 		return "用語集に使えない制御文字が含まれています。改行・タブ以外の特殊な文字を取り除いてください"
-	}
-	return ""
-}
-
-// pickField はプロバイダーごとの欄 perKind が送られていればその名前を、無くてメインのプロバイダーなら従来の欄
-// legacy が送られていればその名前を返す。どちらも無ければ空（保存済みの値を残す）。
-func pickField(has func(string) bool, perKind string, isMain bool, legacy string) string {
-	switch {
-	case has(perKind):
-		return perKind
-	case isMain && has(legacy):
-		return legacy
 	}
 	return ""
 }
@@ -775,20 +702,21 @@ func maskAIKey(key string) string {
 func (s *Server) aiSettingsData(form savedAIConfig, errs []string) aiSettingsData {
 	saved, hasSaved := s.loadAIConfig()
 	current := s.aiProvider()
+	mainKey := saved.Providers[saved.Provider].APIKey
 	d := aiSettingsData{
 		Providers: aiProviderOptions, Form: form, HasSaved: hasSaved,
-		HasSavedKey: hasSaved && saved.APIKey != "",
+		HasSavedKey: hasSaved && mainKey != "",
 		Current:     current.Name(), Configured: ai.IsConfigured(current),
 		EnvKeys: envAIKeys(), Errors: errs,
 
 		MultilingualEnabled: s.isMultilingualEnabled(),
 	}
 	if d.HasSavedKey {
-		d.KeyPreview = maskAIKey(saved.APIKey)
+		d.KeyPreview = maskAIKey(mainKey)
 	}
-	if hasSaved && saved.DeepLAPIKey != "" {
+	if deeplKey := saved.Providers[ai.KindDeepL].APIKey; hasSaved && deeplKey != "" {
 		d.HasSavedDeepLKey = true
-		d.DeepLKeyPreview = maskAIKey(saved.DeepLAPIKey)
+		d.DeepLKeyPreview = maskAIKey(deeplKey)
 	}
 	if hasSaved {
 		_, source := resolveAIConfig(saved, ai.ConfigFromEnv(), os.Getenv)
@@ -815,7 +743,6 @@ func (s *Server) aiSettingsData(form savedAIConfig, errs []string) aiSettingsDat
 		d.ProviderConfigs = append(d.ProviderConfigs, item)
 	}
 	// 入力欄の値はキーを含めない。
-	d.Form.APIKey, d.Form.DeepLAPIKey = "", ""
 	if len(form.Providers) > 0 {
 		d.Form.Providers = make(map[string]savedProviderConfig, len(form.Providers))
 		for k, pc := range form.Providers {
@@ -824,16 +751,19 @@ func (s *Server) aiSettingsData(form savedAIConfig, errs []string) aiSettingsDat
 		}
 	}
 	if d.Form.WritingStyle == "" {
-		if d.Form.AcademicStyle {
-			d.Form.WritingStyle = ai.WritingStyleAcademic
-		} else {
-			d.Form.WritingStyle = ai.WritingStyleStandard
-		}
+		d.Form.WritingStyle = ai.WritingStyleStandard
 	}
 	if d.Form.Provider == "" {
 		d.Form.Provider = ai.KindGemini
 		if env.Kind != "" {
-			d.Form.Provider, d.Form.Model, d.Form.BaseURL = env.Kind, env.Model, env.BaseURL
+			d.Form.Provider = env.Kind
+			pc := savedProviderConfig{Model: env.Model}
+			if env.Kind == ai.KindCustom {
+				pc.BaseURL = env.BaseURL
+			}
+			if pc != (savedProviderConfig{}) {
+				d.Form.Providers = map[string]savedProviderConfig{env.Kind: pc}
+			}
 			for i := range d.ProviderConfigs {
 				if it := &d.ProviderConfigs[i]; it.Key == env.Kind && it.Model == "" && it.BaseURL == "" {
 					it.Model = env.Model
@@ -851,7 +781,6 @@ func (s *Server) aiSettingsData(form savedAIConfig, errs []string) aiSettingsDat
 // （ProviderConfigs。翻訳用 AI の選択肢に使う）は残し、キーの伏せ字・出どころとローカル LLM の送り先は出さない。
 func (d *aiSettingsData) redactForNonAdmin() {
 	d.KeyPreview, d.DeepLKeyPreview, d.KeySource, d.EnvKeys = "", "", "", nil
-	d.Form.BaseURL = ""
 	for k, pc := range d.Form.Providers {
 		pc.BaseURL = ""
 		d.Form.Providers[k] = pc
@@ -891,32 +820,24 @@ func (s *Server) handleAISettingsSave(c echo.Context) error {
 		if !hasSaved {
 			if env := ai.ConfigFromEnv(); env.Kind != "" {
 				saved.Provider = env.Kind
-				saved.Model = env.Model
-				saved.BaseURL = env.BaseURL
+				pc := savedProviderConfig{Model: env.Model}
+				if env.Kind == ai.KindCustom {
+					pc.BaseURL = env.BaseURL
+				}
+				if pc != (savedProviderConfig{}) {
+					saved.Providers = map[string]savedProviderConfig{env.Kind: pc}
+				}
 			} else {
 				saved.Provider = ai.KindGemini
 			}
 		}
 		ws := strings.TrimSpace(c.FormValue("writing_style"))
-		if ws == "" {
-			ws = strings.TrimSpace(c.FormValue("ai_writing_style"))
-		}
-		acadVal := c.FormValue("academic_style")
-		if acadVal == "" {
-			acadVal = c.FormValue("ai_academic_style")
-		}
-		isAcad := acadVal == "1" || acadVal == "true" || acadVal == "on"
 		switch ws {
 		case ai.WritingStyleStandard, ai.WritingStyleAcademic, ai.WritingStyleBusiness, ai.WritingStyleCreative:
 			saved.WritingStyle = ws
 		default:
-			if isAcad {
-				saved.WritingStyle = ai.WritingStyleAcademic
-			} else {
-				saved.WritingStyle = ai.WritingStyleStandard
-			}
+			saved.WritingStyle = ai.WritingStyleStandard
 		}
-		saved.AcademicStyle = (saved.WritingStyle == ai.WritingStyleAcademic)
 		saved.Glossary = strings.TrimSpace(c.FormValue("glossary"))
 		if msg := validateGlossary(saved.Glossary); msg != "" {
 			// 誤りの画面も通常の画面（handleAISettings）と同じく、管理者向けの値（キーの出どころ・環境変数の名前・

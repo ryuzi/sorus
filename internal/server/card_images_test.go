@@ -104,7 +104,7 @@ func TestPublicFrontCardImagesToggle(t *testing.T) {
 	if _, err := env.db.Exec(`UPDATE articles SET featured_image_url = '/uploads/access.webp' WHERE slug = 'access'`); err != nil {
 		t.Fatal(err)
 	}
-	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontPage: "research", FrontCards: []string{"access"}}); err != nil {
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontPage: "research", FrontSections: []FrontSection{{Type: FrontSectionCards, Pages: []string{"access"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	c := env.newClient()

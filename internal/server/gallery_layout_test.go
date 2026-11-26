@@ -76,25 +76,25 @@ func TestValidateTopGalleryLayoutAndLink(t *testing.T) {
 		wantKey string // 空なら有効
 	}{
 		{"default layout", SiteStructure{}, ""},
-		{"justified", SiteStructure{TopGalleryLayout: "justified"}, ""},
-		{"masonry", SiteStructure{TopGalleryLayout: "masonry"}, ""},
-		{"cards", SiteStructure{TopGalleryLayout: "cards"}, ""},
-		{"unknown layout", SiteStructure{TopGalleryLayout: "grid"}, "structure_err_gallery_layout"},
-		{"layout with markup", SiteStructure{TopGalleryLayout: `cards" onclick="x`}, "structure_err_gallery_layout"},
-		{"site path link", SiteStructure{TopGalleryLinkURL: "/highlights", TopGalleryLinkLabel: "もっと見る"}, ""},
-		{"https link", SiteStructure{TopGalleryLinkURL: "https://photos.example.ac.jp/album?id=1#top"}, ""},
-		{"http link", SiteStructure{TopGalleryLinkURL: "http://photos.example.ac.jp/"}, ""},
-		{"javascript link", SiteStructure{TopGalleryLinkURL: "javascript:alert(1)"}, "structure_err_gallery_link_url"},
-		{"protocol-relative link", SiteStructure{TopGalleryLinkURL: "//evil.example"}, "structure_err_gallery_link_url"},
-		{"backslash link", SiteStructure{TopGalleryLinkURL: "/\\evil.example"}, "structure_err_gallery_link_url"},
-		{"http without host", SiteStructure{TopGalleryLinkURL: "http://"}, "structure_err_gallery_link_url"},
-		{"ftp link", SiteStructure{TopGalleryLinkURL: "ftp://example.com/"}, "structure_err_gallery_link_url"},
-		{"relative link", SiteStructure{TopGalleryLinkURL: "highlights"}, "structure_err_gallery_link_url"},
-		{"link with quote", SiteStructure{TopGalleryLinkURL: `/a"onmouseover="x`}, "structure_err_gallery_link_url"},
-		{"credentials in link", SiteStructure{TopGalleryLinkURL: "http://user:pass@example.com/"}, "structure_err_gallery_link_url"},
-		{"max label", SiteStructure{TopGalleryLinkLabel: strings.Repeat("写", maxGalleryLinkLabelRunes)}, ""},
-		{"long label", SiteStructure{TopGalleryLinkLabel: strings.Repeat("写", maxGalleryLinkLabelRunes+1)}, "structure_err_gallery_link_label"},
-		{"label control", SiteStructure{TopGalleryLinkLabel: "すべて\n見る"}, "structure_err_gallery_link_label"},
+		{"justified", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Layout: "justified"}}}, ""},
+		{"masonry", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Layout: "masonry"}}}, ""},
+		{"cards", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Layout: "cards"}}}, ""},
+		{"unknown layout", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Layout: "grid"}}}, "structure_err_gallery_layout"},
+		{"layout with markup", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Layout: `cards" onclick="x`}}}, "structure_err_gallery_layout"},
+		{"site path link", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "/highlights", LinkLabel: "もっと見る"}}}, ""},
+		{"https link", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "https://photos.example.ac.jp/album?id=1#top"}}}, ""},
+		{"http link", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "http://photos.example.ac.jp/"}}}, ""},
+		{"javascript link", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "javascript:alert(1)"}}}, "structure_err_gallery_link_url"},
+		{"protocol-relative link", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "//evil.example"}}}, "structure_err_gallery_link_url"},
+		{"backslash link", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "/\\evil.example"}}}, "structure_err_gallery_link_url"},
+		{"http without host", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "http://"}}}, "structure_err_gallery_link_url"},
+		{"ftp link", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "ftp://example.com/"}}}, "structure_err_gallery_link_url"},
+		{"relative link", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "highlights"}}}, "structure_err_gallery_link_url"},
+		{"link with quote", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: `/a"onmouseover="x`}}}, "structure_err_gallery_link_url"},
+		{"credentials in link", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkURL: "http://user:pass@example.com/"}}}, "structure_err_gallery_link_url"},
+		{"max label", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkLabel: strings.Repeat("写", maxGalleryLinkLabelRunes)}}}, ""},
+		{"long label", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkLabel: strings.Repeat("写", maxGalleryLinkLabelRunes+1)}}}, "structure_err_gallery_link_label"},
+		{"label control", SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, LinkLabel: "すべて\n見る"}}}, "structure_err_gallery_link_label"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateSiteStructure(tc.st)
@@ -120,24 +120,20 @@ func TestTopGalleryLayoutAndLinkSaveAndRender(t *testing.T) {
 
 	// 保存していなければ行揃え（おすすめ）を選んだ表示で、リンクは出さない。
 	page := adm.get("/admin/settings/structure")
-	expectContains(t, page.Body, `id="top-gallery-layout"`, `name="top_gallery_layout" value="justified" checked`,
-		"行揃え（おすすめ）", "段組み", "カード", `id="top-gallery-link-url" name="top_gallery_link_url"`,
-		`id="top-gallery-link-label" name="top_gallery_link_label" type="text" maxlength="40" value="" placeholder="すべて見る"`)
-	expectNotContains(t, page.Body, `value="masonry" checked`)
+	expectContains(t, page.Body, `name="section_type"`, `value="gallery"`, `name="section_layout"`, `name="section_link_url"`, `name="section_link_label"`, `name="section_tag"`)
 
 	form := structureForm(nil, "research")
-	form.Set("top_gallery_tag", "学校")
-	form.Set("top_gallery_layout", "cards")
-	form.Set("top_gallery_link_url", " /highlights ")
-	form.Set("top_gallery_link_label", "写真をもっと見る")
+	setGalleryFormField(form, "tag", "学校")
+	setGalleryFormField(form, "layout", "cards")
+	setGalleryFormField(form, "link_url", " /highlights ")
+	setGalleryFormField(form, "link_label", "写真をもっと見る")
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure?flash=structure_saved")
 	got := env.server.loadSiteStructure(t.Context())
-	if got.TopGalleryLayout != "cards" || got.TopGalleryLinkURL != "/highlights" || got.TopGalleryLinkLabel != "写真をもっと見る" {
-		t.Fatalf("saved = (%q, %q, %q)", got.TopGalleryLayout, got.TopGalleryLinkURL, got.TopGalleryLinkLabel)
+	if frontGallery(got).Layout != "cards" || frontGallery(got).LinkURL != "/highlights" || frontGallery(got).LinkLabel != "写真をもっと見る" {
+		t.Fatalf("saved = (%q, %q, %q)", frontGallery(got).Layout, frontGallery(got).LinkURL, frontGallery(got).LinkLabel)
 	}
 	page = adm.get("/admin/settings/structure")
-	expectContains(t, page.Body, `name="top_gallery_layout" value="cards" checked`, `value="/highlights"`, `value="写真をもっと見る"`)
-	expectNotContains(t, page.Body, `value="justified" checked`)
+	expectContains(t, page.Body, `name="section_layout"`, `value="/highlights"`, `value="写真をもっと見る"`)
 
 	front := env.newClient().get("/")
 	expectStatus(t, front, http.StatusOK)
@@ -148,9 +144,9 @@ func TestTopGalleryLayoutAndLinkSaveAndRender(t *testing.T) {
 	expectNotContains(t, front.Body, "masonry-grid")
 
 	// 段組みは今までの masonry-grid のクラスも付ける（テーマの CSS が使っている）。文言が空なら「すべて見る」。
-	form.Set("top_gallery_layout", "masonry")
-	form.Set("top_gallery_link_url", "https://photos.example.ac.jp/album")
-	form.Set("top_gallery_link_label", "")
+	setGalleryFormField(form, "layout", "masonry")
+	setGalleryFormField(form, "link_url", "https://photos.example.ac.jp/album")
+	setGalleryFormField(form, "link_label", "")
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure?flash=structure_saved")
 	front = env.newClient().get("/")
 	expectContains(t, front.Body,
@@ -158,8 +154,8 @@ func TestTopGalleryLayoutAndLinkSaveAndRender(t *testing.T) {
 		`<p class="front-gallery-more"><a href="https://photos.example.ac.jp/album">すべて見る</a></p>`)
 
 	// リンク先が空ならリンクを出さない。
-	form.Set("top_gallery_link_url", "")
-	form.Set("top_gallery_link_label", "使わない文言")
+	setGalleryFormField(form, "link_url", "")
+	setGalleryFormField(form, "link_label", "使わない文言")
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure?flash=structure_saved")
 	front = env.newClient().get("/")
 	expectContains(t, front.Body, `data-gallery-layout="masonry"`)
@@ -174,18 +170,19 @@ func TestTopGalleryLayoutAndLinkSaveAndRender(t *testing.T) {
 		"long label":      {"top_gallery_link_label", strings.Repeat("あ", maxGalleryLinkLabelRunes+1)},
 	} {
 		bad := structureForm(nil, "research")
-		bad.Set("top_gallery_tag", "学校")
-		bad.Set("top_gallery_layout", "cards")
-		bad.Set(set[0], set[1])
+		setGalleryFormField(bad, "tag", "学校")
+		setGalleryFormField(bad, "layout", "cards")
+		field := strings.TrimPrefix(set[0], "top_gallery_")
+		setGalleryFormField(bad, map[string]string{"link_url": "link_url", "link_label": "link_label", "layout": "layout"}[field], set[1])
 		res := adm.postForm("/admin/settings/structure", bad)
 		expectStatus(t, res, http.StatusUnprocessableEntity)
-		if got := env.server.loadSiteStructure(t.Context()); got.TopGalleryLayout != before.TopGalleryLayout ||
-			got.TopGalleryLinkURL != before.TopGalleryLinkURL || got.TopGalleryLinkLabel != before.TopGalleryLinkLabel {
+		if got := env.server.loadSiteStructure(t.Context()); frontGallery(got).Layout != frontGallery(before).Layout ||
+			frontGallery(got).LinkURL != frontGallery(before).LinkURL || frontGallery(got).LinkLabel != frontGallery(before).LinkLabel {
 			t.Errorf("%s: saved %+v after a rejected form", name, got)
 		}
 	}
 	bad := structureForm(nil, "research")
-	bad.Set("top_gallery_link_url", "javascript:alert(1)")
+	setGalleryFormField(bad, "link_url", "javascript:alert(1)")
 	res := adm.postForm("/admin/settings/structure", bad)
 	expectContains(t, res.Body, "「すべて見る」のリンク先は、/ で始まるサイト内のパスか", `value="javascript:alert(1)"`)
 }
@@ -194,15 +191,13 @@ func TestTopGalleryLayoutAndLinkSaveAndRender(t *testing.T) {
 func TestTopGalleryTamperedSettingsAreIgnored(t *testing.T) {
 	env := newTestEnv(t)
 	env.insertMedia("tamper-photo", "tamper.webp", "校舎", "", "学校")
-	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{TopGalleryTag: "学校", TopGalleryLimit: 4}); err != nil {
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Tag: "学校", Limit: 4}}}); err != nil {
 		t.Fatal(err)
 	}
-	setSettingForTest(t, env.db, settingTopGalleryLayout, `cards" onmouseover="alert(1)`)
-	setSettingForTest(t, env.db, settingTopGalleryLinkURL, "javascript:alert(1)")
-	setSettingForTest(t, env.db, settingTopGalleryLinkLabel, strings.Repeat("長", maxGalleryLinkLabelRunes+1))
+	setSettingForTest(t, env.db, settingFrontSections, `[{"type":"gallery","tag":"学校","limit":4,"layout":"cards\" onmouseover=\"alert(1)","link_url":"javascript:alert(1)","link_label":"`+strings.Repeat("長", maxGalleryLinkLabelRunes+1)+`"}]`)
 	st := env.server.loadSiteStructure(t.Context())
-	if st.TopGalleryLayout != galleryLayoutJustified || st.TopGalleryLinkURL != "" || st.TopGalleryLinkLabel != "" {
-		t.Fatalf("loaded = (%q, %q, %q)", st.TopGalleryLayout, st.TopGalleryLinkURL, st.TopGalleryLinkLabel)
+	if frontGallery(st).Layout != galleryLayoutJustified || frontGallery(st).LinkURL != "" || frontGallery(st).LinkLabel != "" {
+		t.Fatalf("loaded = (%q, %q, %q)", frontGallery(st).Layout, frontGallery(st).LinkURL, frontGallery(st).LinkLabel)
 	}
 	body := env.newClient().get("/").Body
 	expectContains(t, body, `class="photo-gallery gallery-layout-justified" data-gallery-layout="justified"`)
@@ -214,8 +209,7 @@ func TestTopGalleryEnglishDefaults(t *testing.T) {
 	env := newTestEnv(t)
 	enableMultilingual(t, env.db)
 	env.insertMedia("en-photo", "en.webp", "Campus", "", "campus")
-	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{TopGalleryTag: "campus", TopGalleryLimit: 4,
-		TopGalleryLinkURL: "/en/articles"}); err != nil {
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Tag: "campus", Limit: 4, LinkURL: "/en/articles"}}}); err != nil {
 		t.Fatal(err)
 	}
 	res := env.newClient().get("/en")
@@ -229,32 +223,30 @@ func TestSyncAPISyncSettingsGalleryLayoutAndLink(t *testing.T) {
 	env := newSyncEnv(t)
 	adminToken := env.token("chief-admin", auth.RoleAdmin)
 	layout, linkURL, linkLabel := "masonry", "/highlights", "もっと見る"
-	rec := env.call(adminToken, SyncRequest{Action: SyncActionSyncSettings, Settings: &SyncSettings{
-		TopGalleryLayout: &layout, TopGalleryLinkURL: strPtr(" " + linkURL + " "), TopGalleryLinkLabel: &linkLabel,
-	}})
+	sections := []FrontSection{{Type: FrontSectionGallery, Tag: "photos", Layout: layout, LinkURL: " " + linkURL + " ", LinkLabel: linkLabel}}
+	rec := env.call(adminToken, SyncRequest{Action: SyncActionSyncSettings, Settings: &SyncSettings{FrontSections: &sections}})
 	expectSyncStatus(t, rec, http.StatusOK)
 	res := decodeSync[SyncSettingsResponse](t, rec)
-	if res.Settings.TopGalleryLayout == nil || *res.Settings.TopGalleryLayout != layout ||
-		res.Settings.TopGalleryLinkURL == nil || *res.Settings.TopGalleryLinkURL != linkURL ||
-		res.Settings.TopGalleryLinkLabel == nil || *res.Settings.TopGalleryLinkLabel != linkLabel {
+	if len(res.Settings.FrontSections) != 1 || res.Settings.FrontSections[0].Layout != layout ||
+		res.Settings.FrontSections[0].LinkURL != linkURL || res.Settings.FrontSections[0].LinkLabel != linkLabel {
 		t.Errorf("response = %+v", res.Settings)
 	}
 	st := env.server.loadSiteStructure(t.Context())
-	if st.TopGalleryLayout != layout || st.TopGalleryLinkURL != linkURL || st.TopGalleryLinkLabel != linkLabel {
-		t.Fatalf("saved = (%q, %q, %q)", st.TopGalleryLayout, st.TopGalleryLinkURL, st.TopGalleryLinkLabel)
+	if frontGallery(st).Layout != layout || frontGallery(st).LinkURL != linkURL || frontGallery(st).LinkLabel != linkLabel {
+		t.Fatalf("saved = (%q, %q, %q)", frontGallery(st).Layout, frontGallery(st).LinkURL, frontGallery(st).LinkLabel)
 	}
 
 	// 項目を送らない古い PC の反映では変えない。
-	rec = env.call(adminToken, SyncRequest{Action: SyncActionSyncSettings, Settings: &SyncSettings{TopGalleryTag: strPtr("学校")}})
+	rec = env.call(adminToken, SyncRequest{Action: SyncActionSyncSettings, Settings: &SyncSettings{SiteName: strPtr("still valid")}})
 	expectSyncStatus(t, rec, http.StatusOK)
-	if got := env.server.loadSiteStructure(t.Context()); got.TopGalleryLayout != layout || got.TopGalleryLinkURL != linkURL {
+	if got := env.server.loadSiteStructure(t.Context()); frontGallery(got).Layout != layout || frontGallery(got).LinkURL != linkURL {
 		t.Errorf("after a sync without the fields = %+v", got)
 	}
 
 	for name, settings := range map[string]SyncSettings{
-		"unknown layout":  {TopGalleryLayout: strPtr("grid")},
-		"javascript link": {TopGalleryLinkURL: strPtr("javascript:alert(1)")},
-		"long label":      {TopGalleryLinkLabel: strPtr(strings.Repeat("あ", maxGalleryLinkLabelRunes+1))},
+		"unknown layout":  {FrontSections: &[]FrontSection{{Type: FrontSectionGallery, Layout: "grid"}}},
+		"javascript link": {FrontSections: &[]FrontSection{{Type: FrontSectionGallery, LinkURL: "javascript:alert(1)"}}},
+		"long label":      {FrontSections: &[]FrontSection{{Type: FrontSectionGallery, LinkLabel: strings.Repeat("あ", maxGalleryLinkLabelRunes+1)}}},
 	} {
 		rec := env.call(adminToken, SyncRequest{Action: SyncActionSyncSettings, Settings: &settings})
 		expectSyncStatus(t, rec, http.StatusUnprocessableEntity)
@@ -262,7 +254,7 @@ func TestSyncAPISyncSettingsGalleryLayoutAndLink(t *testing.T) {
 			t.Errorf("%s: message = %q", name, msg)
 		}
 	}
-	if got := env.server.loadSiteStructure(t.Context()); got.TopGalleryLayout != layout || got.TopGalleryLinkURL != linkURL || got.TopGalleryLinkLabel != linkLabel {
+	if got := env.server.loadSiteStructure(t.Context()); frontGallery(got).Layout != layout || frontGallery(got).LinkURL != linkURL || frontGallery(got).LinkLabel != linkLabel {
 		t.Errorf("after rejected syncs = %+v", got)
 	}
 }
@@ -272,8 +264,7 @@ func TestSyncAPISyncSettingsGalleryLayoutAndLink(t *testing.T) {
 func TestRemoteSettingsPushGalleryLayoutAndLink(t *testing.T) {
 	env := newRemoteEnv(t)
 	env.remote.insertMedia("remote-photo", "remote.webp", "校舎", "", "学校")
-	if err := env.local.server.saveSiteStructure(t.Context(), SiteStructure{TopGalleryTag: "学校", TopGalleryLimit: 6,
-		TopGalleryLayout: "cards", TopGalleryLinkURL: "/articles", TopGalleryLinkLabel: "記事を見る"}); err != nil {
+	if err := env.local.server.saveSiteStructure(t.Context(), SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Tag: "学校", Limit: 6, Layout: "cards", LinkURL: "/articles", LinkLabel: "記事を見る"}}}); err != nil {
 		t.Fatal(err)
 	}
 	env.configure("root", auth.RoleAdmin)
@@ -286,7 +277,7 @@ func TestRemoteSettingsPushGalleryLayoutAndLink(t *testing.T) {
 		t.Errorf("message = %q, want no old-server note", out.Message)
 	}
 	st := env.remote.server.loadSiteStructure(t.Context())
-	if st.TopGalleryLayout != "cards" || st.TopGalleryLinkURL != "/articles" || st.TopGalleryLinkLabel != "記事を見る" {
+	if frontGallery(st).Layout != "cards" || frontGallery(st).LinkURL != "/articles" || frontGallery(st).LinkLabel != "記事を見る" {
 		t.Fatalf("remote structure = %+v", st)
 	}
 	expectContains(t, env.remote.newClient().get("/").Body, `data-gallery-layout="cards"`,
@@ -302,8 +293,7 @@ func TestRemoteSettingsPushGalleryLayoutAndLink(t *testing.T) {
 		}))
 		defer old.Close()
 		// タグが無ければフォトギャラリーの画像（sync_media）は送らず、sync_settings の応答だけで判断する。
-		if err := env.local.server.saveSiteStructure(t.Context(), SiteStructure{TopGalleryLimit: 6,
-			TopGalleryLayout: "cards", TopGalleryLinkURL: "/articles", TopGalleryLinkLabel: "記事を見る"}); err != nil {
+		if err := env.local.server.saveSiteStructure(t.Context(), SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Limit: 6, Layout: "cards", LinkURL: "/articles", LinkLabel: "記事を見る"}}}); err != nil {
 			t.Fatal(err)
 		}
 		cfg := env.local.server.loadRemoteConfig()
@@ -315,11 +305,11 @@ func TestRemoteSettingsPushGalleryLayoutAndLink(t *testing.T) {
 			Message string `json:"message"`
 		}
 		env.local.loggedIn(admin).postJSON("/admin/remote/settings/push", nil, &out)
-		if !strings.Contains(out.Message, "フォトギャラリーの並べ方と「すべて見る」リンクは反映されていません") {
+		if !strings.Contains(out.Message, "トップページのセクションは反映されていません") {
 			t.Errorf("message = %q", out.Message)
 		}
-		if s := got.Settings; s == nil || s.TopGalleryLayout == nil || *s.TopGalleryLayout != "cards" ||
-			s.TopGalleryLinkURL == nil || *s.TopGalleryLinkURL != "/articles" || s.TopGalleryLinkLabel == nil || *s.TopGalleryLinkLabel != "記事を見る" {
+		if s := got.Settings; s == nil || s.FrontSections == nil || len(*s.FrontSections) != 1 || (*s.FrontSections)[0].Layout != "cards" ||
+			(*s.FrontSections)[0].LinkURL != "/articles" || (*s.FrontSections)[0].LinkLabel != "記事を見る" {
 			t.Errorf("pushed settings = %+v", got.Settings)
 		}
 	})

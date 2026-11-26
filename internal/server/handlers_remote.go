@@ -2192,23 +2192,20 @@ func (s *Server) handleRemoteSettingsPush(c echo.Context) error {
 		settings.Theme = str(t)
 	}
 	st := s.loadSiteStructure(c.Request().Context())
-	menu, cards := st.Menu, st.FrontCards
+	menu := st.Menu
 	if menu == nil {
 		menu = []MenuItem{}
 	}
-	if cards == nil {
-		cards = []string{}
+	sections := st.FrontSections
+	if sections == nil {
+		sections = []FrontSection{}
 	}
 	footer := st.FooterMenu
 	if footer == nil {
 		footer = []MenuItem{}
 	}
-	tag, limit, title := st.TopGalleryTag, st.TopGalleryLimit, st.TopGalleryTitle
-	settings.SiteMenu, settings.FrontPage, settings.FrontCards = &menu, &st.FrontPage, &cards
+	settings.SiteMenu, settings.FrontPage, settings.FrontSections = &menu, &st.FrontPage, &sections
 	settings.SiteFooterMenu = &footer
-	settings.TopGalleryTag, settings.TopGalleryLimit, settings.TopGalleryTitle = &tag, &limit, &title
-	layout, linkURL, linkLabel := st.TopGalleryLayout, st.TopGalleryLinkURL, st.TopGalleryLinkLabel
-	settings.TopGalleryLayout, settings.TopGalleryLinkURL, settings.TopGalleryLinkLabel = &layout, &linkURL, &linkLabel
 	cardImages := s.cardImageSettings()
 	settings.ShowFrontCardImages, settings.ShowArticleCardImages, settings.ShowRelatedCardImages =
 		&cardImages.Front, &cardImages.Article, &cardImages.Related
@@ -2298,14 +2295,14 @@ func (s *Server) handleRemoteSettingsPush(c echo.Context) error {
 	if out.Settings.SiteMenu != nil && out.Settings.SiteFooterMenu == nil && st.usesNestedMenus() {
 		msg += "。公開サーバーの sorus が古いため、メニューのドロップダウン（子項目）とフッターのサイトマップは反映されていません。公開サーバーの sorus を更新してください"
 	}
-	if out.Settings.SiteMenu != nil && out.Settings.TopGalleryLayout == nil {
-		msg += "。公開サーバーの sorus が古いため、フォトギャラリーの並べ方と「すべて見る」リンクは反映されていません。公開サーバーの sorus を更新してください"
+	if out.Settings.SiteMenu != nil && out.Settings.FrontSections == nil {
+		msg += "。公開サーバーの sorus が古いため、トップページのセクションは反映されていません。公開サーバーの sorus を更新してください"
 	}
 	if out.Settings.SiteMenu != nil {
 		// フォトギャラリー（トップページのギャラリー・公開中の記事の :::gallery）は公開サーバーの media をタグで引くため、
 		// そのタグの画像の記録とファイルも送り、このPCで外したタグは公開サーバーでも外す（handlers_remote_media.go）。
 		// 送れなかったときは「フォトギャラリー／メディア」だけを未反映のまま残し、もう一度押せるようにする。
-		tags, err := s.remoteGalleryTags(ctx, st.TopGalleryTag)
+		tags, err := s.remoteGalleryTags(ctx, frontSectionGalleryTag(st.FrontSections))
 		if err != nil {
 			return err
 		}

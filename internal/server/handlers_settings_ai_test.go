@@ -85,14 +85,10 @@ func TestAISettingsServerModeRejectsPrivateBaseURL(t *testing.T) {
 		"http://192.168.1.50:8000/v1", "https://10.0.0.5/v1", "https://172.16.0.2/v1", "https://100.64.0.1/v1",
 		"https://ollama.localhost/v1", "https://[::ffff:127.0.0.1]/v1", "https://0.0.0.0/v1",
 	} {
-		for _, form := range []url.Values{
-			{"provider": {"custom"}, "base_url_custom": {u}, "model_custom": {"llama3.1"}},
-			{"provider": {"custom"}, "base_url": {u}, "model": {"llama3.1"}},
-		} {
-			res := adm.postForm(aiSettingsPath, form)
-			expectStatus(t, res, http.StatusUnprocessableEntity)
-			expectContains(t, res.Body, allowPrivateAIBaseURLEnv)
-		}
+		form := url.Values{"provider": {"custom"}, "base_url_custom": {u}, "model_custom": {"llama3.1"}}
+		res := adm.postForm(aiSettingsPath, form)
+		expectStatus(t, res, http.StatusUnprocessableEntity)
+		expectContains(t, res.Body, allowPrivateAIBaseURLEnv)
 		out := aiSettingsTest(t, adm, url.Values{"test_provider": {"custom"}, "base_url_custom": {u}, "model_custom": {"llama3.1"}})
 		if out.OK || !strings.Contains(out.Message, allowPrivateAIBaseURLEnv) {
 			t.Errorf("connection test for %s = %+v, want the private address message", u, out)
@@ -112,7 +108,7 @@ func TestAISettingsServerModeRejectsPrivateBaseURL(t *testing.T) {
 
 	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"custom"}, "base_url_custom": {"https://llm.example.com/v1/"},
 		"model_custom": {"llama3.1"}}), aiSettingsPath+"?flash=ai_saved")
-	if saved, _ := savedAI(t, env); saved.Provider != ai.KindCustom || saved.BaseURL != "https://llm.example.com/v1" {
+	if saved, _ := savedAI(t, env); saved.Provider != ai.KindCustom || saved.Providers[ai.KindCustom].BaseURL != "https://llm.example.com/v1" {
 		t.Fatalf("saved = %+v, want the public https base URL", saved)
 	}
 }
@@ -122,9 +118,9 @@ func TestAISettingsServerModeRejectsPrivateBaseURL(t *testing.T) {
 func TestAIServerModeRefusesPrivateConnection(t *testing.T) {
 	isolateAIBaseURLPolicy(t)
 	mock := newCompatMock(t, "読書会のお知らせ\n図書館で読書会")
-	legacy := `{"provider":"custom","base_url":"` + mock.URL + `/v1","model":"llama3.1"}`
+	stored := `{"provider":"custom","providers":{"custom":{"base_url":"` + mock.URL + `/v1","model":"llama3.1"}}}`
 	env := newTestEnvWith(t, Config{}, func(db *sqlx.DB) {
-		if err := upsertSetting(db, aiSettingKey, legacy); err != nil {
+		if err := upsertSetting(db, aiSettingKey, stored); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -136,7 +132,7 @@ func TestAIServerModeRefusesPrivateConnection(t *testing.T) {
 	}
 	saved, ok := savedAI(t, env)
 	if !ok {
-		t.Fatal("legacy settings were not loaded")
+		t.Fatal("stored settings were not loaded")
 	}
 	p, _, err := env.server.buildAIProvider(saved)
 	if err != nil {
@@ -147,7 +143,10 @@ func TestAIServerModeRefusesPrivateConnection(t *testing.T) {
 	}
 	// 名前（localhost）で指定しても、解決したループバックのアドレスへは接続しない。
 	host := strings.TrimPrefix(mock.URL, "http://127.0.0.1")
-	p, _, err = env.server.buildAIProvider(savedAIConfig{Provider: ai.KindCustom, BaseURL: "http://localhost" + host + "/v1"})
+	p, _, err = env.server.buildAIProvider(savedAIConfig{
+		Provider:  ai.KindCustom,
+		Providers: map[string]savedProviderConfig{ai.KindCustom: {BaseURL: "http://localhost" + host + "/v1"}},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

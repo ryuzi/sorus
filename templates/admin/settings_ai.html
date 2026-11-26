@@ -144,7 +144,6 @@
           <option value="business"{{if eq $d.Form.WritingStyle "business"}} selected{{end}}>{{if $ja}}ビジネス（提案型・説得力・洗練されたビジネス文）{{else}}Business (persuasive, polished business writing){{end}}</option>
           <option value="creative"{{if eq $d.Form.WritingStyle "creative"}} selected{{end}}>{{if $ja}}クリエイティブ（感情豊か・エッセイ・ストーリーテリング）{{else}}Creative (expressive; essays and storytelling){{end}}</option>
         </select>
-        <input type="hidden" id="ai-academic-style-fallback" name="academic_style" value="{{if eq $d.Form.WritingStyle "academic"}}1{{else}}0{{end}}">
       </div>
 
       <p class="mb-2 flex items-center text-xs text-neutral-600">{{if $ja}}画像の解析・代替テキストについて{{else}}About image analysis and alt text{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}メディアライブラリの画像自動解析や代替テキスト生成には Gemini（Google AI Studio）が使用されます。Gemini をメインAIまたはAPIキーで有効にしておくと自動的に利用可能になります。{{else}}Gemini (Google AI Studio) is used for automatic image analysis and alt text generation in the media library. It becomes available automatically when Gemini is enabled as the main AI or with an API key.{{end}}</span></span></p>
@@ -184,14 +183,6 @@
 (function () {
   var form = document.getElementById('ai-settings-form');
   if (!form) return;
-
-  var writingStyleSelect = document.getElementById('ai-writing-style');
-  var academicFallback = document.getElementById('ai-academic-style-fallback');
-  if (writingStyleSelect && academicFallback) {
-    writingStyleSelect.addEventListener('change', function () {
-      academicFallback.value = (writingStyleSelect.value === 'academic') ? '1' : '0';
-    });
-  }
 
   // メインAIを選び直したら、そのプロバイダーのカードを開いてキーを入力しやすくする。
   var mainSelect = document.getElementById('ai-main-provider');

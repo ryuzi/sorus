@@ -75,7 +75,10 @@ var publicTemplateFuncs = template.FuncMap{
 		data := galleryTemplateData{Tag: tag, Layout: galleryLayoutJustified, Images: []markdown.GalleryImage{}, Lang: p.Lang}
 		query := markdown.GalleryQuery{Tag: tag, Sort: "latest"}
 		if len(options) > 0 {
-			if limit, ok := options[0].(int); ok && limit > 0 {
+			if limit, ok := options[0].(int); ok {
+				if limit <= 0 {
+					limit = 6
+				}
 				query.Limit = min(limit, 100)
 			}
 		}
@@ -373,8 +376,10 @@ func pageLinks(current, total int, pageURL func(int) string) []pageLink {
 }
 
 type indexData struct {
-	Articles   []publicArticle
-	Pagination pagination
+	Articles      []publicArticle
+	Pagination    pagination
+	Sections      []renderedFrontSection
+	SimpleListing bool
 }
 
 // articlesData は記事の一覧（/articles・/en/articles、articles.html）に渡すデータ。
@@ -550,16 +555,23 @@ func (s *Server) publicIndex(c echo.Context, pageNum int) error {
 	if hasFront && pageNum > 1 {
 		return c.Redirect(http.StatusFound, pagedURL(articlesPath, pageNum))
 	}
+	basePath := "/"
+	if lang == "en" {
+		basePath = "/en"
+	}
 	var (
 		articles []publicArticle
 		pg       pagination
 	)
 	if !hasFront {
-		basePath := "/"
-		if lang == "en" {
-			basePath = "/en"
+		categoryID := int64(0)
+		if len(st.FrontSections) == 1 && st.FrontSections[0].Type == FrontSectionArticleList && st.FrontSections[0].ArticleTag != "" {
+			categoryID, err = s.articleTagCategoryID(st.FrontSections[0].ArticleTag)
+			if err != nil {
+				return err
+			}
 		}
-		articles, pg, err = s.listPublic(c, 0, "", pageNum, basePath)
+		articles, pg, err = s.listPublic(c, categoryID, "", pageNum, basePath)
 		if err != nil {
 			return err
 		}
@@ -612,8 +624,48 @@ func (s *Server) publicIndex(c echo.Context, pageNum int) error {
 			p.Title = fmt.Sprintf("新着記事（%dページ目）", pageNum)
 		}
 	}
-	p.Data = indexData{Articles: articles, Pagination: pg}
+	p.Data = indexData{Articles: articles, Pagination: pg, SimpleListing: len(st.FrontSections) == 1 && st.FrontSections[0].Type == FrontSectionArticleList}
+	p.GalleryQueryResolver = s.galleryQueryResolver()
+	index := p.Data.(indexData)
+	sectionOccurrences := map[FrontSectionType]int{}
+	for _, section := range st.FrontSections {
+		sectionOccurrences[section.Type]++
+		layout := section.Layout
+		if section.Type == FrontSectionGallery {
+			layout = normalizeGalleryLayout(layout)
+		}
+		limit := section.Limit
+		if section.Type == FrontSectionGallery && limit <= 0 {
+			limit = 6
+		}
+		view := renderedFrontSection{Type: section.Type, Page: p, Tag: section.Tag, Limit: limit, Title: section.Title, Layout: layout, LinkURL: section.LinkURL, LinkLabel: section.LinkLabel, Index: true, ID: sectionID(section.Type, sectionOccurrences[section.Type])}
+		if section.Type == FrontSectionArticleList {
+			view.IndexArticles, view.Pagination = articles, pg
+			if section.ArticleTag != "" {
+				categoryID, err := s.articleTagCategoryID(section.ArticleTag)
+				if err != nil {
+					return err
+				}
+				view.IndexArticles, view.Pagination, err = s.listPublic(c, categoryID, "", pageNum, basePath)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		index.Sections = append(index.Sections, view)
+	}
+	p.Data = index
 	return s.renderPublic(c, http.StatusOK, "index", p)
+}
+
+// articleTagCategoryID resolves article_tag to a category name or slug; absent tags match no articles.
+func (s *Server) articleTagCategoryID(tag string) (int64, error) {
+	var id int64
+	err := s.db.Get(&id, `SELECT id FROM categories WHERE name = ? OR slug = ? ORDER BY CASE WHEN slug = ? THEN 0 ELSE 1 END LIMIT 1`, tag, tag, tag)
+	if errors.Is(err, sql.ErrNoRows) {
+		return -1, nil
+	}
+	return id, err
 }
 
 // handlePublicArticles は記事の一覧（/articles）を返す。トップに固定ページを出すサイトでも記事の一覧へ行けるよう、

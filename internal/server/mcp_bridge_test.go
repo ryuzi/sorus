@@ -48,10 +48,9 @@ func TestMCPSiteStructureUsesAdminValidationAndStorage(t *testing.T) {
 	seedArticle(t, env.db, article.Article{Title: "研究室について", Slug: "about", Kind: article.KindPage, Status: article.StatusPublished})
 	ctx := context.Background()
 	if err := env.server.saveSiteStructure(ctx, SiteStructure{
-		Menu:            []MenuItem{{Type: MenuItemPage, Target: "about"}, {Type: MenuItemArticles, Label: "ニュース"}},
-		FrontPage:       "about",
-		TopGalleryTag:   "風景",
-		TopGalleryLimit: 12,
+		Menu:          []MenuItem{{Type: MenuItemPage, Target: "about"}, {Type: MenuItemArticles, Label: "ニュース"}},
+		FrontPage:     "about",
+		FrontSections: []FrontSection{{Type: FrontSectionGallery, Tag: "風景", Limit: 12}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -66,17 +65,17 @@ func TestMCPSiteStructureUsesAdminValidationAndStorage(t *testing.T) {
 	}
 	wantMenu := []mcp.SiteMenuItem{{Type: "page", Target: "about"}, {Type: "articles", Label: "ニュース"}}
 	if !reflect.DeepEqual(ctxRes.SiteStructure.SiteMenu, wantMenu) || len(ctxRes.SiteStructure.SiteFooterMenu) != 0 ||
-		len(ctxRes.SiteStructure.FrontCards) != 0 {
+		len(ctxRes.SiteStructure.FrontSections) != 1 || ctxRes.SiteStructure.FrontSections[0].Type != "gallery" {
 		t.Fatalf("site_structure = %+v", ctxRes.SiteStructure)
 	}
 
 	// 執筆者は変更できない。
-	if isErr, text := env.mcpToolJSON(writerToken, "cms_update_site_structure", map[string]any{"front_cards": []string{"about"}}, nil); !isErr ||
+	if isErr, text := env.mcpToolJSON(writerToken, "cms_update_site_structure", map[string]any{"front_sections": []any{}}, nil); !isErr ||
 		!strings.Contains(text, "権限がありません") {
 		t.Fatalf("writer update = %v %q", isErr, text)
 	}
 
-	// フッターとカードだけを変え、メニュー・トップページ・ギャラリーの設定は保つ。カードの空白と重なりは管理画面と同じく整える。
+	// フッターと全フロントセクションを更新する。カードの空白と重なりは管理画面と同じく整える。
 	var upd struct {
 		SiteStructure mcp.SiteStructure `json:"site_structure"`
 		Warnings      []string          `json:"warnings"`
@@ -85,17 +84,17 @@ func TestMCPSiteStructureUsesAdminValidationAndStorage(t *testing.T) {
 		{"type": "page", "target": "about"}, {"type": "category", "target": "no-such-category"},
 	}}}
 	if isErr, text := env.mcpToolJSON(editorToken, "cms_update_site_structure", map[string]any{
-		"site_footer_menu": footer, "front_cards": []string{" about ", "about", "missing-page"},
+		"site_footer_menu": footer, "front_sections": []map[string]any{{"type": "gallery", "tag": "風景", "limit": 12}, {"type": "cards", "pages": []string{" about ", "about", "missing-page"}}},
 	}, &upd); isErr {
 		t.Fatalf("cms_update_site_structure: %s", text)
 	}
 	saved := env.server.loadSiteStructure(ctx)
 	if !reflect.DeepEqual(saved.Menu, []MenuItem{{Type: MenuItemPage, Target: "about"}, {Type: MenuItemArticles, Label: "ニュース"}}) ||
-		saved.FrontPage != "about" || saved.TopGalleryTag != "風景" || saved.TopGalleryLimit != 12 {
+		saved.FrontPage != "about" || frontGallery(saved).Tag != "風景" || frontGallery(saved).Limit != 12 {
 		t.Errorf("untouched settings changed: %+v", saved)
 	}
-	if !reflect.DeepEqual(saved.FrontCards, []string{"about", "missing-page"}) {
-		t.Errorf("front cards = %v", saved.FrontCards)
+	if len(saved.FrontSections) != 2 || saved.FrontSections[1].Type != FrontSectionCards || !reflect.DeepEqual(saved.FrontSections[1].Pages, []string{"about", "missing-page"}) {
+		t.Errorf("front cards = %v", saved.FrontSections)
 	}
 	wantFooter := []MenuItem{{Type: MenuItemGroup, Label: "研究室", Children: []MenuItem{
 		{Type: MenuItemPage, Target: "about"}, {Type: MenuItemCategory, Target: "no-such-category"},
@@ -128,8 +127,8 @@ func TestMCPSiteStructureUsesAdminValidationAndStorage(t *testing.T) {
 		{"unknown type", map[string]any{"site_menu": []map[string]any{{"type": "script", "target": "x"}}}},
 		{"javascript url", map[string]any{"site_menu": []map[string]any{{"type": "url", "label": "x", "target": "javascript:alert(1)"}}}},
 		{"empty group", map[string]any{"site_footer_menu": []map[string]any{{"type": "group", "label": "空"}}}},
-		{"too many cards", map[string]any{"front_cards": []string{"a", "b", "c", "d", "e", "f", "g"}}},
-		{"empty card", map[string]any{"front_cards": []string{""}}},
+		{"too many cards", map[string]any{"front_sections": []map[string]any{{"type": "cards", "pages": []string{"a", "b", "c", "d", "e", "f", "g"}}}}},
+		{"empty card", map[string]any{"front_sections": []map[string]any{{"type": "cards", "pages": []string{""}}}}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			isErr, text := env.mcpToolJSON(editorToken, "cms_update_site_structure", c.args, nil)
@@ -159,7 +158,7 @@ func TestMCPSiteStructureReadOnlyOnPublicServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, isErr, text := env.mcpToolAt(env.server.cfg.MCPAPIPath, tok, "cms_update_site_structure", map[string]any{"front_cards": []string{}})
+	_, isErr, text := env.mcpToolAt(env.server.cfg.MCPAPIPath, tok, "cms_update_site_structure", map[string]any{"front_sections": []any{}})
 	if !isErr || !strings.Contains(text, "公開サーバーではサイト構成を変更できません") {
 		t.Fatalf("public-only update = %v %q", isErr, text)
 	}

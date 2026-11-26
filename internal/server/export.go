@@ -637,13 +637,29 @@ func (s *Server) exportInto(ctx context.Context, outDir string, override *themeO
 	}
 	// トップに固定ページを出さないサイトは、トップの新着記事にもページ送り（/page/N）がある。
 	if front == "" {
-		if err := savePaged("/", 0); err != nil {
+		categoryID := int64(0)
+		st := s.loadSiteStructure(ctx)
+		if len(st.FrontSections) == 1 && st.FrontSections[0].Type == FrontSectionArticleList && st.FrontSections[0].ArticleTag != "" {
+			categoryID, err = s.articleTagCategoryID(st.FrontSections[0].ArticleTag)
+			if err != nil {
+				return fmt.Errorf("export: front article tag: %w", err)
+			}
+		}
+		if err := savePaged("/", categoryID); err != nil {
 			return fmt.Errorf("export: front list pages: %w", err)
 		}
 	}
 	// 英語フロント固定ページが存在しない場合は、英語トップ新着一覧のページ送り（/en/page/N）を書き出す。
 	if multilingual && !hasEnFront {
-		if err := savePagedLang("/en", 0, "en", "en"); err != nil {
+		categoryID := int64(0)
+		st := s.loadSiteStructure(ctx)
+		if len(st.FrontSections) == 1 && st.FrontSections[0].Type == FrontSectionArticleList && st.FrontSections[0].ArticleTag != "" {
+			categoryID, err = s.articleTagCategoryID(st.FrontSections[0].ArticleTag)
+			if err != nil {
+				return fmt.Errorf("export: English front article tag: %w", err)
+			}
+		}
+		if err := savePagedLang("/en", categoryID, "en", "en"); err != nil {
 			return fmt.Errorf("export: en front list pages: %w", err)
 		}
 	}

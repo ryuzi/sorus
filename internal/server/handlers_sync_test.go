@@ -1049,13 +1049,8 @@ func TestSyncAPISyncSettings(t *testing.T) {
 		Theme:           "news",
 		SiteMenu:        []MenuItem{},
 		// フッターのサイトマップは、知っていることを伝えるため空でも空の配列で返す。
-		SiteFooterMenu:  &[]MenuItem{},
-		FrontCards:      []string{},
-		TopGalleryLimit: 6,
-		// フォトギャラリーの並べ方と「すべて見る」リンクは、知っていることを伝えるため既定の値でも返す。
-		TopGalleryLayout:    strPtr(galleryLayoutJustified),
-		TopGalleryLinkURL:   strPtr(""),
-		TopGalleryLinkLabel: strPtr(""),
+		SiteFooterMenu: &[]MenuItem{},
+		FrontSections:  []FrontSection{{Type: FrontSectionArticleList}},
 		// 多言語対応は送っていないため、英語の記事の無い新しいサイトの既定（OFF）のまま返す。
 		MultilingualEnabled: boolPtr(false),
 		ShowAuthor:          boolPtr(false),

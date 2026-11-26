@@ -139,7 +139,7 @@ func styleDescription(style, target string) string {
 // WritingStyleInstruction はライティングスタイルに応じたシステムプロンプト指示（Style Guide / Tone）を返す。
 func WritingStyleInstruction(style string) string {
 	switch strings.ToLower(strings.TrimSpace(style)) {
-	case WritingStyleAcademic, "1":
+	case WritingStyleAcademic:
 		return "## スタイルガイド（学術エディトリアル）\n客観的事実・論理的根拠を重視し、学術論文・研究広報に適した格調高く緻密で信頼感のあるトーンで記述してください。"
 	case WritingStyleBusiness:
 		return "## スタイルガイド（ビジネス）\n提案型で説得力があり、明快かつ洗練された実務・ビジネス文書に適したプロフェッショナルなトーンで記述してください。"
@@ -185,11 +185,8 @@ func buildTranslatePrompt(source, target string, opts TranslateOptions) string {
 
 	toneDesc := "プロフェッショナルな翻訳者"
 	ws := opts.WritingStyle
-	if ws == "" && opts.Academic {
-		ws = WritingStyleAcademic
-	}
 	switch strings.ToLower(strings.TrimSpace(ws)) {
-	case WritingStyleAcademic, "1":
+	case WritingStyleAcademic:
 		toneDesc = "学術論文および研究機関の公式発表・研究広報のプロフェッショナルな翻訳者"
 	case WritingStyleBusiness:
 		toneDesc = "ビジネス・企業広報・提案文書のプロフェッショナルな翻訳者"
@@ -197,10 +194,6 @@ func buildTranslatePrompt(source, target string, opts TranslateOptions) string {
 		toneDesc = "クリエイティブ・エッセイ・ストーリーテリングのプロフェッショナルな翻訳者"
 	case WritingStyleStandard:
 		toneDesc = "Webメディア・情報発信記事のプロフェッショナルな翻訳者"
-	default:
-		if opts.Academic {
-			toneDesc = "学術論文および研究機関の公式発表・研究広報のプロフェッショナルな翻訳者"
-		}
 	}
 
 	styleDesc := styleDescription(opts.Style, target)

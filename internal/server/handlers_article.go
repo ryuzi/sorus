@@ -1713,7 +1713,7 @@ func (s *Server) handleArticleTranslate(c echo.Context) error {
 
 		opts := ai.TranslateOptions{
 			Glossary:      parseGlossary(saved.Glossary),
-			Academic:      saved.AcademicStyle,
+			WritingStyle:  saved.WritingStyle,
 			Style:         strings.TrimSpace(req.Style),
 			Instruction:   strings.TrimSpace(req.Instruction),
 			SiteContext:   siteContext,
@@ -1779,11 +1779,11 @@ func (s *Server) handleArticleTranslate(c echo.Context) error {
 	}
 
 	opts := ai.TranslateOptions{
-		Glossary:    parseGlossary(saved.Glossary),
-		Academic:    saved.AcademicStyle,
-		Style:       strings.TrimSpace(req.Style),
-		Instruction: strings.TrimSpace(req.Instruction),
-		SiteContext: siteContext,
+		Glossary:     parseGlossary(saved.Glossary),
+		WritingStyle: saved.WritingStyle,
+		Style:        strings.TrimSpace(req.Style),
+		Instruction:  strings.TrimSpace(req.Instruction),
+		SiteContext:  siteContext,
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Minute)

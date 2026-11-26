@@ -780,6 +780,7 @@ func TestRender_ReservedClassesOnlyInGeneratedForm(t *testing.T) {
 		`<span class="note math-display">x</span>`,
 		`<section class="photo-gallery">x</section>`,
 		`<figure class="masonry-grid wide">x</figure>`,
+		`<figure class="photo-gallery masonry-grid">x</figure>`,
 		`<figure class="photo-gallery masonry-grid extra">x</figure>`,
 		`<img class="gallery-item" src="/a.webp">`,
 		`<div class="gallery-layout-cards">x</div>`,
@@ -800,11 +801,11 @@ func TestRender_ReservedClassesOnlyInGeneratedForm(t *testing.T) {
 
 	// 生成物の形はこれまでどおり残る。
 	res = mustRender(t, "数式 $x^2$ と\n\n$$y$$\n\n:::gallery\n![a](/a.webp)\n:::\n\n"+
-		`<span class="math-inline">\(z\)</span><figure class="photo-gallery masonry-grid"><div class="gallery-item">x</div></figure>`)
+		`<span class="math-inline">\(z\)</span><figure class="photo-gallery gallery-layout-masonry masonry-grid"><div class="gallery-item">x</div></figure>`)
 	want := []string{
 		"span." + MathInlineClass, "span." + MathDisplayClass,
 		"figure." + GalleryFigureClass(DefaultGalleryLayout), "div." + GalleryItemClass,
-		"span." + MathInlineClass, "figure." + legacyGalleryClass, "div." + GalleryItemClass,
+		"span." + MathInlineClass, "figure." + GalleryFigureClass(GalleryLayoutMasonry), "div." + GalleryItemClass,
 	}
 	if got := classAttrs(t, res.HTML); !reflect.DeepEqual(got, want) {
 		t.Errorf("classes =\n%q\nwant\n%q\nhtml:\n%s", got, want, res.HTML)

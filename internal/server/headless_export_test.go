@@ -167,8 +167,8 @@ func TestHeadlessExport_SitePagesArticlesAndPrivacyFilter(t *testing.T) {
 	writeTestFile(t, filepath.Join(env.uploadDir, "about-hero.webp"), "RIFFaboutWEBP")
 
 	st := SiteStructure{
-		FrontPage:  "about",
-		FrontCards: []string{"contact", "secret-draft-page"},
+		FrontPage:     "about",
+		FrontSections: []FrontSection{{Type: FrontSectionCards, Pages: []string{"contact", "secret-draft-page"}}},
 		Menu: []MenuItem{
 			{Type: MenuItemPage, Target: "about", Label: "概要", LabelEn: "About"},
 			{
@@ -240,8 +240,8 @@ func TestHeadlessExport_SitePagesArticlesAndPrivacyFilter(t *testing.T) {
 	if site.FrontPage != "about" {
 		t.Errorf("front_page = %q, want about", site.FrontPage)
 	}
-	if !slices.Equal(site.FrontCards, []string{"contact"}) {
-		t.Errorf("front_cards = %v, want [contact] (draft excluded)", site.FrontCards)
+	if len(site.FrontSections) != 1 || !slices.Equal(site.FrontSections[0].Pages, []string{"contact"}) {
+		t.Errorf("front_sections = %v, want cards section with [contact] (draft excluded)", site.FrontSections)
 	}
 	if len(site.Categories) != 1 || site.Categories[0].Slug != "news" || site.Categories[0].Name != "お知らせ" {
 		t.Errorf("categories = %+v, want only news", site.Categories)

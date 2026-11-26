@@ -46,9 +46,6 @@ const (
 	// DefaultGalleryLayout は layout の指定が無い・知らない値のときの並べ方。
 	DefaultGalleryLayout = GalleryLayoutJustified
 
-	// legacyGalleryClass は並べ方を導入する前の figure のクラス。生 HTML に書かれた古い形を残すためだけに許可する。
-	legacyGalleryClass = GalleryClass + " " + GalleryMasonryGridClass
-
 	// GalleryMoreClass は「もっと見る」の行（総枚数とボタン）の p のクラス。ギャラリーの figure の直後に置く。
 	GalleryMoreClass = "gallery-more"
 	// GalleryCountClass は総枚数の表示（「全 320 枚」）の span のクラス。

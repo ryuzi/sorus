@@ -231,7 +231,7 @@ func TestPublicFrontCardsRenderPlaceholderMedia(t *testing.T) {
 	env := newFrontEnv(t)
 	// トップのページカードの画像は既定で出さないため、表示する設定にして確かめる。
 	env.setCardImageSetting(settingShowFrontCardImages, "true")
-	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontPage: "research", FrontCards: []string{"access"}}); err != nil {
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontPage: "research", FrontSections: []FrontSection{{Type: FrontSectionCards, Pages: []string{"access"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	res := env.newClient().get("/")

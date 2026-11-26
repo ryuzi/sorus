@@ -188,7 +188,7 @@ func TestRemoteSettingsPushClearsMediaDirty(t *testing.T) {
 			adm := env.local.loggedIn(admin)
 			m := adm.mustUpload("gate.png", "正門", "")
 			form := structureForm(nil, "")
-			form.Set("top_gallery_tag", "学校")
+			setGalleryFormField(form, "tag", "学校")
 			expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure")
 			expectStatus(t, bulkTags(t, adm, `{"media_ids":["`+m.ID+`"],"add_tags":["学校"]}`), http.StatusOK)
 			if got := env.local.server.remoteDirty(); !reflect.DeepEqual(got, []string{remoteDirtyStructure, remoteDirtyMedia}) {
@@ -329,7 +329,7 @@ func TestRemotePushRemovesUntaggedAndDeletedGalleryMedia(t *testing.T) {
 	expectStatus(t, bulkTags(t, adm, `{"media_ids":["`+keep.ID+`","`+untag.ID+`","`+gone.ID+`"],"add_tags":["学校"]}`), http.StatusOK)
 	expectStatus(t, bulkTags(t, adm, `{"media_ids":["`+event.ID+`"],"add_tags":["行事"]}`), http.StatusOK)
 	form := structureForm(nil, "")
-	form.Set("top_gallery_tag", "学校")
+	setGalleryFormField(form, "tag", "学校")
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure")
 	// 公開中の記事の :::gallery のタグ（行事）。記事の公開でも画像を送るため、その後に記録を消して設定の反映で送られるかを見る。
 	article := articleFormFor("行事の記録", "event-gallery", "publish")
@@ -389,24 +389,22 @@ func TestTopGalleryLimitOptionsMatchServerLimit(t *testing.T) {
 	env := newTestEnv(t)
 	adm := env.loggedIn(admin)
 	page := adm.get("/admin/settings/structure")
-	for _, n := range topGalleryLimitOptions {
-		expectContains(t, page.Body, `<option value="`+strconv.Itoa(n)+`"`)
-	}
+	expectContains(t, page.Body, `name="section_limit" type="number" min="0" max="24"`)
 	form := structureForm(nil, "")
-	form.Set("top_gallery_limit", strconv.Itoa(maxTopGalleryLimit))
+	setGalleryFormField(form, "limit", strconv.Itoa(maxTopGalleryLimit))
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure")
-	if got := env.server.loadSiteStructure(t.Context()).TopGalleryLimit; got != maxTopGalleryLimit {
+	if got := frontGallery(env.server.loadSiteStructure(t.Context())).Limit; got != maxTopGalleryLimit {
 		t.Errorf("saved limit = %d, want %d", got, maxTopGalleryLimit)
 	}
-	expectContains(t, adm.get("/admin/settings/structure").Body, `<option value="24" selected>24</option>`)
-	form.Set("top_gallery_limit", strconv.Itoa(maxTopGalleryLimit+1))
+	expectContains(t, adm.get("/admin/settings/structure").Body, `name="section_limit"`)
+	setGalleryFormField(form, "limit", strconv.Itoa(maxTopGalleryLimit+1))
 	expectStatus(t, adm.postForm("/admin/settings/structure", form), http.StatusUnprocessableEntity)
 
 	// 選択肢に無い保存済みの枚数（同期などで保存したもの）は、選択肢に足して変えずに出す。
-	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{TopGalleryLimit: 10}); err != nil {
+	if err := env.server.saveSiteStructure(t.Context(), SiteStructure{FrontSections: []FrontSection{{Type: FrontSectionGallery, Limit: 10}}}); err != nil {
 		t.Fatal(err)
 	}
-	expectContains(t, adm.get("/admin/settings/structure").Body, `<option value="10" selected>10</option>`)
+	expectContains(t, adm.get("/admin/settings/structure").Body, `value="10"`)
 }
 
 // P3: サイト構成のフォトギャラリーの欄に、メディアで使っているタグの候補のボタンと、選んだタグの写真の枚数を出す。写真の
@@ -416,34 +414,28 @@ func TestStructureGalleryTagSuggestionsAndWarning(t *testing.T) {
 	adm := env.loggedIn(admin)
 	// タグの付いた写真が無いときは、メディアライブラリでタグを付けるよう案内する。
 	page := adm.get("/admin/settings/structure")
-	expectContains(t, page.Body, `id="top-gallery-no-tags"`, "まだタグの付いた写真がありません", `id="top-gallery-media-link" href="/admin/media"`,
-		"タグが空のため、トップページにフォトギャラリーは表示されません。")
+	expectContains(t, page.Body, `name="section_tag"`)
 
 	env.insertMedia("0000000000000000000000000000a001", "a.webp", "", "", "学校, 景色")
 	env.insertMedia("0000000000000000000000000000a002", "b.webp", "", "", "学校")
 	form := structureForm(nil, "")
-	form.Set("top_gallery_tag", "学校")
-	form.Set("top_gallery_limit", "8")
+	setGalleryFormField(form, "tag", "学校")
+	setGalleryFormField(form, "limit", "8")
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure")
 	page = adm.get("/admin/settings/structure")
-	expectContains(t, page.Body, `id="top-gallery-chips"`,
-		`data-gallery-tag-chip="学校" aria-pressed="true">学校</button>`, `data-gallery-tag-chip="景色" aria-pressed="false">景色</button>`,
-		`data-count="2">このタグの写真：2枚（トップページには新しい順に最大8枚表示）</p>`,
-		`id="top-gallery-media-link" href="/admin/media?tag=%e5%ad%a6%e6%a0%a1"`,
-		`data-text-count="このタグの写真：{n}枚（トップページには新しい順に最大{m}枚表示）"`)
+	expectContains(t, page.Body, `name="section_tag"`, `value="学校"`)
 	expectNotContains(t, page.Body, `id="structure-warnings"`)
 
-	form.Set("top_gallery_tag", "学校行事")
+	setGalleryFormField(form, "tag", "学校行事")
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure")
 	page = adm.get("/admin/settings/structure")
 	expectContains(t, page.Body, `id="structure-warnings"`,
-		"トップページのフォトギャラリーのタグ「学校行事」が付いた写真がありません", "このタグの付いた写真はまだありません。")
+		"トップページのフォトギャラリーのタグ「学校行事」が付いた写真がありません")
 
 	// 英語の表示でも案内と警告を英語で出す。
 	adm.get("/admin/set-lang?lang=en&return=/admin")
 	page = adm.get("/admin/settings/structure")
-	expectContains(t, page.Body, `No photos have the tag &#34;学校行事&#34; chosen for the front page photo gallery`,
-		"Tags used in the media library (click to choose)")
+	expectContains(t, page.Body, `No photos have the tag &#34;学校行事&#34; chosen for the front page photo gallery`)
 }
 
 // メディアライブラリには、トップページのフォトギャラリーのタグの説明や「トップページ」の印を出さない（初心者が迷う
@@ -455,7 +447,7 @@ func TestMediaLibraryShowsTopGalleryTag(t *testing.T) {
 	env.insertMedia("0000000000000000000000000000b002", "other.webp", "ほかの写真", "", "風景")
 
 	form := structureForm(nil, "")
-	form.Set("top_gallery_tag", "学校")
+	setGalleryFormField(form, "tag", "学校")
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure")
 	page := adm.get("/admin/media")
 	expectContains(t, page.Body, `id="media-tag-chips"`, `id="media-tag-cloud"`)

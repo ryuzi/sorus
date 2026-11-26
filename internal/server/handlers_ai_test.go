@@ -92,7 +92,7 @@ func TestAIDraftEndpoint(t *testing.T) {
 	}.Encode()))
 	expectStatus(t, res, http.StatusOK)
 	var got struct {
-		Configured bool          `json:"configured"`
+		Configured bool           `json:"configured"`
 		Draft      ai.DraftResult `json:"draft"`
 	}
 	if err := json.Unmarshal([]byte(res.Body), &got); err != nil {

@@ -57,11 +57,11 @@ func galleryLayoutClassNames() []string {
 }
 
 // galleryFigureClassPattern はギャラリーの figure の class 属性として許可する値。gallery.go が出力する並べ方ごとの値
-// （GalleryFigureClass）と、並べ方を導入する前の値（photo-gallery masonry-grid）だけに一致する。
+// （GalleryFigureClass）だけに一致する。
 var galleryFigureClassPattern = regexp.MustCompile(galleryFigureClassRegexp())
 
 func galleryFigureClassRegexp() string {
-	alts := []string{regexp.QuoteMeta(legacyGalleryClass)}
+	alts := make([]string, 0, len(GalleryLayouts))
 	for _, l := range GalleryLayouts {
 		alts = append(alts, regexp.QuoteMeta(GalleryFigureClass(l)))
 	}

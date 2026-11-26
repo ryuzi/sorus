@@ -1140,8 +1140,7 @@ func (s *Server) syncSettings(c echo.Context, req *SyncRequest) error {
 	if in.AIEnabled != nil {
 		updates = append(updates, update{settingAIEnabled, formatAIEnabled(*in.AIEnabled)})
 	}
-	hasStructure := in.SiteMenu != nil || in.SiteFooterMenu != nil || in.FrontPage != nil || in.FrontCards != nil || in.TopGalleryTag != nil ||
-		in.TopGalleryLimit != nil || in.TopGalleryTitle != nil || in.TopGalleryLayout != nil || in.TopGalleryLinkURL != nil || in.TopGalleryLinkLabel != nil
+	hasStructure := in.SiteMenu != nil || in.SiteFooterMenu != nil || in.FrontPage != nil || in.FrontSections != nil
 	if len(updates) == 0 && !hasStructure && in.Theme == nil && !in.RevokeAllMCP {
 		return echo.NewHTTPError(http.StatusBadRequest, "更新する設定を指定してください")
 	}
@@ -1157,26 +1156,17 @@ func (s *Server) syncSettings(c echo.Context, req *SyncRequest) error {
 		if in.FrontPage != nil {
 			st.FrontPage = strings.TrimSpace(*in.FrontPage)
 		}
-		if in.FrontCards != nil {
-			st.FrontCards = *in.FrontCards
-		}
-		if in.TopGalleryTag != nil {
-			st.TopGalleryTag = strings.TrimSpace(*in.TopGalleryTag)
-		}
-		if in.TopGalleryLimit != nil {
-			st.TopGalleryLimit = *in.TopGalleryLimit
-		}
-		if in.TopGalleryTitle != nil {
-			st.TopGalleryTitle = strings.TrimSpace(*in.TopGalleryTitle)
-		}
-		if in.TopGalleryLayout != nil {
-			st.TopGalleryLayout = strings.TrimSpace(*in.TopGalleryLayout)
-		}
-		if in.TopGalleryLinkURL != nil {
-			st.TopGalleryLinkURL = strings.TrimSpace(*in.TopGalleryLinkURL)
-		}
-		if in.TopGalleryLinkLabel != nil {
-			st.TopGalleryLinkLabel = strings.TrimSpace(*in.TopGalleryLinkLabel)
+		if in.FrontSections != nil {
+			st.FrontSections = slices.Clone(*in.FrontSections)
+			for i := range st.FrontSections {
+				section := &st.FrontSections[i]
+				section.Tag = strings.TrimSpace(section.Tag)
+				section.Title = strings.TrimSpace(section.Title)
+				section.Layout = strings.TrimSpace(section.Layout)
+				section.LinkURL = strings.TrimSpace(section.LinkURL)
+				section.LinkLabel = strings.TrimSpace(section.LinkLabel)
+				section.ArticleTag = strings.TrimSpace(section.ArticleTag)
+			}
 		}
 		// 基本設定を書き込む前に検査し、サイト構成が不正なら基本設定も変えない。
 		if err := validateSiteStructure(st); err != nil {
@@ -1266,8 +1256,8 @@ func (s *Server) syncSettings(c echo.Context, req *SyncRequest) error {
 	if footer == nil {
 		footer = []MenuItem{}
 	}
-	if saved.FrontCards == nil {
-		saved.FrontCards = []string{}
+	if saved.FrontSections == nil {
+		saved.FrontSections = []FrontSection{}
 	}
 	multilingual := s.isMultilingualEnabled()
 	showAuthor := s.getShowAuthor()
@@ -1294,14 +1284,7 @@ func (s *Server) syncSettings(c echo.Context, req *SyncRequest) error {
 			SiteMenu:        saved.Menu,
 			SiteFooterMenu:  &footer,
 			FrontPage:       saved.FrontPage,
-			FrontCards:      saved.FrontCards,
-			TopGalleryTag:   saved.TopGalleryTag,
-			TopGalleryLimit: saved.TopGalleryLimit,
-			TopGalleryTitle: saved.TopGalleryTitle,
-			// フォトギャラリーの並べ方と「すべて見る」リンクは、この項目を知っていることを伝えるため常に返す。
-			TopGalleryLayout:    &saved.TopGalleryLayout,
-			TopGalleryLinkURL:   &saved.TopGalleryLinkURL,
-			TopGalleryLinkLabel: &saved.TopGalleryLinkLabel,
+			FrontSections:   saved.FrontSections,
 			// 多言語対応の ON/OFF は、保存した値（無ければ英語の記事の有無から決めた値）を返す。
 			MultilingualEnabled: &multilingual,
 			ShowAuthor:          &showAuthor,

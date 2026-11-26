@@ -410,7 +410,7 @@ func TestAISettingsGlossaryValidation(t *testing.T) {
 	clearAIEnv(t)
 	mock := newCompatMock(t, "案A")
 	env := newTestEnv(t)
-	base := url.Values{"provider": {"custom"}, "base_url": {mock.URL + "/v1/"}, "model": {"llama3.1:8b"}}
+	base := url.Values{"provider": {"custom"}, "base_url_custom": {mock.URL + "/v1/"}, "model_custom": {"llama3.1:8b"}}
 	form := func(glossary string) url.Values {
 		f := url.Values{}
 		for k, v := range base {
@@ -462,7 +462,7 @@ func TestAISettingsGlossaryErrorRedactsForNonAdmin(t *testing.T) {
 	env := newTestEnv(t)
 	// 管理者がローカル LLM（custom）の送り先を保存しておく。
 	expectRedirect(t, env.loggedIn(admin).postForm(aiSettingsPath, url.Values{"provider": {"custom"},
-		"base_url": {mock.URL + "/v1/"}, "model": {"llama3.1:8b"}}), aiSettingsPath+"?flash=ai_saved")
+		"base_url_custom": {mock.URL + "/v1/"}, "model_custom": {"llama3.1:8b"}}), aiSettingsPath+"?flash=ai_saved")
 
 	bad := url.Values{"glossary": {"AI=人工知能\x00"}}
 	res := env.loggedIn(admin).postForm(aiSettingsPath, bad)

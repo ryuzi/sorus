@@ -41,8 +41,8 @@ func (f *fakeSite) config(cfg *Config) {
 		if upd.SiteFooterMenu != nil {
 			f.structure.SiteFooterMenu = *upd.SiteFooterMenu
 		}
-		if upd.FrontCards != nil {
-			f.structure.FrontCards = *upd.FrontCards
+		if upd.FrontSections != nil {
+			f.structure.FrontSections = *upd.FrontSections
 		}
 		return f.structure, f.warnings, nil
 	}
@@ -87,7 +87,7 @@ func TestGetSiteContextIncludesSiteStructure(t *testing.T) {
 			{Type: "page", Target: "about"},
 			{Type: "group", Label: "研究", Children: []SiteMenuItem{{Type: "category", Target: "research"}}},
 		},
-		FrontCards: []string{"about"},
+		FrontSections: []FrontSection{{Type: "cards", Pages: []string{"about"}}},
 	}}
 	env := newSiteEnv(t, Config{}, f)
 	var got struct {
@@ -105,7 +105,7 @@ func TestGetSiteContextIncludesSiteStructure(t *testing.T) {
 	// 空のサイト構成は null ではなく空の配列で返す（AI が「未取得」と取り違えない）。
 	f.with(func() { f.structure = SiteStructure{} })
 	res := env.callTool(writerA.ID, "cms_get_site_context", map[string]any{})
-	expectContains(t, string(res.StructuredContent), `"site_menu":[]`, `"site_footer_menu":[]`, `"front_cards":[]`)
+	expectContains(t, string(res.StructuredContent), `"site_menu":[]`, `"site_footer_menu":[]`, `"front_sections":[]`)
 
 	// 取得の仕組みが無ければ site_structure を返さない。
 	plain := newTestEnv(t, Config{})
@@ -117,13 +117,13 @@ func TestGetSiteContextIncludesSiteStructure(t *testing.T) {
 
 func TestUpdateSiteStructure(t *testing.T) {
 	f := &fakeSite{
-		structure: SiteStructure{SiteMenu: []SiteMenuItem{{Type: "articles"}}, FrontCards: []string{"old"}},
+		structure: SiteStructure{SiteMenu: []SiteMenuItem{{Type: "articles"}}, FrontSections: []FrontSection{{Type: "cards", Pages: []string{"old"}}}},
 		warnings:  []string{"トップのカードに選んだページ「missing」が見つからないか、公開されていません。このカードは表示されません"},
 	}
 	env := newSiteEnv(t, Config{}, f)
 
 	// 執筆者は変更できない（呼び出し先まで届かない）。
-	expectContains(t, env.toolErr(writerA.ID, "cms_update_site_structure", map[string]any{"front_cards": []string{"x"}}),
+	expectContains(t, env.toolErr(writerA.ID, "cms_update_site_structure", map[string]any{"front_sections": []map[string]any{{"type": "cards", "pages": []string{"x"}}}}),
 		"サイト構成を変更する権限がありません")
 	if n := f.updateCount(); n != 0 {
 		t.Fatalf("writer reached UpdateSiteStructure %d times", n)
@@ -140,13 +140,13 @@ func TestUpdateSiteStructure(t *testing.T) {
 
 	// 指定した項目だけを渡し、省略した項目は nil（今の値を保つ）。
 	var res updateSiteStructureResult
-	env.toolOK(editor.ID, "cms_update_site_structure", map[string]any{"front_cards": []string{"about", "missing"}}, &res)
+	env.toolOK(editor.ID, "cms_update_site_structure", map[string]any{"front_sections": []map[string]any{{"type": "cards", "pages": []string{"about", "missing"}}}}, &res)
 	updates := f.getUpdates()
 	if len(updates) != 1 || updates[0].SiteMenu != nil || updates[0].SiteFooterMenu != nil ||
-		updates[0].FrontCards == nil || !reflect.DeepEqual(*updates[0].FrontCards, []string{"about", "missing"}) {
+		updates[0].FrontSections == nil || len(*updates[0].FrontSections) != 1 || !reflect.DeepEqual((*updates[0].FrontSections)[0].Pages, []string{"about", "missing"}) {
 		t.Fatalf("update = %+v", updates)
 	}
-	if !reflect.DeepEqual(res.Updated, []string{"front_cards"}) || !reflect.DeepEqual(res.Warnings, f.warnings) ||
+	if !reflect.DeepEqual(res.Updated, []string{"front_sections"}) || !reflect.DeepEqual(res.Warnings, f.warnings) ||
 		!reflect.DeepEqual(res.SiteStructure.SiteMenu, []SiteMenuItem{{Type: "articles"}}) || res.Message == "" {
 		t.Errorf("result = %+v", res)
 	}
@@ -159,7 +159,7 @@ func TestUpdateSiteStructure(t *testing.T) {
 	}
 	env.toolOK(admin.ID, "cms_update_site_structure", map[string]any{"site_menu": menu, "site_footer_menu": []any{}}, &res)
 	upd := f.getUpdates()[1]
-	if upd.FrontCards != nil || upd.SiteMenu == nil || upd.SiteFooterMenu == nil || len(*upd.SiteFooterMenu) != 0 {
+	if upd.FrontSections != nil || upd.SiteMenu == nil || upd.SiteFooterMenu == nil || len(*upd.SiteFooterMenu) != 0 {
 		t.Fatalf("second update = %+v", upd)
 	}
 	wantMenu := []SiteMenuItem{{Type: "group", Label: "研究室", LabelEn: "Lab", Children: []SiteMenuItem{
@@ -188,7 +188,7 @@ func TestUpdateSiteStructureUnavailable(t *testing.T) {
 	// 公開サーバー（管理画面の無いサーバー）では、PC からの反映で上書きされるため変更させない。
 	f := &fakeSite{}
 	public := newSiteEnv(t, Config{PublicOnly: true}, f)
-	expectContains(t, public.toolErr(admin.ID, "cms_update_site_structure", map[string]any{"front_cards": []string{}}),
+	expectContains(t, public.toolErr(admin.ID, "cms_update_site_structure", map[string]any{"front_sections": []map[string]any{}}),
 		"公開サーバーではサイト構成を変更できません", "PC の sorus")
 	if n := f.updateCount(); n != 0 {
 		t.Fatalf("public-only reached UpdateSiteStructure %d times", n)
@@ -202,7 +202,7 @@ func TestUpdateSiteStructureUnavailable(t *testing.T) {
 
 	// 保存の仕組みが無ければ使えない。
 	plain := newTestEnv(t, Config{})
-	expectContains(t, plain.toolErr(admin.ID, "cms_update_site_structure", map[string]any{"front_cards": []string{}}), "利用できません")
+	expectContains(t, plain.toolErr(admin.ID, "cms_update_site_structure", map[string]any{"front_sections": []map[string]any{}}), "利用できません")
 }
 
 func TestListMedia(t *testing.T) {

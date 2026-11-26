@@ -228,7 +228,7 @@ func (s *Server) toolCreateTranslation(ctx context.Context, user *auth.User, raw
 		}
 
 		if finalTitle == "" {
-			t, err := aiProv.Translate(ctx, srcArticle.Title, srcArticle.Lang, targetLang, ai.TranslateOptions{Academic: true})
+			t, err := aiProv.Translate(ctx, srcArticle.Title, srcArticle.Lang, targetLang, ai.TranslateOptions{WritingStyle: ai.WritingStyleAcademic})
 			if err != nil {
 				return nil, s.aiError(aiProv, err)
 			}
@@ -239,7 +239,7 @@ func (s *Server) toolCreateTranslation(ctx context.Context, user *auth.User, raw
 		}
 
 		if finalContent == "" {
-			c, err := aiProv.Translate(ctx, srcArticle.ContentMarkdown, srcArticle.Lang, targetLang, ai.TranslateOptions{Academic: true})
+			c, err := aiProv.Translate(ctx, srcArticle.ContentMarkdown, srcArticle.Lang, targetLang, ai.TranslateOptions{WritingStyle: ai.WritingStyleAcademic})
 			if err != nil {
 				return nil, s.aiError(aiProv, err)
 			}
@@ -405,7 +405,7 @@ func (s *Server) toolSyncTranslation(ctx context.Context, user *auth.User, raw j
 		return nil, toolErrorf("AI アシスタントが設定されていません。%s", setupGuide(aiProv))
 	}
 
-	translatedTitle, err := aiProv.Translate(ctx, srcArticle.Title, srcArticle.Lang, targetArticle.Lang, ai.TranslateOptions{Academic: true})
+	translatedTitle, err := aiProv.Translate(ctx, srcArticle.Title, srcArticle.Lang, targetArticle.Lang, ai.TranslateOptions{WritingStyle: ai.WritingStyleAcademic})
 	if err != nil {
 		return nil, s.aiError(aiProv, err)
 	}
@@ -414,7 +414,7 @@ func (s *Server) toolSyncTranslation(ctx context.Context, user *auth.User, raw j
 		title = srcArticle.Title + " (" + targetArticle.Lang + ")"
 	}
 
-	translatedContent, err := aiProv.Translate(ctx, srcArticle.ContentMarkdown, srcArticle.Lang, targetArticle.Lang, ai.TranslateOptions{Academic: true})
+	translatedContent, err := aiProv.Translate(ctx, srcArticle.ContentMarkdown, srcArticle.Lang, targetArticle.Lang, ai.TranslateOptions{WritingStyle: ai.WritingStyleAcademic})
 	if err != nil {
 		return nil, s.aiError(aiProv, err)
 	}

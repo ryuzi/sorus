@@ -63,85 +63,37 @@
         {{with $d.FrontPage.Missing}}<option value="{{.}}" selected>{{$.T "structure_missing_option" .}}</option>{{end}}
       </select>
 
-      <h2 class="mt-6 flex items-center text-sm font-semibold text-neutral-800">{{$.T "structure_cards_title" $d.MaxFrontCards}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "structure_cards_desc"}}</span></span></h2>
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
-        {{range $card := $d.FrontCards}}
-        <div>
-          <label for="front-card-{{$card.Number}}" class="text-xs font-medium text-neutral-600">{{$.T "structure_card_n" $card.Number}}</label>
-          <select id="front-card-{{$card.Number}}" name="front_card" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
-            <option value="">{{$.T "structure_none"}}</option>
-            {{range $d.Pages}}<option value="{{.Slug}}"{{if eq .Slug $card.Value}} selected{{end}}>{{.Title}}{{if $ja}}（/{{.Slug}}）{{else}} (/{{.Slug}}){{end}}</option>{{end}}
-            {{with $card.Missing}}<option value="{{.}}" selected>{{$.T "structure_missing_option" .}}</option>{{end}}
-          </select>
-        </div>
-        {{end}}
-      </div>
-    </fieldset>
-
-    <fieldset class="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
-      <legend class="flex items-center px-1 text-base font-semibold text-neutral-900">{{$.T "structure_gallery_title"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "structure_gallery_desc"}}</span></span></legend>
-      <label for="top-gallery-tag" class="mt-4 block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_tag"}}</label>
-      <input id="top-gallery-tag" name="top_gallery_tag" type="text" maxlength="100" list="top-gallery-tags" value="{{$d.TopGalleryTag}}" aria-describedby="top-gallery-status" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm sm:w-2/3">
-      <datalist id="top-gallery-tags">{{range $d.GalleryTags}}<option value="{{.}}">{{end}}</datalist>
-      {{/* メディアで使っているタグを、押すだけで選べるボタンで並べる（datalist は候補があることに気付きにくいため）。 */}}
-      {{if $d.GalleryTags}}
-      <p id="top-gallery-suggest-label" class="mt-3 text-xs text-neutral-600">{{$.T "structure_gallery_suggest"}}</p>
-      <div id="top-gallery-chips" class="mt-1.5 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto" role="group" aria-labelledby="top-gallery-suggest-label">
-        {{range $d.GalleryTags}}<button type="button" class="tag-chip" data-gallery-tag-chip="{{.}}" aria-pressed="{{if eq . $d.TopGalleryTag}}true{{else}}false{{end}}">{{.}}</button>{{end}}
-      </div>
-      {{else}}
-      <p id="top-gallery-no-tags" class="mt-3 text-sm text-neutral-600">{{$.T "structure_gallery_no_tags"}}</p>
-      {{end}}
-      {{/* 選んだタグの写真の枚数と、トップページに出る写真（新しい順に表示枚数まで）。入力に合わせて下のスクリプトが
-           GET /admin/api/media?tag= で書き換える。 */}}
-      <div id="top-gallery-preview" class="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3"
-           data-text-count="{{$.T "structure_gallery_count"}}" data-text-empty="{{$.T "structure_gallery_empty"}}"
-           data-text-off="{{$.T "structure_gallery_off"}}" data-text-loading="{{$.T "structure_gallery_loading"}}"
-           data-text-error="{{$.T "structure_gallery_load_error"}}">
-        <p id="top-gallery-status" class="text-sm text-neutral-800" aria-live="polite" data-count="{{$d.TopGalleryCount}}">{{$d.TopGalleryStatus}}</p>
-        <p id="top-gallery-thumbs-label" class="mt-2 text-xs text-neutral-500" hidden>{{$.T "structure_gallery_preview"}}</p>
-        <ul id="top-gallery-thumbs" class="mt-1.5 grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:grid-cols-8" aria-labelledby="top-gallery-thumbs-label" hidden></ul>
-        <a id="top-gallery-media-link" href="/admin/media{{with $d.TopGalleryTag}}?tag={{.}}{{end}}" class="mt-2 inline-block text-sm font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900">{{$.T "structure_gallery_open_media"}}</a>
-      </div>
-      <div class="mt-4 grid gap-4 sm:grid-cols-2">
-        <div>
-          <label for="top-gallery-limit" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_limit"}}</label>
-          <select id="top-gallery-limit" name="top_gallery_limit" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
-            {{range $d.TopGalleryLimitOptions}}<option value="{{.}}"{{if eq . $d.TopGalleryLimit}} selected{{end}}>{{.}}</option>{{end}}
-          </select>
-        </div>
-        <div>
-          <label for="top-gallery-heading" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_heading"}}</label>
-          <input id="top-gallery-heading" name="top_gallery_title" type="text" maxlength="100" value="{{$d.TopGalleryTitle}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
-        </div>
-      </div>
-      {{/* 並べ方（justified が既定・おすすめ）。どれも写真を切り抜かず、元の縦横比のまま並べる。 */}}
-      <fieldset id="top-gallery-layout" class="mt-5">
-        <legend class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_layout"}}</legend>
-        <div class="mt-1.5 grid gap-2 sm:grid-cols-3">
-          {{range $d.TopGalleryLayouts}}
-          <label class="flex cursor-pointer items-start gap-2 rounded-lg border border-neutral-200 p-3 hover:bg-neutral-50 has-[:checked]:border-zinc-800 has-[:checked]:bg-zinc-50">
-            <input type="radio" name="top_gallery_layout" value="{{.}}"{{if eq . $d.TopGalleryLayout}} checked{{end}} class="mt-0.5 text-zinc-800 focus:ring-zinc-600">
-            <span class="min-w-0">
-              <span class="block text-sm font-medium text-neutral-900">{{$.T (printf "structure_gallery_layout_%s" .)}}</span>
-              <span class="mt-0.5 block text-xs text-neutral-600">{{$.T (printf "structure_gallery_layout_%s_desc" .)}}</span>
-            </span>
+      <h2 class="mt-6 text-sm font-semibold text-neutral-800">Front page sections</h2>
+      <ol class="mt-3 space-y-4">
+        {{range $section := $d.Sections}}
+        <li class="rounded-lg border border-neutral-200 p-4">
+          <div class="mb-3 flex items-center justify-between">
+            <span class="text-sm font-medium text-neutral-800">Section {{$section.Index}}</span>
+            <div class="flex gap-2">
+              {{if gt $section.Index 0}}<button type="submit" name="op" value="section-up:{{$section.Index}}" class="btn btn-secondary btn-sm">Move up</button>{{end}}
+              <button type="submit" name="op" value="section-delete:{{$section.Index}}" class="btn btn-secondary btn-sm">Delete</button>
+              <button type="submit" name="op" value="section-down:{{$section.Index}}" class="btn btn-secondary btn-sm">Move down</button>
+            </div>
+          </div>
+          <label class="block text-sm font-medium text-neutral-800">Type
+            <select name="section_type" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+              {{range $type := $d.FrontSectionTypes}}<option value="{{$type}}"{{if eq $section.Type $type}} selected{{end}}>{{$type}}</option>{{end}}
+            </select>
           </label>
-          {{end}}
-        </div>
-      </fieldset>
-      {{/* ギャラリーの下に出す「すべて見る」リンク（任意）。行き先が空ならリンクを出さない。 */}}
-      <div class="mt-5 grid gap-4 sm:grid-cols-2">
-        <div>
-          <label for="top-gallery-link-url" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_link_url"}}</label>
-          <input id="top-gallery-link-url" name="top_gallery_link_url" type="text" inputmode="url" maxlength="2000" value="{{$d.TopGalleryLinkURL}}" placeholder="/articles" aria-describedby="top-gallery-link-help" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
-        </div>
-        <div>
-          <label for="top-gallery-link-label" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_link_label"}}</label>
-          <input id="top-gallery-link-label" name="top_gallery_link_label" type="text" maxlength="{{$d.MaxGalleryLinkLabelRunes}}" value="{{$d.TopGalleryLinkLabel}}" placeholder="{{$.T "structure_gallery_link_label_default"}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
-        </div>
-      </div>
-      <p id="top-gallery-link-help" class="mt-1.5 flex items-center text-xs text-neutral-600">{{$.T "structure_gallery_link_help"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "structure_gallery_link_format"}}</span></span></p>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <label class="text-sm">Page slugs (comma separated)<input name="section_pages" value="{{$section.PagesText}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
+            <label class="text-sm">Media tag<input name="section_tag" value="{{$section.Tag}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
+            <label class="text-sm">Title<input name="section_title" value="{{$section.Title}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
+            <label class="text-sm">Limit<input name="section_limit" type="number" min="0" max="24" value="{{$section.Limit}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
+            <label class="text-sm">Layout<input name="section_layout" value="{{$section.Layout}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
+            <label class="text-sm">Article tag<input name="section_article_tag" value="{{$section.ArticleTag}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
+            <label class="text-sm">Link URL<input name="section_link_url" value="{{$section.LinkURL}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
+            <label class="text-sm">Link label<input name="section_link_label" value="{{$section.LinkLabel}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
+          </div>
+        </li>
+        {{end}}
+      </ol>
+      {{if lt (len $d.Sections) 12}}<button type="submit" name="op" value="section-add" class="btn btn-secondary btn-sm mt-4">Add section</button>{{end}}
     </fieldset>
 
     <div class="flex justify-end">

@@ -63,12 +63,8 @@ func TestAISettingsKeepsKeysPerProvider(t *testing.T) {
 			t.Errorf("providers[%s] = %+v, want %+v", k, saved.Providers[k], pc)
 		}
 	}
-	// 旧形式の項目は、メインのプロバイダーと DeepL の設定を写す。
-	if saved.APIKey != "AQ.gemini-key" || saved.DeepLAPIKey != "deepl-key:fx" || saved.BaseURL != "" {
-		t.Errorf("legacy fields = %+v", saved)
-	}
 	var raw map[string]any
-	if err := json.Unmarshal([]byte(env.setting(aiSettingKey)), &raw); err != nil || raw["providers"] == nil || raw["api_key"] != "AQ.gemini-key" {
+	if err := json.Unmarshal([]byte(env.setting(aiSettingKey)), &raw); err != nil || raw["providers"] == nil {
 		t.Errorf("stored JSON = %s", env.setting(aiSettingKey))
 	}
 
@@ -76,7 +72,7 @@ func TestAISettingsKeepsKeysPerProvider(t *testing.T) {
 	expectRedirect(t, adm.postForm(aiSettingsPath, url.Values{"provider": {"openai"}, "translation_provider": {"deepl"}}),
 		aiSettingsPath+"?flash=ai_saved")
 	saved, _ = savedAI(t, env)
-	if saved.Provider != ai.KindOpenAI || saved.APIKey != "sk-openai-key" || saved.Providers[ai.KindGemini].APIKey != "AQ.gemini-key" ||
+	if saved.Provider != ai.KindOpenAI || saved.Providers[ai.KindOpenAI].APIKey != "sk-openai-key" || saved.Providers[ai.KindGemini].APIKey != "AQ.gemini-key" ||
 		saved.Providers[ai.KindClaude] != want[ai.KindClaude] || saved.TranslationProvider != ai.KindDeepL {
 		t.Fatalf("after switching = %+v", saved)
 	}
@@ -164,7 +160,7 @@ func TestAISettingsProviderConfigsData(t *testing.T) {
 			t.Errorf("non-admin item %s leaks %+v", it.Key, it)
 		}
 	}
-	if wd.Form.BaseURL != "" || wd.KeyPreview != "" {
+	if wd.Form.Providers[ai.KindCustom].BaseURL != "" || wd.KeyPreview != "" {
 		t.Errorf("non-admin form = %+v", wd.Form)
 	}
 
@@ -178,42 +174,29 @@ func TestAISettingsProviderConfigsData(t *testing.T) {
 	}
 }
 
-// 旧形式（Provider・APIKey・Model・BaseURL・DeepLAPIKey だけ）の保存データは、読み込むときに Providers へ補完する。
-func TestLoadAIConfigBackfillsLegacyFormat(t *testing.T) {
+// 保存データは Providers と WritingStyle を読み込み、知らないプロバイダーや custom 以外のベース URL は捨てる。
+func TestLoadAIConfigNormalizesProviders(t *testing.T) {
 	clearAIEnv(t)
 	env := newTestEnv(t)
-	legacy := `{"provider":"custom","api_key":"legacy-key","model":"llama3.1","base_url":"http://localhost:11434/v1",` +
-		`"translation_provider":"deepl","deepl_api_key":"legacy-deepl:fx","writing_style":"academic"}`
-	if err := upsertSetting(env.db, aiSettingKey, legacy); err != nil {
+	canonical := `{"provider":"custom","providers":{"custom":{"api_key":"custom-key","model":"llama3.1","base_url":"http://localhost:11434/v1"},"deepl":{"api_key":"deepl-key:fx"}},` +
+		`"translation_provider":"deepl","writing_style":"academic"}`
+	if err := upsertSetting(env.db, aiSettingKey, canonical); err != nil {
 		t.Fatal(err)
 	}
 	cfg, ok := env.server.loadAIConfig()
 	if !ok {
-		t.Fatal("legacy settings must load")
+		t.Fatal("settings must load")
 	}
-	if got := cfg.Providers[ai.KindCustom]; got != (savedProviderConfig{APIKey: "legacy-key", Model: "llama3.1", BaseURL: "http://localhost:11434/v1"}) {
+	if got := cfg.Providers[ai.KindCustom]; got != (savedProviderConfig{APIKey: "custom-key", Model: "llama3.1", BaseURL: "http://localhost:11434/v1"}) {
 		t.Errorf("custom = %+v", got)
 	}
-	if got := cfg.Providers[ai.KindDeepL]; got != (savedProviderConfig{APIKey: "legacy-deepl:fx"}) {
+	if got := cfg.Providers[ai.KindDeepL]; got != (savedProviderConfig{APIKey: "deepl-key:fx"}) {
 		t.Errorf("deepl = %+v", got)
 	}
-	if cfg.APIKey != "legacy-key" || cfg.Model != "llama3.1" || cfg.BaseURL != "http://localhost:11434/v1" || cfg.DeepLAPIKey != "legacy-deepl:fx" || !cfg.AcademicStyle {
-		t.Errorf("legacy fields = %+v", cfg)
+	if cfg.WritingStyle != ai.WritingStyleAcademic {
+		t.Errorf("writing_style = %q, want academic", cfg.WritingStyle)
 	}
 
-	// DeepL をメインにした古いデータは、メインのキーを DeepL のキーとして使う。
-	for raw, want := range map[string]string{
-		`{"provider":"deepl","api_key":"main-deepl"}`:                                                       "main-deepl",
-		`{"provider":"deepl","deepl_api_key":"only-deepl"}`:                                                 "only-deepl",
-		`{"provider":"gemini","api_key":"g","providers":{"deepl":{"api_key":"new"}},"deepl_api_key":"old"}`: "new",
-	} {
-		if err := upsertSetting(env.db, aiSettingKey, raw); err != nil {
-			t.Fatal(err)
-		}
-		if cfg, _ := env.server.loadAIConfig(); cfg.Providers[ai.KindDeepL].APIKey != want || cfg.DeepLAPIKey != want {
-			t.Errorf("%s: deepl = %+v", raw, cfg.Providers[ai.KindDeepL])
-		}
-	}
 	// 知らないプロバイダーと、custom 以外のベース URL は捨てる。
 	if err := upsertSetting(env.db, aiSettingKey, `{"provider":"gemini","providers":{"gemini":{"api_key":"g","base_url":"https://evil.example"},"bogus":{"api_key":"x"}}}`); err != nil {
 		t.Fatal(err)

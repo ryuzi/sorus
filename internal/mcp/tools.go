@@ -88,7 +88,7 @@ func (s *Server) newTools() []*tool {
 			info: toolInfo{
 				Name:  "cms_get_site_context",
 				Title: "サイト情報",
-				Description: "サイト名・説明・カテゴリと最近の公開記事、サイト構成（site_structure: ナビゲーションメニュー site_menu・フッターのサイトマップ site_footer_menu・トップのカード front_cards）を返します。" +
+				Description: "サイト名・説明・カテゴリと最近の公開記事、サイト構成（site_structure: ナビゲーションメニュー site_menu・フッターのサイトマップ site_footer_menu・トップのセクション front_sections）を返します。" +
 					"記事作成前にサイトの文脈を把握するために使ってください。サイト構成の変更は cms_update_site_structure で行えます。公開記事の一覧は /llms.txt も参照できます。",
 				InputSchema: objectSchema(map[string]any{}),
 				Annotations: &toolAnnotations{Title: "サイト情報", ReadOnlyHint: true, IdempotentHint: true},
@@ -1313,7 +1313,7 @@ func (s *Server) toolProofread(ctx context.Context, user *auth.User, raw json.Ra
 			res.Text, err = assistant.GenerateAbstract(ctx, text)
 		case modeTranslate:
 			var translated string
-			translated, err = provider.Translate(ctx, text, "", args.TargetLang, ai.TranslateOptions{Academic: true})
+			translated, err = provider.Translate(ctx, text, "", args.TargetLang, ai.TranslateOptions{WritingStyle: ai.WritingStyleAcademic})
 			if err == nil {
 				res.Text = translated
 				target := args.TargetLang
