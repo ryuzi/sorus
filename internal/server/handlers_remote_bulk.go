@@ -106,14 +106,15 @@ type remoteBulkPlan struct {
 }
 
 // remoteBulkArticleIDs はこの PC で公開中（読者に見えている）の記事・固定ページの ID を、公開日時の古い順に返す。
+// ただし親ページも送る子ページは親の後にする（parentsFirst。公開サーバーで子ページを親の下に置けるように）。
 func (s *Server) remoteBulkArticleIDs(ctx context.Context) ([]string, error) {
-	var ids []string
-	err := s.db.SelectContext(ctx, &ids, `SELECT a.id FROM articles a WHERE `+publishedCondition+`
+	var rows []idParent
+	err := s.db.SelectContext(ctx, &rows, `SELECT a.id, COALESCE(a.parent_id, '') AS parent_id FROM articles a WHERE `+publishedCondition+`
 		ORDER BY julianday(a.published_at), a.id`, article.StatusPublished, clockNow().UTC())
 	if err != nil {
 		return nil, fmt.Errorf("server: remote bulk sync: list articles: %w", err)
 	}
-	return ids, nil
+	return parentsFirst(rows), nil
 }
 
 // remoteBulkPlanFor は一括同期で送る記事と添付資料の数を数える。

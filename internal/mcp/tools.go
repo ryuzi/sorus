@@ -100,7 +100,8 @@ func (s *Server) newTools() []*tool {
 				Name:  "cms_list_articles",
 				Title: "記事一覧",
 				Description: "CMS の記事を更新日時の新しい順に一覧します。status（draft=下書き, review=校閲待ち, scheduled=予約投稿, " +
-					"published=公開中, deleted=ゴミ箱）・種類（kind: post=記事, page=固定ページ）・カテゴリで絞り込めます。status を省略するとゴミ箱以外のすべてを返します。" +
+					"published=公開中, deleted=ゴミ箱）・種類（kind: post=記事, page=固定ページ）・カテゴリ・親ページ（parent_id か parent_slug）で絞り込めます。status を省略するとゴミ箱以外のすべてを返します。" +
+					"固定ページの階層は各行の parent_id・parent_slug（親ページ。最上位のページと記事では省略）と sort_order（同じ親の中での並び順）で分かります。親ページで絞り込むと子ページを並び順に返します。" +
 					"管理画面と同じく、執筆チーム（執筆者・編集者・管理者）は他の人の下書きなど公開前の記事も一覧できます。本文は cms_get_article で取得してください。",
 				InputSchema: objectSchema(map[string]any{
 					"status":      enumProp("記事の状態。省略（all）ならゴミ箱以外のすべて", "all", "draft", "review", "scheduled", "published", "deleted"),
@@ -108,6 +109,8 @@ func (s *Server) newTools() []*tool {
 					"category":    stringProp("カテゴリのスラッグまたは名前"),
 					"category_id": integerProp("カテゴリの ID", 1, 0),
 					"lang":        stringProp("言語コード（ja, en など）で絞り込み"),
+					"parent_id":   stringProp("この ID の固定ページの子ページだけを一覧する（並び順 sort_order・タイトルの順）"),
+					"parent_slug": stringProp("このスラッグの固定ページの子ページだけを一覧する（parent_id と同じ。どちらか一方を指定）"),
 					"mine":        boolProp("true なら自分が作成した記事だけ"),
 					"limit":       integerProp(fmt.Sprintf("返す件数（既定 %d、最大 %d）", defaultListLimit, maxListLimit), 1, maxListLimit),
 					"offset":      integerProp("先頭から飛ばす件数（ページング用）", 0, 0),
@@ -120,7 +123,7 @@ func (s *Server) newTools() []*tool {
 			info: toolInfo{
 				Name:  "cms_get_article",
 				Title: "記事の取得",
-				Description: "記事の本文（Markdown）とメタデータ（ID・タイトル・スラッグ・状態・種類・カテゴリ・公開日時など）を取得します。" +
+				Description: "記事の本文（Markdown）とメタデータ（ID・タイトル・スラッグ・状態・種類・カテゴリ・公開日時、固定ページの親ページ parent_id・parent_slug と並び順 sort_order など）を取得します。" +
 					"article_id か slug のどちらかを指定します。校閲の差し戻し理由などの内部コメント（管理画面の編集画面と同じもの）と、" +
 					"sorus の画面での確認を待っている変更案（pending_proposal）があればその概要も返します。",
 				InputSchema: objectSchema(map[string]any{
@@ -138,6 +141,9 @@ func (s *Server) newTools() []*tool {
 				Description: "下書き記事を新規作成、または既存の下書きを更新します。article_id を省略すると新規作成（title 必須）、" +
 					"指定するとその下書きを更新し、省略した項目は現在の値を保ちます。スラッグは省略するとタイトルから自動生成し、重複すると連番を付けます。" +
 					"カテゴリを省略した新規作成は最初のカテゴリになります。kind に page を指定すると固定ページ（/スラッグ で公開し、新着一覧・RSS には出ない）になります。" +
+					"固定ページは parent_slug（または parent_id）で親の固定ページの下に置け、sort_order で同じ親の中での並び順（小さいほど先）を決められます。" +
+					"親を持てるのは固定ページだけで、自分自身や自分の子孫は親にできません。parent_id に空文字を指定すると親から外して最上位に戻します。" +
+					"親・並び順の変更は、タイトル・本文・抜粋の変更（変更案）と同時には指定できません。" +
 					"更新できるのは下書き（draft）の記事だけです（管理画面と同じく、他の執筆者の下書きも対象）。" +
 					"既存の記事のタイトル・本文・抜粋を変える場合は、記事をすぐには変えず「変更案」として預かり（needs_confirmation: true）、" +
 					"sorus の編集画面で人が差分を確かめて保存したときに反映されます。返された confirm_url を利用者に伝えてください。" +
@@ -155,6 +161,9 @@ func (s *Server) newTools() []*tool {
 					"lang":                 stringProp("言語コード（省略時は新規作成で ja、更新時は現在の言語を維持）"),
 					"translation_group_id": stringProp("翻訳グループ ID（省略時は新規作成で自身の ID、更新時は現在のグループを維持）"),
 					"source_article_id":    stringProp("翻訳元の記事 ID"),
+					"parent_id":            stringProp("親の固定ページの ID（固定ページだけ）。空文字なら親から外して最上位にする。省略すると新規作成では親なし、更新では今の親のまま"),
+					"parent_slug":          stringProp("親の固定ページのスラッグ（parent_id の代わり。どちらか一方を指定）。空文字なら親から外す"),
+					"sort_order":           integerProp("同じ親の中での並び順（小さいほど先。同じ値はタイトル順）。省略すると新規作成では 0、更新では今の値のまま", 0, 0),
 				}),
 				Annotations: &toolAnnotations{Title: "下書き保存"},
 			},
@@ -398,6 +407,12 @@ type articleRow struct {
 	Lang               string         `db:"lang" json:"lang"`
 	TranslationGroupID string         `db:"translation_group_id" json:"translation_group_id"`
 	IsOutdated         bool           `db:"is_outdated" json:"is_outdated"`
+	// ParentID・ParentSlug は固定ページの親ページの ID とスラッグ。最上位のページと記事では省く。
+	// 親を完全に削除した子ページは最上位に移る。ゴミ箱にある親は ID・スラッグをそのまま返す。
+	ParentID   string `db:"parent_id" json:"parent_id,omitempty"`
+	ParentSlug string `db:"parent_slug" json:"parent_slug,omitempty"`
+	// SortOrder は同じ親の中での並び順（小さいほど先）。
+	SortOrder int `db:"sort_order" json:"sort_order"`
 }
 
 // viewSchedule は予約中の記事の行を、状態 scheduled と公開予定日時 scheduled_at の形にする。
@@ -407,8 +422,16 @@ func (r *articleRow) viewSchedule(now time.Time) {
 	}
 }
 
+// updatedOrder は記事の一覧の既定の並び順（更新日時の新しい順）の ORDER BY 句。
+const updatedOrder = `julianday(a.updated_at) DESC, a.id`
+
 // queryArticles は conds（AND で結ぶ条件、articles の別名 a）に一致する記事を更新日時の新しい順に返す。
 func (s *Server) queryArticles(ctx context.Context, conds []string, args []any, limit, offset int) ([]articleRow, error) {
+	return s.queryArticlesOrdered(ctx, conds, args, updatedOrder, limit, offset)
+}
+
+// queryArticlesOrdered は queryArticles を order（ORDER BY 句。定数だけを渡すこと）の順で返す。
+func (s *Server) queryArticlesOrdered(ctx context.Context, conds []string, args []any, order string, limit, offset int) ([]articleRow, error) {
 	where := ""
 	if len(conds) > 0 {
 		where = "WHERE " + strings.Join(conds, " AND ")
@@ -416,13 +439,15 @@ func (s *Server) queryArticles(ctx context.Context, conds []string, args []any, 
 	rows := []articleRow{}
 	err := s.db.SelectContext(ctx, &rows, `SELECT a.id, a.title, a.slug, a.status, a.kind, a.category_id, a.author_id,
 			a.updated_at, a.published_at, a.lang, a.translation_group_id, a.is_outdated,
+			COALESCE(a.parent_id, '') AS parent_id, COALESCE(parent.slug, '') AS parent_slug, a.sort_order,
 			COALESCE(c.name, '') AS category_name,
 			COALESCE(NULLIF(u.display_name, ''), u.username, '') AS author_name
 		FROM articles a
 		LEFT JOIN categories c ON c.id = a.category_id
 		LEFT JOIN users u ON u.id = a.author_id
+		LEFT JOIN articles parent ON parent.id = a.parent_id
 		`+where+`
-		ORDER BY julianday(a.updated_at) DESC, a.id
+		ORDER BY `+order+`
 		LIMIT ? OFFSET ?`, append(append([]any{}, args...), limit, offset)...)
 	if err != nil {
 		return nil, fmt.Errorf("list articles: %w", err)
@@ -489,6 +514,8 @@ type listArticlesArgs struct {
 	Category   string `json:"category"`
 	CategoryID int64  `json:"category_id"`
 	Lang       string `json:"lang"`
+	ParentID   string `json:"parent_id"`
+	ParentSlug string `json:"parent_slug"`
 	Mine       bool   `json:"mine"`
 	Limit      int    `json:"limit"`
 	Offset     int    `json:"offset"`
@@ -549,12 +576,22 @@ func (s *Server) toolListArticles(ctx context.Context, user *auth.User, raw json
 	if lang := strings.TrimSpace(args.Lang); lang != "" {
 		conds, condArgs = append(conds, "a.lang = ?"), append(condArgs, lang)
 	}
+	// 親ページで絞り込むときは、子ページを公開サイトと同じ並び順（sort_order・タイトル・作成日時）で返す。
+	order := updatedOrder
+	parentID, err := s.resolveParent(user, optionalString(args.ParentID), optionalString(args.ParentSlug))
+	if err != nil {
+		return nil, err
+	}
+	if parentID != nil {
+		conds, condArgs = append(conds, "a.parent_id = ?"), append(condArgs, *parentID)
+		order = article.PageOrder
+	}
 
 	res := listArticlesResult{Limit: args.Limit, Offset: args.Offset}
 	if err := s.db.GetContext(ctx, &res.Total, `SELECT COUNT(*) FROM articles a WHERE `+strings.Join(conds, " AND "), condArgs...); err != nil {
 		return nil, fmt.Errorf("count articles: %w", err)
 	}
-	if res.Articles, err = s.queryArticles(ctx, conds, condArgs, args.Limit, args.Offset); err != nil {
+	if res.Articles, err = s.queryArticlesOrdered(ctx, conds, condArgs, order, args.Limit, args.Offset); err != nil {
 		return nil, err
 	}
 	if next := args.Offset + len(res.Articles); next < res.Total {
@@ -703,6 +740,11 @@ type saveDraftArgs struct {
 	Lang               string  `json:"lang"`
 	TranslationGroupID string  `json:"translation_group_id"`
 	SourceArticleID    string  `json:"source_article_id"`
+	// ParentID・ParentSlug は親の固定ページ（nil なら今の親のまま、空文字なら親から外す）。toolSaveDraft が
+	// parent_slug を固定ページの ID に解決して ParentID に入れ、ParentSlug は nil にしてから applyDraft に渡す。
+	ParentID   *string `json:"parent_id"`
+	ParentSlug *string `json:"parent_slug"`
+	SortOrder  *int    `json:"sort_order"`
 }
 
 type saveDraftResult struct {
@@ -731,10 +773,17 @@ func (s *Server) toolSaveDraft(ctx context.Context, user *auth.User, raw json.Ra
 	if args.Kind != "" && !article.Kind(args.Kind).Valid() {
 		return nil, toolErrorf("kind %q は不正です（post か page）", args.Kind)
 	}
+	if args.SortOrder != nil && *args.SortOrder < 0 {
+		return nil, toolErrorf("sort_order は 0 以上の整数で指定してください")
+	}
 	catID, err := s.resolveCategory(ctx, args.CategoryID, args.Category)
 	if err != nil {
 		return nil, err
 	}
+	if args.ParentID, err = s.resolveParent(user, args.ParentID, args.ParentSlug); err != nil {
+		return nil, err
+	}
+	args.ParentSlug = nil
 
 	id := strings.TrimSpace(args.ArticleID)
 	created := id == ""
@@ -742,6 +791,9 @@ func (s *Server) toolSaveDraft(ctx context.Context, user *auth.User, raw json.Ra
 	if created {
 		if args.Title == nil {
 			return nil, toolErrorf("新規作成では title が必須です")
+		}
+		if err := checkHierarchy(nil, args, false); err != nil {
+			return nil, err
 		}
 		if catID == 0 {
 			if catID, err = s.defaultCategory(ctx); err != nil {
@@ -763,7 +815,11 @@ func (s *Server) toolSaveDraft(ctx context.Context, user *auth.User, raw json.Ra
 		}
 		// 既存の記事の文章を変える保存は、AI アプリの承認では人が確かめたことを保証できないため、記事を変えずに
 		// 変更案として預かり、sorus の画面で確かめてもらう。
-		if changes := draftChanges(a, args, catID); changes.ReplacesContent() {
+		changes := draftChanges(a, args, catID)
+		if err := checkHierarchy(a, args, changes.ReplacesContent()); err != nil {
+			return nil, err
+		}
+		if changes.ReplacesContent() {
 			return s.proposeDraft(ctx, user, a, changes)
 		}
 		release, err := s.lockForWrite(ctx, user, id)
@@ -779,7 +835,11 @@ func (s *Server) toolSaveDraft(ctx context.Context, user *auth.User, raw json.Ra
 			return nil, err
 		}
 		// 読み直すまでに他の人が文章を変えていれば、指定した文章はもう今の記事と違う。その場合も案にする。
-		if changes := draftChanges(a, args, catID); changes.ReplacesContent() {
+		changes = draftChanges(a, args, catID)
+		if err := checkHierarchy(a, args, changes.ReplacesContent()); err != nil {
+			return nil, err
+		}
+		if changes.ReplacesContent() {
 			return s.proposeDraft(ctx, user, a, changes)
 		}
 		if catID != 0 {
@@ -862,6 +922,70 @@ func draftChanges(a *article.Article, args saveDraftArgs, catID int64) ProposalC
 		c.SourceArticleID = &v
 	}
 	return c
+}
+
+// optionalString は空文字を nil（未指定）にする。cms_list_articles の絞り込みのように、空文字に意味の無い引数に使う。
+func optionalString(v string) *string {
+	if v = strings.TrimSpace(v); v == "" {
+		return nil
+	}
+	return &v
+}
+
+// resolveParent は parent_id・parent_slug の指定から親の固定ページの ID を返す。どちらも nil なら nil（指定なし）、
+// 空文字（空白だけを含む）なら ""（親から外す）を返す。parent_slug は先頭の / を除いた固定ページのスラッグで解決し、
+// 見つからない・固定ページでない・ゴミ箱にある・閲覧できないページは toolError にする。parent_id の検証
+// （存在・種類・循環）は article.Service.Save が行う。
+func (s *Server) resolveParent(user *auth.User, id, slug *string) (*string, error) {
+	if id != nil && slug != nil {
+		return nil, toolErrorf("parent_id と parent_slug はどちらか一方だけを指定してください")
+	}
+	if id != nil {
+		v := strings.TrimSpace(*id)
+		return &v, nil
+	}
+	if slug == nil {
+		return nil, nil
+	}
+	key := strings.TrimPrefix(strings.TrimSpace(*slug), "/")
+	if key == "" {
+		return &key, nil
+	}
+	p, err := s.articles.GetBySlug(key)
+	if errors.Is(err, article.ErrNotFound) ||
+		(err == nil && (p.Kind != article.KindPage || p.Status == article.StatusDeleted || !visible(user, p))) {
+		return nil, toolErrorf("親にする固定ページ %q が見つかりません。parent_slug には固定ページ（kind=page）のスラッグを指定してください", key)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p.ID, nil
+}
+
+// checkHierarchy は cms_save_draft の親ページ・並び順の指定を、記事 a（新規作成では nil）に重ねたときに確かめる。
+// args.ParentID は resolveParent で解決済みであること。親を持てるのは固定ページだけで、保存が文章の変更案になる
+// （replacesContent）ときは親・並び順を変えられない（案には入らず、sorus の画面で確かめた保存で失われるため）。
+func checkHierarchy(a *article.Article, args saveDraftArgs, replacesContent bool) error {
+	kind, parent := article.KindPost, ""
+	if a != nil {
+		kind, parent = a.Kind, a.ParentID
+	}
+	if args.Kind != "" {
+		kind = article.Kind(args.Kind)
+	}
+	if args.ParentID != nil {
+		parent = *args.ParentID
+	}
+	if parent != "" && kind != article.KindPage {
+		return toolErrorf("親ページ（parent_id・parent_slug）を持てるのは固定ページ（kind=page）だけです。" +
+			"固定ページにするなら kind に page を、記事（post）にするなら parent_id に空文字を指定して親から外してください")
+	}
+	if replacesContent && a != nil &&
+		((args.ParentID != nil && *args.ParentID != a.ParentID) || (args.SortOrder != nil && *args.SortOrder != a.SortOrder)) {
+		return toolErrorf("parent_id・parent_slug・sort_order は、タイトル・本文・抜粋の変更（sorus の画面で確かめる変更案）と同時には指定できません。" +
+			"先に親ページ・並び順だけを cms_save_draft で保存してから、文章の変更を送ってください")
+	}
+	return nil
 }
 
 // proposeDraft は cms_save_draft の変更を記事 a の変更案として預かり、確認の画面を返す。
@@ -947,6 +1071,12 @@ func applyDraft(a *article.Article, args saveDraftArgs) {
 	if srcID := strings.TrimSpace(args.SourceArticleID); srcID != "" {
 		a.SourceArticleID = sql.NullString{String: srcID, Valid: true}
 	}
+	if args.ParentID != nil {
+		a.ParentID = *args.ParentID
+	}
+	if args.SortOrder != nil {
+		a.SortOrder = *args.SortOrder
+	}
 }
 
 func (s *Server) saveArticle(a *article.Article) error {
@@ -958,6 +1088,14 @@ func (s *Server) saveArticle(a *article.Article) error {
 			slug = a.Title
 		}
 		return toolErrorf("スラッグ %q は固定ページには使えません（サイトの決まった URL と重なります）。slug に別のスラッグを指定してください", article.NormalizeSlug(slug))
+	}
+	if errors.Is(err, article.ErrInvalidParent) {
+		return toolErrorf("親ページ %q には指定できません。親にできるのはゴミ箱にない固定ページ（kind=page）だけで、"+
+			"自分自身や自分の子孫のページは親にできません", a.ParentID)
+	}
+	if errors.Is(err, article.ErrHasChildPages) {
+		return toolErrorf("子ページのある固定ページは記事（post）に変えられません。先に子ページを別の親へ移すか、親から外してください" +
+			"（子ページは cms_list_articles の parent_id で一覧できます）")
 	}
 	if errors.Is(err, article.ErrInvalid) {
 		return toolErrorf("記事を保存できませんでした。入力内容を確認してください")
