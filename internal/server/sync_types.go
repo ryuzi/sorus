@@ -393,6 +393,13 @@ type SyncArticle struct {
 	Lang               string `json:"lang,omitempty"`
 	TranslationGroupID string `json:"translation_group_id,omitempty"`
 	SourceArticleID    string `json:"source_article_id,omitempty"`
+	// ParentID は固定ページの親ページの記事 ID（PC と公開サーバーで同じ ID）。nil（項目なし）は公開サーバーの今の親を保ち
+	// （階層を知らない古い PC からの提出で外さない）、空文字は最上位にする。親を持てるのは固定ページだけで、記事（post）の
+	// 提出では無視する。親のページが公開サーバーにまだ無い（ゴミ箱にある）ときは、今の親のまま（新しいページは最上位）に
+	// して保存を続ける（一括同期で子ページが親より先に届いても止めない）。知らない古い公開サーバーは無視する。
+	ParentID *string `json:"parent_id,omitempty"`
+	// SortOrder は固定ページの同じ親の中での並び順。nil（項目なし）は公開サーバーの今の値を保つ。
+	SortOrder *int `json:"sort_order,omitempty"`
 	// PublishedAt は PC での公開日時（publish_article で直接公開するときだけ使う）。今より前なら公開サーバーでも同じ
 	// 公開日時にし、一括同期で送った古い記事が「今日の記事」として並ばないようにする。未来の日時・省略したときは、
 	// 公開サーバーの今までどおり（初めて公開する記事なら今の時刻）にする。知らない古い公開サーバーは無視する。
@@ -528,6 +535,10 @@ type SyncPendingArticle struct {
 	Lang               string `db:"lang" json:"lang,omitempty"`
 	TranslationGroupID string `db:"translation_group_id" json:"translation_group_id,omitempty"`
 	SourceArticleID    string `db:"source_article_id" json:"source_article_id,omitempty"`
+	// ParentID・SortOrder は固定ページの階層（親ページの記事 ID。空文字は最上位）と並び順。階層を知らない古い公開
+	// サーバーは返さず（nil）、PC は今の親・並び順を保って取り込む。
+	ParentID  *string `db:"parent_id" json:"parent_id,omitempty"`
+	SortOrder *int    `db:"sort_order" json:"sort_order,omitempty"`
 	// CheckedOutBy・CheckedOutAt は PC の sorus でこの記事を編集中の人と、その開始日時（有効な印があるときだけ）。
 	CheckedOutBy string     `db:"checked_out_by" json:"checked_out_by,omitempty"`
 	CheckedOutAt *time.Time `db:"checked_out_at" json:"checked_out_at,omitempty"`

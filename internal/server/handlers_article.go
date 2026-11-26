@@ -279,6 +279,13 @@ type articleForm struct {
 	TranslationGroupID string
 	SourceArticleID    string
 	IsOutdated         bool
+
+	// 固定ページの階層。ParentID は親ページの ID（空なら最上位）、SortOrder は同じ親の中の並び順（入力のままの文字列。
+	// applyForm が整数として確かめる）。HasHierarchy はフォームに親ページの欄があったか（欄の無い送信・記事の編集では
+	// 保存済みの親・並び順を変えない）。
+	ParentID     string
+	SortOrder    string
+	HasHierarchy bool
 }
 
 // HasAcademicMeta は学術メタデータが1つでも入力されているか。編集画面で入力欄を開いておくために使う。
@@ -338,6 +345,21 @@ type editData struct {
 	Lang string
 	// MultilingualEnabled は多言語対応を有効にしているか。OFF なら翻訳ボタン・英語版の作成・言語バッジを出さない。
 	MultilingualEnabled bool
+	// ParentPages は固定ページの編集で「親ページ」の欄に出す候補（ゴミ箱にない固定ページを階層の順に。自分自身と
+	// 自分の子孫は除く）。固定ページの編集のときだけ renderEditPage が埋める。
+	ParentPages []parentPageOption
+}
+
+// parentPageOption は「親ページ」の欄の選択肢1つ。
+type parentPageOption struct {
+	ID string
+	// Label は階層の深さだけ字下げしたタイトル。
+	Label string
+	// Status は保存した状態（下書き・校閲待ちなどを見分けて添える）。Missing は選択中の親が候補に無い（ゴミ箱にある・
+	// 別の言語の）ページであることを示す。
+	Status   article.Status
+	Missing  bool
+	Selected bool
 }
 
 // ReadOnly は他のユーザーが編集中で、閲覧専用で表示するか。
@@ -1035,6 +1057,11 @@ func (s *Server) renderEditPage(c echo.Context, code int, data editData, errMsg 
 	data.Locked = !data.CanPublish && requiresPublisher(data.Form.Status)
 	data.MinScheduleAt = minScheduleAt(clockNow())
 	data.RemoteSync = s.remoteSyncViewFor(user)
+	if data.Form.IsPage() {
+		if data.ParentPages, err = s.parentPageOptions(c.Request().Context(), data.Form); err != nil {
+			return err
+		}
+	}
 	if !data.IsNew {
 		if data.Attachments, err = s.attachmentList(c, data.Form.ID); err != nil {
 			return err
@@ -1083,6 +1110,16 @@ func (s *Server) renderEditPage(c echo.Context, code int, data editData, errMsg 
 func (s *Server) saveError(c echo.Context, data editData, err error) error {
 	if errors.Is(err, article.ErrReservedSlug) {
 		return s.renderFormError(c, http.StatusUnprocessableEntity, data, reservedSlugMessage(c, data.Form))
+	}
+	if errors.Is(err, article.ErrInvalidParent) {
+		return s.renderFormError(c, http.StatusUnprocessableEntity, data, adminText(c,
+			"この親ページは選べません。自分自身・自分の子ページ・ゴミ箱のページは親ページにできません",
+			"This parent page cannot be used. A page cannot be placed under itself, its own child pages, or a page in the trash"))
+	}
+	if errors.Is(err, article.ErrHasChildPages) {
+		return s.renderFormError(c, http.StatusUnprocessableEntity, data, adminText(c,
+			"子ページのある固定ページは記事に変えられません。先に子ページの親ページを変えてください",
+			"A page with child pages cannot become a post. Move its child pages to another parent first"))
 	}
 	if errors.Is(err, article.ErrInvalid) {
 		return s.renderFormError(c, http.StatusUnprocessableEntity, data, "入力内容を確認してください")
@@ -1134,6 +1171,22 @@ func (s *Server) applyForm(c echo.Context, a *article.Article, form articleForm,
 	if form.HasFeaturedImage && form.FeaturedImage != a.FeaturedImage && !validFeaturedImageURL(form.FeaturedImage) {
 		return "アイキャッチ画像の URL が正しくありません（メディアライブラリから選択してください）", nil
 	}
+	sortOrder := a.SortOrder
+	if kind == article.KindPage && form.HasHierarchy {
+		if v := strings.TrimSpace(form.SortOrder); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < -maxSortOrder || n > maxSortOrder {
+				return adminText(c, "並び順は -"+strconv.Itoa(maxSortOrder)+" から "+strconv.Itoa(maxSortOrder)+" までの整数で入力してください",
+					"Enter the order as a whole number from -"+strconv.Itoa(maxSortOrder)+" to "+strconv.Itoa(maxSortOrder)), nil
+			}
+			sortOrder = n
+		} else {
+			sortOrder = 0
+		}
+		if form.ParentID != "" && form.ParentID == a.ID {
+			return adminText(c, "自分自身を親ページにはできません", "A page cannot be its own parent"), nil
+		}
+	}
 	ok, err := s.categoryExists(form.CategoryID)
 	if err != nil {
 		return "", err
@@ -1149,6 +1202,14 @@ func (s *Server) applyForm(c echo.Context, a *article.Article, form articleForm,
 		return "カテゴリを選択してください", nil
 	}
 	a.Kind = kind
+	// 親を持てるのは固定ページだけ。記事に変えるときは親から外す（子ページを持つページは article.Service.Save が断る）。
+	switch {
+	case kind != article.KindPage:
+		a.ParentID = ""
+	case form.HasHierarchy:
+		a.ParentID = form.ParentID
+		a.SortOrder = sortOrder
+	}
 	a.Title = form.Title
 	a.Slug = form.Slug
 	a.CategoryID = form.CategoryID
@@ -1267,7 +1328,11 @@ func readArticleForm(c echo.Context) articleForm {
 	catID, _ := strconv.ParseInt(c.FormValue("category_id"), 10, 64)
 	params, _ := c.FormParams()
 	_, hasFeatured := params["featured_image_url"]
+	_, hasHierarchy := params["parent_id"]
 	return articleForm{
+		ParentID:           strings.TrimSpace(c.FormValue("parent_id")),
+		SortOrder:          strings.TrimSpace(c.FormValue("sort_order")),
+		HasHierarchy:       hasHierarchy,
 		FeaturedImage:      strings.TrimSpace(c.FormValue("featured_image_url")),
 		HasFeaturedImage:   hasFeatured,
 		Title:              strings.TrimSpace(c.FormValue("title")),
@@ -1294,6 +1359,13 @@ func withStoredState(form articleForm, a *article.Article) articleForm {
 	stored := formFromArticle(a)
 	form.Status, form.UpdatedAt, form.PublishedAt, form.WasPublished = stored.Status, stored.UpdatedAt, stored.PublishedAt, stored.WasPublished
 	form.Lang, form.TranslationGroupID, form.SourceArticleID, form.IsOutdated = stored.Lang, stored.TranslationGroupID, stored.SourceArticleID, stored.IsOutdated
+	// 種類の欄・親ページの欄が無い（閲覧専用・公開中で無効にした）送信では、保存済みの種類・階層で出し直す。
+	if form.Kind == "" {
+		form.Kind = stored.Kind
+	}
+	if !form.HasHierarchy {
+		form.ParentID, form.SortOrder = stored.ParentID, stored.SortOrder
+	}
 	return form
 }
 
@@ -1320,6 +1392,8 @@ func formFromArticle(a *article.Article) articleForm {
 		TranslationGroupID: a.TranslationGroupID,
 		SourceArticleID:    a.SourceArticleID.String,
 		IsOutdated:         a.IsOutdated,
+		ParentID:           a.ParentID,
+		SortOrder:          strconv.Itoa(a.SortOrder),
 	}
 }
 

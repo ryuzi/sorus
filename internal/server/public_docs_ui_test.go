@@ -44,28 +44,28 @@ func TestBuildDocNav(t *testing.T) {
 			section("ドキュメント", "", false, link("はじめに", "/intro", false), link("インストール", "/install", true), link("設定", "/setup", false)),
 		}, &docNav{
 			Title: "ドキュメント",
-			Links: []docNavLink{{"はじめに", "/intro", false}, {"インストール", "/install", true}, {"設定", "/setup", false}},
+			Links: []docNavLink{{Label: "はじめに", URL: "/intro", Current: false}, {Label: "インストール", URL: "/install", Current: true}, {Label: "設定", URL: "/setup", Current: false}},
 			Prev:  ptr("はじめに", "/intro"), Next: ptr("設定", "/setup"),
 		}},
 		{"heading-only section: first child has no previous page", []publicMenuItem{
 			section("ドキュメント", "", false, link("はじめに", "/intro", true), link("設定", "/setup", false)),
 		}, &docNav{
 			Title: "ドキュメント",
-			Links: []docNavLink{{"はじめに", "/intro", true}, {"設定", "/setup", false}},
+			Links: []docNavLink{{Label: "はじめに", URL: "/intro", Current: true}, {Label: "設定", URL: "/setup", Current: false}},
 			Next:  ptr("設定", "/setup"),
 		}},
 		{"linked parent is the current page and comes first", []publicMenuItem{
 			section("ガイド", "/guide", true, link("基本", "/guide-basic", false), link("応用", "/guide-advanced", false)),
 		}, &docNav{
 			Title: "ガイド", TitleURL: "/guide", TitleCurrent: true,
-			Links: []docNavLink{{"基本", "/guide-basic", false}, {"応用", "/guide-advanced", false}},
+			Links: []docNavLink{{Label: "基本", URL: "/guide-basic", Current: false}, {Label: "応用", URL: "/guide-advanced", Current: false}},
 			Next:  ptr("基本", "/guide-basic"),
 		}},
 		{"first child goes back to the linked parent", []publicMenuItem{
 			section("ガイド", "/guide", false, link("基本", "/guide-basic", true), link("応用", "/guide-advanced", false)),
 		}, &docNav{
 			Title: "ガイド", TitleURL: "/guide",
-			Links: []docNavLink{{"基本", "/guide-basic", true}, {"応用", "/guide-advanced", false}},
+			Links: []docNavLink{{Label: "基本", URL: "/guide-basic", Current: true}, {Label: "応用", URL: "/guide-advanced", Current: false}},
 			Prev:  ptr("ガイド", "/guide"), Next: ptr("応用", "/guide-advanced"),
 		}},
 		{"external links and duplicates of the current page are skipped in the pager", []publicMenuItem{
@@ -79,14 +79,14 @@ func TestBuildDocNav(t *testing.T) {
 			),
 		}, &docNav{
 			Title: "リンク",
-			Links: []docNavLink{{"公式サイト", "https://example.com/", false}, {"前", "/prev", false}, {"別ホスト", "//evil.example/x", false},
-				{"ここ", "/here", true}, {"ここ（再掲）", "/here", true}, {"GitHub", "https://github.com/", false}},
+			Links: []docNavLink{{Label: "公式サイト", URL: "https://example.com/", Current: false}, {Label: "前", URL: "/prev", Current: false}, {Label: "別ホスト", URL: "//evil.example/x", Current: false},
+				{Label: "ここ", URL: "/here", Current: true}, {Label: "ここ（再掲）", URL: "/here", Current: true}, {Label: "GitHub", URL: "https://github.com/", Current: false}},
 			Prev: ptr("前", "/prev"),
 		}},
 		{"the first section that contains the page wins", []publicMenuItem{
 			section("A", "", false, link("x", "/x", true)),
 			section("B", "", false, link("x", "/x", true), link("y", "/y", false)),
-		}, &docNav{Title: "A", Links: []docNavLink{{"x", "/x", true}}}},
+		}, &docNav{Title: "A", Links: []docNavLink{{Label: "x", URL: "/x", Current: true}}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := buildDocNav(tc.menu)

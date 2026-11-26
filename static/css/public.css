@@ -602,6 +602,9 @@
   .doc-sidebar-links { margin: 0; padding: 0 0 0 4px; list-style: none; }
   .doc-sidebar-links a { display: block; padding: 5px 10px 5px 14px; border-left: 2px solid var(--border); color: var(--muted); line-height: 1.55; text-decoration: none; overflow-wrap: anywhere; transition: color .15s ease, border-color .15s ease, background-color .15s ease; }
   .doc-sidebar-links a:hover { border-left-color: var(--muted); color: var(--fg); }
+  /* 固定ページの階層から作ったサイドバーの入れ子（表示中のページとその祖先の子ページ）。一段ごとに字下げする。 */
+  .doc-sidebar-links ul { margin: 2px 0 4px; padding: 0 0 0 12px; list-style: none; }
+  .doc-sidebar-links ul a { padding-top: 4px; padding-bottom: 4px; font-size: .95em; }
   .doc-sidebar-title a:hover { color: var(--accent); }
   .doc-sidebar a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
   .doc-sidebar-links a[aria-current="page"] { border-left-color: var(--accent); border-radius: 0 var(--radius) var(--radius) 0; }
@@ -661,12 +664,86 @@
   .callout-warning { --callout-icon: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PHBhdGggZD0nTTcuMTMgMi4yNWExIDEgMCAwIDEgMS43NCAwbDUuOSAxMC41YTEgMSAwIDAgMS0uODcgMS41SDIuMWExIDEgMCAwIDEtLjg3LTEuNVonIGZpbGw9J25vbmUnIHN0cm9rZT0nYmxhY2snIHN0cm9rZS13aWR0aD0nMS41JyBzdHJva2UtbGluZWpvaW49J3JvdW5kJy8+PHJlY3QgeD0nNy4yNScgeT0nNS43NScgd2lkdGg9JzEuNScgaGVpZ2h0PSc0LjI1JyByeD0nLjc1Jy8+PGNpcmNsZSBjeD0nOCcgY3k9JzEyJyByPScuOTUnLz48L3N2Zz4="); }
   .callout-caution { --callout-icon: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PHBhdGggZD0nTTUuNCAxLjI1aDUuMmw0LjE1IDQuMTV2NS4ybC00LjE1IDQuMTVINS40TDEuMjUgMTAuNlY1LjRaJyBmaWxsPSdub25lJyBzdHJva2U9J2JsYWNrJyBzdHJva2Utd2lkdGg9JzEuNScgc3Ryb2tlLWxpbmVqb2luPSdyb3VuZCcvPjxyZWN0IHg9JzcuMjUnIHk9JzQuMjUnIHdpZHRoPScxLjUnIGhlaWdodD0nNC43NScgcng9Jy43NScvPjxjaXJjbGUgY3g9JzgnIGN5PScxMS4yNScgcj0nLjk1Jy8+PC9zdmc+"); }
 
+  /* 汎用のセクション（internal/markdown/sections.go）。どれもスクリプトを使わず、色・角丸・影はデザイントークンだけで
+     描くため、テーマの配色（明るい・暗い）にそのまま従う。
+     カード（div.doc-cards > div.doc-card）: 幅に合わせて 1〜4 列に並べ、ちょうど4枚なら 2×2 にする。リンクのあるカードは
+     ポインターを載せると浮かせ、最後のリンクに矢印を添える。 */
+  .doc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 16px; margin: 0 0 1.6em; }
+  @media (min-width: 560px) { .doc-cards:has(> .doc-card:nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .doc-card { display: flex; flex-direction: column; min-width: 0; padding: 1.15em 1.25em 1.2em; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--fg); box-shadow: var(--shadow); transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+  .doc-card > :first-child { margin-top: 0; }
+  .doc-card > :last-child { margin-bottom: 0; }
+  .prose .doc-card h2, .prose .doc-card h3, .prose .doc-card h4 { margin: 0 0 .45em; padding: 0; border: 0; color: var(--fg); font-size: 1.05rem; line-height: 1.45; }
+  .doc-card p, .doc-card ul, .doc-card ol { margin: 0 0 .75em; color: var(--muted); font-size: .93rem; line-height: 1.7; }
+  .doc-card a { color: var(--accent); font-weight: 650; text-decoration: none; }
+  .doc-card a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  /* カードの最後のリンク（説明の後の「〜を見る」）は説明の途中で折り返さず、次の行にまとめて置く。 */
+  .doc-card > p:last-child > a:last-child { display: block; width: fit-content; margin-top: .4em; }
+  .doc-card > p:last-child > a:last-child::after { content: "\00a0\2192"; content: "\00a0\2192" / ""; display: inline-block; transition: transform .15s ease; }
+  .doc-card:has(a):hover { border-color: var(--accent); box-shadow: 0 6px 18px rgb(15 23 42 / .1); transform: translateY(-2px); }
+  .doc-card:has(a):hover > p:last-child > a:last-child::after { transform: translateX(3px); }
+  .doc-card a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  @supports (color: color-mix(in srgb, red, blue)) {
+    .doc-card:has(a):hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+  }
+
+  /* 行動の呼びかけ（div.doc-cta > div.doc-cta-body + div.doc-cta-actions）。本文の欄とボタンの欄を横に並べ、狭い幅では
+     縦に積む。ボタンの欄の最初のリンクを主のボタン（アクセント色の塗り）、残りを副のボタン（枠だけ）にする。 */
+  .doc-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px 32px; margin: 0 0 1.6em; padding: 1.6em 1.75em; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--accent-soft); color: var(--fg); }
+  @supports (color: color-mix(in srgb, red, blue)) {
+    .doc-cta { border-color: color-mix(in srgb, var(--accent) 24%, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--bg)) 0%, color-mix(in srgb, var(--accent) 4%, var(--surface)) 100%); }
+  }
+  .doc-cta-body { flex: 1 1 300px; min-width: 0; }
+  .doc-cta-body > :first-child { margin-top: 0; }
+  .doc-cta-body > :last-child { margin-bottom: 0; }
+  .prose .doc-cta h2, .prose .doc-cta h3, .prose .doc-cta h4 { margin: 0 0 .35em; padding: 0; border: 0; color: var(--fg); font-size: 1.35rem; line-height: 1.4; }
+  .doc-cta-body p { margin: 0 0 .6em; color: var(--muted); }
+  .doc-cta-actions { display: flex; flex: 0 1 auto; flex-direction: column; gap: 10px; min-width: 0; }
+  .doc-cta-actions p, .doc-cta-actions ul, .doc-cta-actions ol { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .doc-cta-actions li { margin: 0; }
+  .doc-cta-actions a { display: inline-flex; align-items: center; justify-content: center; gap: .4em; min-height: 44px; padding: .55em 1.3em; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--fg); font-weight: 650; line-height: 1.4; text-align: center; text-decoration: none; white-space: nowrap; transition: color .15s ease, border-color .15s ease, background-color .15s ease, box-shadow .15s ease; }
+  .doc-cta-actions a:hover { border-color: var(--accent); color: var(--accent); }
+  .doc-cta-actions > :first-child > a:first-child, .doc-cta-actions > :first-child > li:first-child > a { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); box-shadow: var(--shadow); }
+  .doc-cta-actions > :first-child > a:first-child:hover, .doc-cta-actions > :first-child > li:first-child > a:hover { color: var(--accent-fg); box-shadow: 0 4px 14px rgb(15 23 42 / .16); }
+  @supports (color: color-mix(in srgb, red, blue)) {
+    .doc-cta-actions > :first-child > a:first-child:hover, .doc-cta-actions > :first-child > li:first-child > a:hover { border-color: color-mix(in srgb, var(--accent) 86%, var(--fg)); background: color-mix(in srgb, var(--accent) 86%, var(--fg)); }
+  }
+  .doc-cta-actions a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (max-width: 560px) {
+    .doc-cta { padding: 1.3em 1.2em; }
+    .doc-cta-actions { flex-basis: 100%; }
+    .doc-cta-actions a { flex: 1 1 auto; white-space: normal; }
+    .doc-cta-actions li { display: flex; flex: 1 1 auto; }
+  }
+
+  /* よくある質問（div.doc-faq > details.doc-faq-item > summary.doc-faq-q + div.doc-faq-a）。枠の中に質問を区切り線で
+     並べ、開いている質問はアクセント色にする。開閉の矢印はサイドバーと同じ形。 */
+  .doc-faq { margin: 0 0 1.6em; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); overflow: hidden; }
+  .doc-faq-item + .doc-faq-item { border-top: 1px solid var(--border); }
+  .doc-faq-q { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 48px; padding: .8em 1.15em; color: var(--fg); font-family: var(--font-heading); font-weight: 650; line-height: 1.55; cursor: pointer; list-style: none; transition: background-color .15s ease, color .15s ease; }
+  .doc-faq-q::-webkit-details-marker { display: none; }
+  .doc-faq-q::after { content: ""; flex: none; width: 7px; height: 7px; margin-right: 2px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: translateY(-25%) rotate(45deg); transition: transform .2s ease; }
+  .doc-faq-item[open] > .doc-faq-q { color: var(--accent); }
+  .doc-faq-item[open] > .doc-faq-q::after { border-color: currentColor; transform: translateY(25%) rotate(-135deg); }
+  .doc-faq-q:hover { background: var(--surface); }
+  .doc-faq-q:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .doc-faq-a { padding: .1em 1.15em 1.05em; color: var(--fg); }
+  .doc-faq-a > :first-child { margin-top: 0; }
+  .doc-faq-a > :last-child { margin-bottom: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .doc-card, .doc-card > p:last-child > a:last-child::after, .doc-cta-actions a, .doc-faq-q, .doc-faq-q::after { transition: none; }
+    .doc-card:has(a):hover { transform: none; }
+  }
+
   /* タブ（internal/markdown/tabs.go の div.doc-tabs[data-tabs]）。JavaScript が無いときは、すべてのタブの中身を名前
      （.doc-tab-title）付きで縦に並べて読める。public.js がタブの並び（.doc-tab-list）の hidden を外して .doc-tabs に
      .is-ready を付け、選んでいないタブの中身と、名前の行を hidden で隠す。選んでいるタブは aria-selected="true"。 */
   .doc-tabs { margin: 0 0 1.2em; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); }
-  .doc-tab-list { display: flex; gap: 2px; padding: 0 8px; overflow-x: auto; border-bottom: 1px solid var(--border); border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--surface); scrollbar-width: thin; }
-  .doc-tab { flex: none; margin: 0 0 -1px; padding: .6em .95em; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font: inherit; font-size: .88rem; font-weight: 600; line-height: 1.5; white-space: nowrap; cursor: pointer; transition: color .15s ease, border-color .15s ease; }
+  /* タブの並びの下の線は枠線ではなく内側の影で描き、選んだタブの下線（2px）をその上に重ねる。タブに負の余白
+     （margin-bottom: -1px）を付けて枠線に重ねると、横スクロールの枠（overflow-x: auto は overflow-y も auto にする）の
+     中身が 1px はみ出し、縦のスクロールバーが出るため。縦は overflow-y: hidden で、はみ出しがあっても出さない。 */
+  .doc-tab-list { display: flex; align-items: stretch; gap: 2px; padding: 0 8px; overflow-x: auto; overflow-y: hidden; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--surface); box-shadow: inset 0 -1px 0 var(--border); scrollbar-width: thin; }
+  .doc-tab { flex: none; margin: 0; padding: .6em .95em; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); font: inherit; font-size: .88rem; font-weight: 600; line-height: 1.5; white-space: nowrap; cursor: pointer; transition: color .15s ease, border-color .15s ease; }
   .doc-tab:hover { color: var(--fg); }
   .doc-tab[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent); }
   .doc-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: var(--radius); }
@@ -688,9 +765,15 @@
   .code-block:last-child > pre { margin-bottom: 0; }
   .code-block-toolbar { position: absolute; top: 6px; right: 6px; z-index: 1; display: flex; align-items: center; gap: 6px; pointer-events: none; }
   .code-block-toolbar > * { pointer-events: auto; }
-  .code-block-lang { padding: 1px 4px; color: var(--code-fg); font-family: var(--font-mono); font-size: .72rem; line-height: 1.6; letter-spacing: .04em; opacity: .6; user-select: none; -webkit-user-select: none; }
-  .code-copy { display: inline-flex; align-items: center; min-height: 28px; margin: 0; padding: 2px 10px; border: 1px solid rgb(255 255 255 / .2); border-radius: var(--radius); background: var(--code-bg); color: var(--code-fg); font: inherit; font-family: var(--font-body); font-size: .75rem; font-weight: 600; line-height: 1.4; cursor: pointer; opacity: 0; transition: opacity .15s ease, border-color .15s ease; }
-  @supports (color: color-mix(in srgb, red, blue)) { .code-copy { border-color: color-mix(in srgb, var(--code-fg) 28%, transparent); } }
+  /* ボタンは背景をコードの背景（--code-bg）より一段明るく（暗いコードの配色では明るく、明るい配色では暗く）し、枠と影で
+     コードの文字から浮かせる。--code-fg と --code-bg を混ぜて作るため、明るい配色・暗い配色・テーマのどの組み合わせでも
+     背景との差が出る。color-mix を使えないブラウザは半透明の白の枠と濃い背景にする。 */
+  .code-block-lang { padding: 1px 4px; color: var(--code-fg); font-family: var(--font-mono); font-size: .72rem; line-height: 1.6; letter-spacing: .04em; opacity: .78; user-select: none; -webkit-user-select: none; }
+  .code-copy { display: inline-flex; align-items: center; min-height: 28px; margin: 0; padding: 2px 10px; border: 1px solid rgb(255 255 255 / .34); border-radius: var(--radius); background: #1e293b; color: var(--code-fg); font: inherit; font-family: var(--font-body); font-size: .75rem; font-weight: 600; line-height: 1.4; cursor: pointer; opacity: 0; box-shadow: 0 1px 2px rgb(0 0 0 / .3); transition: opacity .15s ease, border-color .15s ease, background-color .15s ease; }
+  @supports (color: color-mix(in srgb, red, blue)) {
+    .code-copy { border-color: color-mix(in srgb, var(--code-fg) 42%, var(--code-bg)); background: color-mix(in srgb, var(--code-fg) 14%, var(--code-bg)); }
+    .code-copy:hover { background: color-mix(in srgb, var(--code-fg) 24%, var(--code-bg)); }
+  }
   .code-block:hover .code-copy, .code-copy:focus-visible, .code-copy.is-copied, .code-copy.is-failed { opacity: 1; }
   .code-copy:hover { border-color: var(--code-fg); }
   .code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

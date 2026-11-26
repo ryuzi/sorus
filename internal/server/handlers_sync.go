@@ -527,6 +527,9 @@ func (s *Server) syncSaveRemoteArticle(c echo.Context, claims *auth.Claims, req 
 		}
 		a.SourceArticleID = sql.NullString{String: sourceID, Valid: true}
 	}
+	if err := s.applySyncHierarchy(ctx, a, in.ParentID, in.SortOrder); err != nil {
+		return err
+	}
 	if publish {
 		a.Status = article.StatusPublished
 		now := time.Now().UTC()
@@ -557,6 +560,9 @@ func (s *Server) syncSaveRemoteArticle(c echo.Context, claims *auth.Claims, req 
 			return echo.NewHTTPError(http.StatusConflict, "同じ記事 ID の記事が同時に作成されました。もう一度提出してください")
 		}
 		removeFiles(created)
+		if errors.Is(err, article.ErrInvalidParent) || errors.Is(err, article.ErrHasChildPages) {
+			return echo.NewHTTPError(http.StatusUnprocessableEntity, "固定ページの親子関係が正しくないため保存できませんでした（自分の子ページを親にした・子ページのある固定ページを記事にした など）")
+		}
 		if errors.Is(err, article.ErrInvalid) {
 			return echo.NewHTTPError(http.StatusUnprocessableEntity, "記事を保存できませんでした。入力内容を確認してください")
 		}
@@ -709,6 +715,7 @@ const syncPendingSelect = `SELECT a.id, a.title, a.slug, a.content_markdown,
 		COALESCE(NULLIF(a.lang, ''), 'ja') AS lang,
 		COALESCE(a.translation_group_id, '') AS translation_group_id,
 		COALESCE(a.source_article_id, '') AS source_article_id,
+		COALESCE(a.parent_id, '') AS parent_id, a.sort_order,
 		COALESCE(a.checked_out_by, '') AS checked_out_by, a.checked_out_at,
 		COALESCE(a.checked_out_client, '') AS checked_out_client
 	FROM articles a

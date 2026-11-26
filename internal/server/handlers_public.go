@@ -134,9 +134,13 @@ type publicPage struct {
 	Menu []publicMenuItem
 	// FooterMenu はフッターのサイトマップの列（参照先を解決済み。見出しと、その子項目のリンク）。空なら出さない。
 	FooterMenu []publicMenuItem
-	// DocNav は固定ページ・記事のドキュメント表示（左のサイドバーと前後のページ送り）。表示中のページがメニューの
-	// 子項目のある項目（セクション）に入っているときだけ renderPublic が埋める（buildDocNav）。nil なら今までどおりの見た目。
+	// DocNav は固定ページ・記事のドキュメント表示（左のサイドバーと前後のページ送り）。固定ページの親子階層に入っている
+	// ページは renderPageDetail が先に埋め（pageHierarchyFor）、それ以外は表示中のページがメニューの子項目のある項目
+	// （セクション）に入っているときだけ renderPublic が埋める（buildDocNav）。nil なら今までどおりの見た目。
 	DocNav *docNav
+	// PageAncestors は固定ページのパンくずリストに出す祖先のページ（ルートが先頭、親が末尾。表示中のページは含まない）。
+	// 親ページを持つ固定ページだけ renderPageDetail が埋める。トップに出しているページ（ホームと同じ URL）は含めない。
+	PageAncestors []docNavLink
 	// SearchIndexURL は静的エクスポートの検索用インデックス（/search-index.json）の URL。静的エクスポートのときだけ
 	// renderPublic が埋め、Cmd+K の検索（public.js）はサーバーの /search の代わりにこれを static-search.js で絞り込む。
 	SearchIndexURL string
@@ -258,6 +262,9 @@ type publicArticle struct {
 	// 多言語化・翻訳クラスタ
 	Lang               string `db:"lang"`
 	TranslationGroupID string `db:"translation_group_id"`
+	// ParentID は固定ページの親ページの ID（最上位のページと記事では空）。公開ページの階層ナビゲーション
+	// （pageHierarchyFor）に使う。
+	ParentID string `db:"parent_id"`
 }
 
 // URL は記事詳細ページ（ページなら /<slug>）のパス。英語記事は /en プレフィックスを付ける。
@@ -464,7 +471,8 @@ const publicArticleColumns = `a.id, a.title, a.slug, a.excerpt, a.featured_image
 	COALESCE(NULLIF(u.display_name, ''), u.username, '') AS author_name,
 	COALESCE(c.name, '') AS category_name, COALESCE(c.slug, '') AS category_slug, a.kind,
 	a.published_at, a.updated_at, a.doi, a.journal_name, a.conference_name, a.co_authors,
-	COALESCE(NULLIF(a.lang, ''), 'ja') AS lang, COALESCE(NULLIF(a.translation_group_id, ''), a.id) AS translation_group_id`
+	COALESCE(NULLIF(a.lang, ''), 'ja') AS lang, COALESCE(NULLIF(a.translation_group_id, ''), a.id) AS translation_group_id,
+	COALESCE(a.parent_id, '') AS parent_id`
 
 // publishedCondition は公開中で公開日時を迎えた（読者に見える）記事の WHERE 条件（article.VisibleCondition）。
 // プレースホルダは状態・現在時刻の順で、現在時刻には clockNow を使う。
@@ -1210,7 +1218,24 @@ func (s *Server) renderPageDetail(c echo.Context, a publicArticle, lang string, 
 	if p.OGImage != "" {
 		ld["primaryImageOfPage"] = map[string]any{"@type": "ImageObject", "url": p.OGImage}
 	}
-	p.JSONLD = []any{ld, breadcrumbList(crumb{homeLabel, topURL}, crumb{a.Title, canonical})}
+	// 親子階層に入っている固定ページは、サイドバー・ページ送りを階層から作り（メニューより優先）、パンくずリストに祖先を出す。
+	h, err := s.pageHierarchyFor(c.Request().Context(), a, st)
+	if err != nil {
+		return err
+	}
+	p.DocNav = h.Nav
+	crumbs := []crumb{{homeLabel, topURL}}
+	homePath := strings.TrimPrefix(topURL, base)
+	for _, anc := range h.Ancestors {
+		// トップに出しているページはホームと同じ URL のため、ホームの後に重ねない。
+		if anc.URL == homePath {
+			continue
+		}
+		p.PageAncestors = append(p.PageAncestors, anc)
+		crumbs = append(crumbs, crumb{anc.Label, base + anc.URL})
+	}
+	crumbs = append(crumbs, crumb{a.Title, canonical})
+	p.JSONLD = []any{ld, breadcrumbList(crumbs...)}
 	p.Data = data
 	// 管理画面のテーマ・下書きのプレビューは読者の閲覧ではないため数えない。
 	if !isThemePreview(c) && !isDraftPreview(c) {
@@ -1832,7 +1857,7 @@ func (s *Server) renderPublic(c echo.Context, code int, name string, p publicPag
 		return err
 	}
 	p.Menu, p.FooterMenu = menu, footer
-	if name == "page" || name == "article" {
+	if p.DocNav == nil && (name == "page" || name == "article") {
 		p.DocNav = buildDocNav(menu)
 	}
 	if isStaticExport(c) {

@@ -11,13 +11,19 @@
     <summary class="doc-sidebar-summary">{{if eq $.Lang "en"}}Pages in this section{{else}}このセクションのページ{{end}}</summary>
     <nav class="doc-sidebar-nav" aria-label="{{.Title}}">
       <p class="doc-sidebar-title">{{if .TitleURL}}<a href="{{.TitleURL}}"{{if .TitleCurrent}} aria-current="page"{{end}}>{{.Title}}</a>{{else}}{{.Title}}{{end}}</p>
-      <ul class="doc-sidebar-links">{{range .Links}}
-        <li><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></li>{{end}}
+      <ul class="doc-sidebar-links">{{template "doc_sidebar_items" .Links}}
       </ul>
     </nav>
   </details>
 </aside>
 {{end}}{{end}}
+
+{{/* doc_sidebar_items はサイドバーの一覧の項目（docNavLink の並び）。固定ページの階層から作ったサイドバーでは、表示中の
+     ページとその祖先の子ページ（.Children）を、項目の中の入れ子の <ul> で出す。 */}}
+{{define "doc_sidebar_items"}}{{range .}}
+        <li><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a>{{if .Children}}
+          <ul>{{template "doc_sidebar_items" .Children}}
+          </ul>{{end}}</li>{{end}}{{end}}
 
 {{/* doc_pager は本文の後の「前のページ」「次のページ」。前後のどちらも無ければ出さない。 */}}
 {{define "doc_pager"}}{{with .DocNav}}{{if or .Prev .Next}}
