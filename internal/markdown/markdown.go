@@ -1,5 +1,5 @@
 // Package markdown は記事本文の Markdown を安全な HTML に変換する。
-// Goldmark (GFM + LaTeX 数式・Mermaid の図・フォトギャラリー・注意書き・タブ) でパースし、見出しにアンカー ID を付与して目次を抽出した上で、
+// Goldmark (GFM + LaTeX 数式・Mermaid の図・フォトギャラリー・注意書き・タブ・カード・行動の呼びかけ・よくある質問) でパースし、見出しにアンカー ID を付与して目次を抽出した上で、
 // Bluemonday で XSS サニタイズする。
 package markdown
 
@@ -171,6 +171,7 @@ func newMarkdown(opts GalleryOptions, tabs *tabsState) goldmark.Markdown {
 			galleryExtension{opts: opts},
 			calloutExtension{},
 			tabsExtension{state: tabs},
+			sectionsExtension{},
 		),
 		// 生 HTML は Goldmark で捨てずに出力し、Bluemonday で許可要素のみ残す。
 		// WordPress 由来の本文など、安全な生 HTML を含む記事を扱うため。
@@ -218,6 +219,11 @@ func newPolicy() *bluemonday.Policy {
 	p.AllowAttrs("class").Matching(regexp.MustCompile(`^` + TabTitleClass + `$`)).OnElements("p")
 	p.AllowAttrs("role").Matching(regexp.MustCompile(`^tabpanel$`)).OnElements("div")
 	p.AllowAttrs("aria-labelledby").Matching(tabLabelledByPattern).OnElements("div")
+	// カード・行動の呼びかけ・よくある質問（sections.go）。生成物の div のクラスと、質問の details・summary のクラスだけを許可する。
+	// スクリプトを使わないため予約せず、生 HTML でも同じクラスを使える（details の open は UGCPolicy が許可している）。
+	p.AllowAttrs("class").Matching(sectionDivClassPattern).OnElements("div")
+	p.AllowAttrs("class").Matching(faqItemClassPattern).OnElements("details")
+	p.AllowAttrs("class").Matching(faqQuestionClassPattern).OnElements("summary")
 	// altTextPattern で日本語の句読点（、。）を含む安全な代替テキストを許可する。
 	p.AllowAttrs("alt").Matching(altTextPattern).OnElements("img")
 	// data-full は bluemonday の URL 検査の対象外のため、http(s) の絶対 URL か ":" を含まない相対 URL に限る。
