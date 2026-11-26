@@ -4,6 +4,8 @@ import (
 	"html"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -285,4 +287,78 @@ func TestThemePreviewHiddenInPublicOnlyMode(t *testing.T) {
 			t.Errorf("%s rendered the preview in public-only mode", p)
 		}
 	}
+}
+
+// TestThemeDeclarativeLayoutPublicRendering は、カスタムテーマの theme.json の layout 設定が
+// 公開 HTML の修飾クラスに反映され、既定テーマ時は従来と変わらない HTML が出力されることを確かめる。
+func TestThemeDeclarativeLayoutPublicRendering(t *testing.T) {
+	env, themesDir := newCustomThemeEnv(t, func(dir string) {
+		writeTestTheme(t, dir, "editorial", "エディトリアル")
+		manifest := `{"name":{"ja":"エディトリアル","en":"Editorial"},"description":{"ja":"説明","en":"Desc"},"color_scheme":"light","order":100,"layout":{"header_style":"centered","hero_layout":"split","article_list":"magazine"}}`
+		if err := os.WriteFile(filepath.Join(dir, "editorial", "theme.json"), []byte(manifest), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		writeTestTheme(t, dir, "compact", "コンパクト")
+		manifestCompact := `{"name":{"ja":"コンパクト","en":"Compact"},"description":{"ja":"説明","en":"Desc"},"color_scheme":"light","order":101,"layout":{"header_style":"minimal","hero_layout":"centered","article_list":"list"}}`
+		if err := os.WriteFile(filepath.Join(dir, "compact", "theme.json"), []byte(manifestCompact), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	})
+	_ = themesDir
+
+	catID := seedCategory(t, env.db, "お知らせ", "news", "")
+	seedArticle(t, env.db, article.Article{
+		Title: "トップ固定ページ", Slug: "welcome", Kind: article.KindPage,
+		ContentMarkdown: "ようこそ", Status: article.StatusPublished, PublishedAt: ago(2 * time.Hour),
+	})
+	seedArticle(t, env.db, article.Article{
+		Title: "最初の記事", Slug: "first-post", CategoryID: catID,
+		ContentMarkdown: "本文1", Status: article.StatusPublished, PublishedAt: ago(time.Hour),
+	})
+
+	pub := env.newClient()
+
+	// 1. 既定テーマ（modern）では修飾クラスが付かず、従来どおりのクラス名のみ出力される。
+	resDefaultIndex := pub.get("/")
+	expectStatus(t, resDefaultIndex, http.StatusOK)
+	expectContains(t, resDefaultIndex.Body, `<header class="site-header">`, `<div class="card-grid">`)
+	expectNotContains(t, resDefaultIndex.Body, "site-header--", "card-grid--")
+
+	// トップを固定ページ（front.html）に切り替える。
+	if _, err := env.db.Exec(`INSERT INTO settings (key, value) VALUES ('front_page', 'welcome') ON CONFLICT(key) DO UPDATE SET value = excluded.value`); err != nil {
+		t.Fatal(err)
+	}
+	resDefaultFront := pub.get("/")
+	expectStatus(t, resDefaultFront, http.StatusOK)
+	expectContains(t, resDefaultFront.Body, `<header class="site-header">`, `<section class="front-hero" aria-labelledby="front-hero-title">`, `<div class="card-grid">`)
+	expectNotContains(t, resDefaultFront.Body, "site-header--", "front-hero--", "card-grid--")
+
+	// 2. editorial（centered / split / magazine）を適用すると各修飾クラスが出力される。
+	env.setTheme("editorial")
+	resEditorialFront := pub.get("/")
+	expectStatus(t, resEditorialFront, http.StatusOK)
+	expectContains(t, resEditorialFront.Body,
+		`<header class="site-header site-header--centered">`,
+		`<section class="front-hero front-hero--split" aria-labelledby="front-hero-title">`,
+		`<div class="card-grid card-grid--magazine">`,
+	)
+	resEditorialArticles := pub.get("/articles")
+	expectStatus(t, resEditorialArticles, http.StatusOK)
+	expectContains(t, resEditorialArticles.Body,
+		`<header class="site-header site-header--centered">`,
+		`<div class="card-grid card-grid--magazine">`,
+	)
+	resEditorialCategory := pub.get("/categories/news")
+	expectStatus(t, resEditorialCategory, http.StatusOK)
+	expectContains(t, resEditorialCategory.Body, `<div class="card-grid card-grid--magazine">`)
+
+	// 3. compact（minimal / centered / list）を適用すると各修飾クラスが出力される。
+	env.setTheme("compact")
+	resCompactFront := pub.get("/")
+	expectStatus(t, resCompactFront, http.StatusOK)
+	expectContains(t, resCompactFront.Body,
+		`<header class="site-header site-header--minimal">`,
+		`<section class="front-hero front-hero--centered" aria-labelledby="front-hero-title">`,
+		`<div class="card-grid card-grid--list">`,
+	)
 }

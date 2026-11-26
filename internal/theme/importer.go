@@ -636,8 +636,13 @@ func writeEntry(f *zip.File, target string, budget int64) (int64, error) {
 
 // writeManifest は t の内容で theme.json を書き直す（source_url の記録に使う）。
 func writeManifest(p string, t Theme) error {
+	var layout *ThemeLayout
+	if !t.Layout.isDefault() {
+		l := t.Layout
+		layout = &l
+	}
 	data, err := json.MarshalIndent(manifest{
-		Name: t.Name, Description: t.Description, ColorScheme: t.ColorScheme, Order: t.Order, SourceURL: t.SourceURL,
+		Name: t.Name, Description: t.Description, ColorScheme: t.ColorScheme, Order: t.Order, Layout: layout, SourceURL: t.SourceURL,
 	}, "", "  ")
 	if err != nil {
 		return err

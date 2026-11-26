@@ -514,9 +514,83 @@ func TestBasePublicCSSEditorialFallbacks(t *testing.T) {
 	if d := selectorDecls(rules, ".articles-filter-bar"); d["display"] != "grid" || d["grid-template-columns"] != "minmax(0, 1fr) auto" {
 		t.Errorf(".articles-filter-bar = %v, want a two-column grid toolbar (minmax(0, 1fr) auto)", d)
 	}
-	for _, sel := range []string{".category-filter-pills", "select.year-filter-select", ".card--no-media", ".front-card--no-media", ".related-article-card--no-media", ".front-card-index"} {
+	for _, sel := range []string{
+		".category-filter-pills", "select.year-filter-select", ".card--no-media", ".front-card--no-media", ".related-article-card--no-media", ".front-card-index",
+		".site-header--centered", ".site-header--minimal", ".front-hero--centered", ".front-hero--split", ".card-grid--list", ".card-grid--magazine",
+	} {
 		if len(selectorDecls(rules, sel)) == 0 {
 			t.Errorf("%s has no base style", sel)
 		}
+	}
+}
+
+func TestValidateThemeDirLayout(t *testing.T) {
+	defaultLayout := ThemeLayout{
+		HeaderStyle: HeaderStyleInline,
+		HeroLayout:  HeroLayoutStacked,
+		ArticleList: ArticleListGrid,
+	}
+	for _, tc := range []struct {
+		name       string
+		layoutJSON string
+		want       ThemeLayout
+	}{
+		{"omitted", "", defaultLayout},
+		{"empty object", `, "layout": {}`, defaultLayout},
+		{"partial", `, "layout": {"header_style": "centered"}`, ThemeLayout{
+			HeaderStyle: HeaderStyleCentered,
+			HeroLayout:  HeroLayoutStacked,
+			ArticleList: ArticleListGrid,
+		}},
+		{"all defaults explicit", `, "layout": {"header_style": "inline", "hero_layout": "stacked", "article_list": "grid"}`, defaultLayout},
+		{"all non-default values", `, "layout": {"header_style": "minimal", "hero_layout": "split", "article_list": "magazine"}`, ThemeLayout{
+			HeaderStyle: HeaderStyleMinimal,
+			HeroLayout:  HeroLayoutSplit,
+			ArticleList: ArticleListMagazine,
+		}},
+		{"centered and list", `, "layout": {"header_style": "centered", "hero_layout": "centered", "article_list": "list"}`, ThemeLayout{
+			HeaderStyle: HeaderStyleCentered,
+			HeroLayout:  HeroLayoutCentered,
+			ArticleList: ArticleListList,
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			manifestJSON := `{"name": {"ja": "テスト"}, "description": {"ja": "説明"}, "color_scheme": "light"` + tc.layoutJSON + `}`
+			m := fstest.MapFS{
+				"x/custom/theme.json": {Data: []byte(manifestJSON)},
+				"x/custom/theme.css":  {Data: []byte(`.a { color: red; }`)},
+			}
+			th, err := ValidateThemeDir(m, "x/custom")
+			if err != nil {
+				t.Fatalf("ValidateThemeDir(%s): %v", tc.name, err)
+			}
+			if th.Layout != tc.want {
+				t.Errorf("th.Layout = %+v, want %+v", th.Layout, tc.want)
+			}
+		})
+	}
+
+	for _, tc := range []struct {
+		name       string
+		layoutJSON string
+		wantErr    string
+	}{
+		{"invalid header_style", `, "layout": {"header_style": "floating"}`, "layout.header_style"},
+		{"invalid hero_layout", `, "layout": {"hero_layout": "fullbleed"}`, "layout.hero_layout"},
+		{"invalid article_list", `, "layout": {"article_list": "masonry"}`, "layout.article_list"},
+		{"unknown layout field", `, "layout": {"sidebar": "left"}`, "sidebar"},
+		{"layout not an object", `, "layout": "centered"`, "theme.json"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			manifestJSON := `{"name": {"ja": "テスト"}, "description": {"ja": "説明"}, "color_scheme": "light"` + tc.layoutJSON + `}`
+			m := fstest.MapFS{
+				"x/custom/theme.json": {Data: []byte(manifestJSON)},
+				"x/custom/theme.css":  {Data: []byte(`.a { color: red; }`)},
+			}
+			_, err := ValidateThemeDir(m, "x/custom")
+			if !errors.Is(err, ErrInvalidTheme) || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("ValidateThemeDir(%s) = %v, want ErrInvalidTheme mentioning %q", tc.name, err, tc.wantErr)
+			}
+		})
 	}
 }

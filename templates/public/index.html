@@ -3,7 +3,7 @@
 
 {{template "front_gallery" $}}{{with .Data}}
 {{if .Articles}}
-<div class="card-grid">
+<div class="card-grid{{if eq $.Layout.ArticleList "list"}} card-grid--list{{else if eq $.Layout.ArticleList "magazine"}} card-grid--magazine{{end}}">
   {{range .Articles}}{{template "article_card" .}}{{end}}
 </div>
 {{template "pagination" .Pagination}}

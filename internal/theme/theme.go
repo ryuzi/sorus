@@ -36,6 +36,42 @@ var idPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,40}$`)
 // colorSchemes は theme.json の color_scheme に書ける値。
 var colorSchemes = map[string]bool{"light": true, "dark": true, "light dark": true}
 
+// ThemeLayout の各フィールドに指定できる値（空文字はそれぞれの既定値に正規化される）。
+const (
+	HeaderStyleInline   = "inline"
+	HeaderStyleCentered = "centered"
+	HeaderStyleMinimal  = "minimal"
+
+	HeroLayoutStacked  = "stacked"
+	HeroLayoutCentered = "centered"
+	HeroLayoutSplit    = "split"
+
+	ArticleListGrid     = "grid"
+	ArticleListList     = "list"
+	ArticleListMagazine = "magazine"
+)
+
+var (
+	headerStyles = map[string]bool{HeaderStyleInline: true, HeaderStyleCentered: true, HeaderStyleMinimal: true}
+	heroLayouts  = map[string]bool{HeroLayoutStacked: true, HeroLayoutCentered: true, HeroLayoutSplit: true}
+	articleLists = map[string]bool{ArticleListGrid: true, ArticleListList: true, ArticleListMagazine: true}
+)
+
+// ThemeLayout は theme.json の任意項目 layout で宣言する公開ページのレイアウト選択。
+// 未指定の項目は既定値（HeaderStyle: "inline", HeroLayout: "stacked", ArticleList: "grid"）として扱う。
+type ThemeLayout struct {
+	HeaderStyle string `json:"header_style,omitempty"`
+	HeroLayout  string `json:"hero_layout,omitempty"`
+	ArticleList string `json:"article_list,omitempty"`
+}
+
+// isDefault はすべての項目が空または既定値であるかを返す。
+func (l ThemeLayout) isDefault() bool {
+	return (l.HeaderStyle == "" || l.HeaderStyle == HeaderStyleInline) &&
+		(l.HeroLayout == "" || l.HeroLayout == HeroLayoutStacked) &&
+		(l.ArticleList == "" || l.ArticleList == ArticleListGrid)
+}
+
 // ErrInvalidTheme はテーマのディレクトリが検証を通らないときのエラー。errors.Is で判定できる。
 var ErrInvalidTheme = errors.New("theme: invalid theme")
 
@@ -46,6 +82,7 @@ type Theme struct {
 	Description map[string]string // 説明文（キーは "ja"・"en"）
 	ColorScheme string            // "light"・"dark"・"light dark" のどれか
 	Order       int               // 管理画面での並び順（同じ値なら ID の順）
+	Layout      ThemeLayout       // 宣言的レイアウト選択（未指定項目は既定値）
 	IsCustom    bool              // データディレクトリに置いたカスタムテーマなら true
 	SourceURL   string            // 取り込み元の URL（theme.json の source_url。無ければ空）
 	Dir         string            // カスタムテーマのディレクトリの実パス（ビルトインは空）
@@ -103,6 +140,7 @@ type manifest struct {
 	Description map[string]string `json:"description"`
 	ColorScheme string            `json:"color_scheme"`
 	Order       int               `json:"order"`
+	Layout      *ThemeLayout      `json:"layout,omitempty"`
 	SourceURL   string            `json:"source_url,omitempty"`
 }
 
@@ -315,6 +353,22 @@ func ValidateThemeDir(fsys fs.FS, dir string) (Theme, error) {
 	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return fail("theme.json: unexpected data after the object")
 	}
+	layout := ThemeLayout{
+		HeaderStyle: HeaderStyleInline,
+		HeroLayout:  HeroLayoutStacked,
+		ArticleList: ArticleListGrid,
+	}
+	if m.Layout != nil {
+		if m.Layout.HeaderStyle != "" {
+			layout.HeaderStyle = m.Layout.HeaderStyle
+		}
+		if m.Layout.HeroLayout != "" {
+			layout.HeroLayout = m.Layout.HeroLayout
+		}
+		if m.Layout.ArticleList != "" {
+			layout.ArticleList = m.Layout.ArticleList
+		}
+	}
 	switch {
 	case strings.TrimSpace(m.Name["ja"]) == "":
 		return fail("theme.json: name.ja is required")
@@ -322,6 +376,12 @@ func ValidateThemeDir(fsys fs.FS, dir string) (Theme, error) {
 		return fail("theme.json: description.ja is required")
 	case !colorSchemes[m.ColorScheme]:
 		return fail("theme.json: color_scheme %q must be \"light\", \"dark\" or \"light dark\"", m.ColorScheme)
+	case !headerStyles[layout.HeaderStyle]:
+		return fail("theme.json: layout.header_style %q must be %q, %q or %q", layout.HeaderStyle, HeaderStyleInline, HeaderStyleCentered, HeaderStyleMinimal)
+	case !heroLayouts[layout.HeroLayout]:
+		return fail("theme.json: layout.hero_layout %q must be %q, %q or %q", layout.HeroLayout, HeroLayoutStacked, HeroLayoutCentered, HeroLayoutSplit)
+	case !articleLists[layout.ArticleList]:
+		return fail("theme.json: layout.article_list %q must be %q, %q or %q", layout.ArticleList, ArticleListGrid, ArticleListList, ArticleListMagazine)
 	}
 	cssPath := path.Join(dir, "theme.css")
 	info, err := fs.Stat(fsys, cssPath)
@@ -341,7 +401,7 @@ func ValidateThemeDir(fsys fs.FS, dir string) (Theme, error) {
 	}
 	return Theme{
 		ID: id, Name: m.Name, Description: m.Description, ColorScheme: m.ColorScheme, Order: m.Order,
-		SourceURL: m.SourceURL, maintenanceHTML: maint,
+		Layout: layout, SourceURL: m.SourceURL, maintenanceHTML: maint,
 	}, nil
 }
 

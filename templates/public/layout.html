@@ -53,7 +53,7 @@
     </div>
   </div>
   {{end}}{{end}}
-  <header class="site-header">
+  <header class="site-header{{if eq .Layout.HeaderStyle "centered"}} site-header--centered{{else if eq .Layout.HeaderStyle "minimal"}} site-header--minimal{{end}}">
     <div class="container header-inner">
       <a href="{{if eq .Lang "en"}}/en/{{else}}/{{end}}" class="site-title">{{.SiteName}}</a>{{if .Translations}}
       <div class="header-tools">

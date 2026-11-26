@@ -1,7 +1,7 @@
 {{define "head"}}{{template "content_head" .}}{{end}}
 {{define "content"}}
 {{with .Data}}
-<section class="front-hero" aria-labelledby="front-hero-title">
+<section class="front-hero{{if eq $.Layout.HeroLayout "centered"}} front-hero--centered{{else if eq $.Layout.HeroLayout "split"}} front-hero--split{{end}}" aria-labelledby="front-hero-title">
   {{with .Article.ImageHTML}}<figure class="hero">{{.}}</figure>{{end}}
   <h1 id="front-hero-title" class="article-title">{{.Article.Title}}</h1>
   <div class="prose" data-math-root>{{.HTML}}</div>
@@ -25,7 +25,7 @@
 <section class="front-news" aria-labelledby="front-news-title">
   <h2 id="front-news-title" class="page-title">{{if eq $.Lang "en"}}Latest News{{else}}新着記事{{end}}</h2>
   {{if .News}}
-  <div class="card-grid">
+  <div class="card-grid{{if eq $.Layout.ArticleList "list"}} card-grid--list{{else if eq $.Layout.ArticleList "magazine"}} card-grid--magazine{{end}}">
     {{range .News}}{{template "article_card" .}}{{end}}
   </div>
   {{else}}

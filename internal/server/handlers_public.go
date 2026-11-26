@@ -147,10 +147,11 @@ type publicPage struct {
 	Categories     []publicCategory
 	Query          string
 	// Theme は <html data-theme> に出すテーマ ID。ThemeStylesheet はそのテーマ CSS の版付き URL、
-	// ColorScheme は <meta name="color-scheme"> に出す配色モード。
+	// ColorScheme は <meta name="color-scheme"> に出す配色モード、Layout は theme.json の宣言的レイアウト設定。
 	Theme           string
 	ThemeStylesheet string
 	ColorScheme     string
+	Layout          theme.ThemeLayout
 	AnalyticsTag    template.HTML
 	Copyright       string
 	SiteStructure   SiteStructure
@@ -1885,6 +1886,7 @@ func (s *Server) renderPublic(c echo.Context, code int, name string, p publicPag
 	p.Theme = t.ID
 	p.ThemeStylesheet = themeStylesheetURL(t)
 	p.ColorScheme = t.ColorScheme
+	p.Layout = t.Layout
 	if ov, ok := themeOverrideFrom(c); ok && ov.Preview != nil {
 		// プレビューは検索エンジンに登録させず、解析タグにも閲覧として送らない。
 		p.Preview = ov.Preview

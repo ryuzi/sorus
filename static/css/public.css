@@ -108,6 +108,25 @@
   }
   @media (prefers-reduced-motion: reduce) { .submenu-caret, .nav-toggle-icon, .nav-toggle-icon::before, .nav-toggle-icon::after { transition: none; } }
 
+  /* テーマの宣言的ヘッダーレイアウト（theme.json の layout.header_style: "centered"・"minimal"）。 */
+  .site-header--centered { text-align: center; }
+  .site-header--centered .category-nav ul { justify-content: center; }
+  @media (min-width: 768px) {
+    .site-header--centered .header-inner { flex-direction: column; justify-content: center; gap: 10px; padding-top: 20px; padding-bottom: 16px; }
+    .site-header--centered .site-title { font-size: 1.6rem; }
+    .site-header--centered .header-tools { justify-content: center; width: 100%; }
+  }
+  @media (max-width: 767.98px) {
+    .site-header--centered.is-nav-ready .site-title { text-align: left; }
+    .site-header--centered.is-nav-ready .site-menu { text-align: left; }
+  }
+  .site-header--minimal { border-bottom-color: transparent; }
+  .site-header--minimal .header-inner { padding-top: 10px; padding-bottom: 10px; }
+  .site-header--minimal .site-title { font-size: 1.15rem; font-weight: 700; }
+  .site-header--minimal .search-form { max-width: 260px; }
+  .site-header--minimal .category-nav { border-top: 0; }
+  .site-header--minimal .category-nav ul { padding-top: 0; padding-bottom: 10px; }
+
   main.container { padding-top: 24px; padding-bottom: 48px; min-height: 60vh; }
   .page-title, .article-title, .prose h2, .prose h3, .prose h4, .site-title, .card-title { font-family: var(--font-heading); }
   .page-title { font-size: 1.6rem; line-height: 1.4; margin: 0 0 16px; }
@@ -149,6 +168,24 @@
   .card--no-media { background: var(--surface); }
   .card--no-media .card-body { padding: 18px 16px 16px; }
   .card--no-media .card-excerpt { -webkit-line-clamp: 5; }
+
+  /* テーマの宣言的記事一覧レイアウト（theme.json の layout.article_list: "list"・"magazine"）。 */
+  .card-grid--list { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  @media (min-width: 640px) {
+    .card-grid--list .card { flex-direction: row; align-items: stretch; }
+    .card-grid--list .card-media { flex: 0 0 240px; width: 240px; }
+    .card-grid--list .card-media img { height: 100%; }
+    .card-grid--list .card-media.is-placeholder { height: 100%; min-height: 150px; }
+  }
+  .card-grid--magazine { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+  .card-grid--magazine > .card:first-child .card-title { font-size: 1.4rem; line-height: 1.4; }
+  @media (min-width: 768px) {
+    .card-grid--magazine > .card:first-child { grid-column: 1 / -1; }
+    .card-grid--magazine > .card:first-child:has(.card-media) { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: stretch; }
+    .card-grid--magazine > .card:first-child .card-media img, .card-grid--magazine > .card:first-child .card-media.is-placeholder { height: 100%; min-height: 240px; }
+    .card-grid--magazine > .card:first-child .card-body { padding: 24px; justify-content: center; }
+    .card-grid--magazine > .card:first-child .card-excerpt { -webkit-line-clamp: 4; font-size: .98rem; }
+  }
 
   /* 記事一覧のフィルタバー: 左の列にカテゴリのピル、右の列に年のセレクト。長いカテゴリ名でピルが何行に折り返しても、
      年のセレクトは右上に留まり（上端で揃える）、縦中央に浮いたりピルの並びに割り込んだりしない。狭い画面では縦に積む。 */
@@ -205,6 +242,20 @@
   .front-hero { max-width: var(--prose-width); margin: 0 auto 32px; }
   .front-hero > .hero:first-child { margin-top: 0; }
   .front-hero .article-title { margin: 0 0 12px; }
+  /* テーマの宣言的トップヒーローレイアウト（theme.json の layout.hero_layout: "centered"・"split"）。 */
+  .front-hero--centered { max-width: var(--prose-width); margin: 0 auto 40px; text-align: center; }
+  .front-hero--centered .prose { text-align: center; }
+  .front-hero--centered .prose ul, .front-hero--centered .prose ol, .front-hero--centered .prose pre, .front-hero--centered .prose table, .front-hero--centered .prose blockquote { text-align: left; }
+  .front-hero--centered .doc-cta-actions { justify-content: center; }
+  .front-hero--split { max-width: var(--content-width); margin: 0 auto 40px; padding: 16px 0; }
+  .front-hero--split:not(:has(> .hero)) { max-width: var(--prose-width); padding: 28px 0; text-align: center; }
+  .front-hero--split:not(:has(> .hero)) .prose ul, .front-hero--split:not(:has(> .hero)) .prose ol, .front-hero--split:not(:has(> .hero)) .prose pre, .front-hero--split:not(:has(> .hero)) .prose table, .front-hero--split:not(:has(> .hero)) .prose blockquote { text-align: left; }
+  @media (min-width: 768px) {
+    .front-hero--split:has(> .hero) { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); column-gap: 36px; row-gap: 12px; align-items: center; }
+    .front-hero--split:has(> .hero) > .article-title { grid-column: 1; align-self: end; margin: 0; }
+    .front-hero--split:has(> .hero) > .prose { grid-column: 1; align-self: start; }
+    .front-hero--split:has(> .hero) > .hero { grid-column: 2; grid-row: 1 / span 2; margin: 0; }
+  }
   .front-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(200px, calc((100% - 60px) / 4)), 1fr)); gap: 20px; list-style: none; margin: 0 0 40px; padding: 0; }
   .front-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
   .front-card-media img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center 25%; }
