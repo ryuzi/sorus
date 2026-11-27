@@ -168,6 +168,7 @@ func TestImportPageShowsFormAndBackupNotice(t *testing.T) {
 	expectStatus(t, res, http.StatusOK)
 	expectContains(t, res.Body,
 		"他のサービスから取り込む",
+		`id="import-source"`, `<option value="wordpress" selected>WordPress</option>`, `<option value="markdown">Markdown / Zip</option>`,
 		`action="/admin/import/preview"`, `enctype="multipart/form-data"`, `name="wxr"`, `accept=".xml`,
 		`name="download_images" value="1" class="mt-0.5" checked`,
 		`name="skip_pages" value="1" class="mt-0.5">`,
@@ -182,6 +183,22 @@ func TestImportPageShowsFormAndBackupNotice(t *testing.T) {
 	if table := strings.Index(body, "<table"); table >= 0 && strings.Contains(body[:table], `id="import-wordpress-link"`) {
 		t.Error("article list header shows the import link")
 	}
+}
+
+func TestImportMarkdownSourceAndFileExtension(t *testing.T) {
+	env := newTestEnv(t)
+	c := env.loggedIn(admin)
+	markdown := "---\ntitle: Markdown Article\nslug: markdown-article\nstatus: publish\n---\nContent from Markdown."
+	res := c.postImport(importPreviewPath, map[string]string{"source": "markdown", "dry_run": "1"}, "article.md", markdown)
+	expectStatus(t, res, http.StatusOK)
+	expectContains(t, res.Body, `id="import-filename" class="break-all font-mono">article.md</dd>`, `id="import-stat-articles" class="mt-1 text-xl font-bold tabular-nums text-neutral-900">1</p>`, `name="token"`)
+	if got := env.countRows(`SELECT COUNT(*) FROM articles WHERE slug = 'markdown-article'`); got != 0 {
+		t.Fatalf("dry-run created %d markdown articles, want 0", got)
+	}
+
+	res = c.postImport(importPreviewPath, map[string]string{"source": "markdown"}, "wordpress.xml", importTestWXR)
+	expectStatus(t, res, http.StatusBadRequest)
+	expectContains(t, res.Body, "選んだ取り込み元に合うファイル")
 }
 
 func TestImportBackupNoticeWarnsAboutSecretsAndSharingAlternatives(t *testing.T) {

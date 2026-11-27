@@ -48,6 +48,7 @@
       <button type="submit" id="publish-reflect-button" data-publish-reflect{{if $d.Status.Running}} disabled{{end}}
               class="btn btn-primary btn-md">{{if $ja}}サイトに反映{{else}}Update site{{end}}</button>
     </form>
+    <p class="mt-2 text-sm text-neutral-600">{{if $ja}}公開先の設定を保存したあと、この「サイトに反映」を押すと、変更内容を公開先へ送ります。{{else}}After saving the destination settings below, press “Update site” here to send your changes to the destination.{{end}}</p>
     {{else}}
     {{/* 公開サーバーを使っているあいだ（静的サイトは待機中）は、静的サイトへ送らない。切り替えは上の1行の状態から。 */}}
     <div class="mt-4 flex flex-wrap items-center gap-3">
@@ -393,9 +394,10 @@
     <div class="mt-5 flex flex-wrap items-center gap-3">
       <button type="button" data-publish-test id="publish-test"
               class="btn btn-secondary btn-md">{{if $ja}}接続テスト{{else}}Test connection{{end}}</button>
-      <button type="submit" id="publish-save" class="btn btn-primary btn-md">{{if $ja}}保存{{else}}Save{{end}}</button>
+      <button type="submit" id="publish-save" class="btn btn-primary btn-md">{{if $ja}}公開先を保存{{else}}Save destination{{end}}</button>
       <span class="flex items-center text-xs text-neutral-500">{{if $ja}}パスワードの扱い{{else}}About passwords{{end}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{if $ja}}パスワードと API トークンはこのパソコンの sorus に保存し、画面には表示しません。{{else}}Passwords and API tokens are stored in sorus on this computer and are never shown on screen.{{end}}</span></span></span>
     </div>
+    <p class="mt-2 text-sm text-neutral-600">{{if $ja}}公開先を保存したあと、画面上部の「サイトに反映」を押すと実際に書き出されます{{else}}After saving the destination, press “Update site” at the top of the page to export your site.{{end}}</p>
     <div data-publish-test-result aria-live="polite"></div>
 
     {{if $d.Configured}}<details id="publish-target-switch" class="mt-6 border-t border-neutral-100 pt-5">

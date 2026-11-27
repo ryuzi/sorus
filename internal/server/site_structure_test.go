@@ -319,7 +319,7 @@ func TestStructureRowOperationsWithoutJavaScript(t *testing.T) {
 		f.Set("op", op)
 		res := adm.postForm("/admin/settings/structure", f)
 		expectStatus(t, res, http.StatusOK)
-		expectContains(t, res.Body, `id="structure-unsaved"`)
+		expectContains(t, res.Body, `id="structure-unsaved" class="notice notice-warn`, `id="structure-unsaved-save" class="notice notice-warn`)
 		return res
 	}
 	for _, tc := range []struct {

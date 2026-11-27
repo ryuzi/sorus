@@ -66,6 +66,7 @@ func (e *importError) Error() string { return "import: " + e.Key }
 
 var (
 	errImportMissingFile     = &importError{http.StatusBadRequest, "import_err_missing_file"}
+	errImportSourceMismatch  = &importError{http.StatusBadRequest, "import_err_source_mismatch"}
 	errImportTooLarge        = &importError{http.StatusRequestEntityTooLarge, "import_err_too_large"}
 	errImportNotWXR          = &importError{http.StatusBadRequest, "import_err_not_wxr"}
 	errImportInvalidXML      = &importError{http.StatusBadRequest, "import_err_invalid_xml"}
@@ -82,6 +83,7 @@ var (
 
 // importForm は取り込みのオプション。フォームのフィールド名は download_images・skip_pages・account_mode・dry_run。
 type importForm struct {
+	Source         string
 	DownloadImages bool
 	SkipPages      bool
 	AccountMode    string
@@ -90,16 +92,20 @@ type importForm struct {
 
 // defaultImportForm は画面を開いたときのオプション（画像を取り込み、固定ページも取り込み、自分の記事にまとめ、先に確認する）。
 func defaultImportForm() importForm {
-	return importForm{DownloadImages: true, AccountMode: importAccountCurrent, DryRun: true}
+	return importForm{Source: "wordpress", DownloadImages: true, AccountMode: importAccountCurrent, DryRun: true}
 }
 
 // readImportForm は送られたオプションを読む。チェックボックスは外すと送られないため、無ければ false。
 func readImportForm(c echo.Context) importForm {
 	f := importForm{
+		Source:         c.FormValue("source"),
 		DownloadImages: c.FormValue("download_images") != "",
 		SkipPages:      c.FormValue("skip_pages") != "",
 		AccountMode:    c.FormValue("account_mode"),
 		DryRun:         c.FormValue("dry_run") != "",
+	}
+	if f.Source != "" && f.Source != "wordpress" && f.Source != "markdown" {
+		f.Source = "wordpress"
 	}
 	if f.AccountMode != importAccountAuthors {
 		f.AccountMode = importAccountCurrent
@@ -284,6 +290,11 @@ func (s *Server) handleImportPreview(c echo.Context) error {
 			os.Remove(path)
 		}
 	}()
+	form.Source = importSourceForFile(form.Source, filename)
+	form = normalizeImportFormForSource(form)
+	if err := validateImportSource(form.Source, filename); err != nil {
+		return s.renderImportError(c, form, err)
+	}
 
 	release, err := s.lockImport()
 	if err != nil {
@@ -323,7 +334,11 @@ func (s *Server) handleImportRun(c echo.Context) error {
 		return s.renderImportError(c, form, err)
 	}
 	defer os.Remove(path)
-
+	form.Source = importSourceForFile(form.Source, filename)
+	form = normalizeImportFormForSource(form)
+	if err := validateImportSource(form.Source, filename); err != nil {
+		return s.renderImportError(c, form, err)
+	}
 	release, err := s.lockImport()
 	if err != nil {
 		return s.renderImportError(c, form, err)
@@ -338,6 +353,42 @@ func (s *Server) handleImportRun(c echo.Context) error {
 		return s.renderImportError(c, form, err)
 	}
 	return s.render(c, http.StatusOK, "settings_import_result", importTitle(c), s.importResult(exp, sum, form, filename, indexFailed))
+}
+
+// validateImportSource rejects a selected source that does not match the uploaded file.
+// An omitted source is treated as WordPress for compatibility with existing callers.
+func validateImportSource(source, filename string) error {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if source == "markdown" && (ext == ".md" || ext == ".zip") {
+		return nil
+	}
+	if source == "wordpress" && ext == ".xml" {
+		return nil
+	}
+	if source == "markdown" || source == "wordpress" {
+		return errImportSourceMismatch
+	}
+	return errImportSourceMismatch
+}
+
+func importSourceForFile(source, filename string) string {
+	if source != "" {
+		return source
+	}
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".md", ".zip":
+		return "markdown"
+	default:
+		return "wordpress"
+	}
+}
+
+func normalizeImportFormForSource(form importForm) importForm {
+	if form.Source == "markdown" {
+		form.SkipPages = false
+		form.AccountMode = importAccountCurrent
+	}
+	return form
 }
 
 // runStagedImport は確認したときに預かったファイルを、確認したときのオプションで取り込む。取り込めたら預かったファイルを消す。

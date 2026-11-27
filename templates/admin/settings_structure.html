@@ -18,7 +18,7 @@
     <ul class="mt-1 list-disc space-y-1 pl-5">{{range .}}<li>{{.}}</li>{{end}}</ul>
   </div>
   {{end}}
-  {{if $d.Unsaved}}<p id="structure-unsaved" class="mt-4 rounded-lg border border-neutral-300 bg-white px-4 py-3 text-sm text-neutral-800" role="status">{{$.T "structure_unsaved"}}</p>{{end}}
+  {{if $d.Unsaved}}<p id="structure-unsaved" class="notice notice-warn mt-4 px-4 py-3" role="status">{{$.T "structure_unsaved"}}</p>{{end}}
 
   <form method="post" action="/admin/settings/structure" class="mt-6 space-y-6" id="structure-form">
     <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
@@ -143,6 +143,7 @@
     </fieldset>
 
     <div class="flex justify-end">
+      {{if $d.Unsaved}}<p id="structure-unsaved-save" class="notice notice-warn mr-auto px-4 py-3" role="status">{{$.T "structure_unsaved"}}</p>{{end}}
       <button type="submit" name="op" value="save" id="structure-save" class="btn btn-primary btn-md">{{$.T "structure_save"}}</button>
     </div>
   </form>
