@@ -1,28 +1,36 @@
 {{/* ドキュメント表示の部品（固定ページ・記事）。データは publicPage で、.DocNav（internal/server/doc_nav.go）が nil なら何も出さない。
      テーマが変えてよい公開クラス: .doc-layout・.doc-main・.doc-sidebar・.doc-sidebar-collapsible・.doc-sidebar-summary・
-     .doc-sidebar-nav・.doc-sidebar-title・.doc-sidebar-links・.doc-pager・.doc-pager-link・.doc-pager-prev・.doc-pager-next・
-     .doc-pager-label・.doc-pager-title。表示中のページは aria-current="page"。 */}}
+     .doc-sidebar-nav・.doc-sidebar-title・.doc-sidebar-links・.doc-sidebar-group・.doc-pager・.doc-pager-link・.doc-pager-prev・
+     .doc-pager-next・.doc-pager-label・.doc-pager-title。表示中のページは aria-current="page"。 */}}
 
-{{/* doc_sidebar は左のサイドバー（同じセクションのページの一覧）。スマートフォンでは開閉する一覧（<details>）で本文の上に置き、
-     PC の幅（1024px 以上）では本文の左に固定する。JavaScript が無くても開いた状態で読める（public.js が狭い画面では閉じる）。 */}}
+{{/* doc_sidebar は左のサイドバー（同じセクションのページの一覧、または layout.front_sidebar 時の全体目次）。スマートフォンでは
+     開閉する一覧（<details>）で本文の上に置き、PC の幅（1024px 以上）では本文の左に固定する。JavaScript が無くても開いた状態で
+     読める（public.js が狭い画面では閉じる）。 */}}
 {{define "doc_sidebar"}}{{with .DocNav}}
 <aside class="doc-sidebar">
   <details class="doc-sidebar-collapsible" open>
-    <summary class="doc-sidebar-summary">{{if eq $.Lang "en"}}Pages in this section{{else}}このセクションのページ{{end}}</summary>
+    <summary class="doc-sidebar-summary">{{if .Grouped}}{{if eq $.Lang "en"}}On this site{{else}}このサイトのページ{{end}}{{else}}{{if eq $.Lang "en"}}Pages in this section{{else}}このセクションのページ{{end}}{{end}}</summary>
     <nav class="doc-sidebar-nav" aria-label="{{.Title}}">
       <p class="doc-sidebar-title">{{if .TitleURL}}<a href="{{.TitleURL}}"{{if .TitleCurrent}} aria-current="page"{{end}}>{{.Title}}</a>{{else}}{{.Title}}{{end}}</p>
-      <ul class="doc-sidebar-links">{{template "doc_sidebar_items" .Links}}
+      <ul class="doc-sidebar-links">{{if .Grouped}}{{template "doc_sidebar_grouped_items" .Links}}{{else}}{{template "doc_sidebar_section_items" .Links}}{{end}}
       </ul>
     </nav>
   </details>
 </aside>
 {{end}}{{end}}
 
-{{/* doc_sidebar_items はサイドバーの一覧の項目（docNavLink の並び）。固定ページの階層から作ったサイドバーでは、表示中の
-     ページとその祖先の子ページ（.Children）を、項目の中の入れ子の <ul> で出す。 */}}
-{{define "doc_sidebar_items"}}{{range .}}
+{{/* doc_sidebar_grouped_items は全体目次サイドバー（layout.front_sidebar）の一覧の項目（docNavLink の並び）。子ページ（.Children）を
+     持つ親項目は <details class="doc-sidebar-group"> で JS なしでも開閉可能にし、表示中のページを含む親グループ（.Open）を自動で開く。 */}}
+{{define "doc_sidebar_grouped_items"}}{{range .}}
+        <li>{{if .Children}}<details class="doc-sidebar-group"{{if .Open}} open{{end}}><summary><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a></summary>
+          <ul>{{template "doc_sidebar_grouped_items" .Children}}
+          </ul></details>{{else}}<a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}</li>{{end}}{{end}}
+
+{{/* doc_sidebar_section_items は従来のセクション別サイドバーの一覧の項目。表示中のページとその祖先の子ページ（.Children）を
+     項目の中の入れ子の <ul> で出す。 */}}
+{{define "doc_sidebar_section_items"}}{{range .}}
         <li><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a>{{if .Children}}
-          <ul>{{template "doc_sidebar_items" .Children}}
+          <ul>{{template "doc_sidebar_section_items" .Children}}
           </ul>{{end}}</li>{{end}}{{end}}
 
 {{/* doc_pager は本文の後の「前のページ」「次のページ」。前後のどちらも無ければ出さない。 */}}

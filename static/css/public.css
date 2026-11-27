@@ -661,9 +661,19 @@
   .doc-sidebar-links { margin: 0; padding: 0 0 0 4px; list-style: none; }
   .doc-sidebar-links a { display: block; padding: 5px 10px 5px 14px; border-left: 2px solid var(--border); color: var(--muted); line-height: 1.55; text-decoration: none; overflow-wrap: anywhere; transition: color .15s ease, border-color .15s ease, background-color .15s ease; }
   .doc-sidebar-links a:hover { border-left-color: var(--muted); color: var(--fg); }
-  /* 固定ページの階層から作ったサイドバーの入れ子（表示中のページとその祖先の子ページ）。一段ごとに字下げする。 */
+  /* 固定ページの階層から作ったサイドバーの入れ子（表示中のページとその祖先の子ページ、および layout.front_sidebar の開閉可能な章グループ）。一段ごとに字下げする。 */
   .doc-sidebar-links ul { margin: 2px 0 4px; padding: 0 0 0 12px; list-style: none; }
   .doc-sidebar-links ul a { padding-top: 4px; padding-bottom: 4px; font-size: .95em; }
+  .doc-sidebar-group { margin: 0; }
+  .doc-sidebar-group > summary { display: flex; align-items: center; justify-content: space-between; gap: 4px; border-left: 2px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0; color: var(--fg); font-weight: 600; cursor: pointer; list-style: none; user-select: none; -webkit-user-select: none; transition: color .15s ease, border-color .15s ease, background-color .15s ease; }
+  .doc-sidebar-group > summary::-webkit-details-marker { display: none; }
+  .doc-sidebar-group > summary::after { content: ""; flex: 0 0 auto; width: 2rem; height: 2rem; background-color: var(--muted); -webkit-mask: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PHBhdGggZD0nTTYgMy41TDEwLjUgOCA2IDEyLjUnIGZpbGw9J25vbmUnIHN0cm9rZT0nYmxhY2snIHN0cm9rZS13aWR0aD0nMS43NScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJy8+PC9zdmc+") center / 1rem 1rem no-repeat; mask: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxNiAxNic+PHBhdGggZD0nTTYgMy41TDEwLjUgOCA2IDEyLjUnIGZpbGw9J25vbmUnIHN0cm9rZT0nYmxhY2snIHN0cm9rZS13aWR0aD0nMS43NScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJy8+PC9zdmc+") center / 1rem 1rem no-repeat; transition: transform .18s ease, background-color .15s ease; }
+  .doc-sidebar-group[open] > summary::after { transform: rotate(90deg); }
+  .doc-sidebar-group > summary > a { flex: 1 1 auto; min-width: 0; padding: 5px 6px 5px 14px; border-left: 0; color: inherit; font-weight: inherit; user-select: text; -webkit-user-select: text; }
+  .doc-sidebar-group > summary:hover { border-left-color: var(--muted); color: var(--fg); }
+  .doc-sidebar-group > summary:has(> a[aria-current="page"]) { border-left-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .doc-sidebar-group > summary:has(> a[aria-current="page"])::after { background-color: var(--accent); }
+  .doc-sidebar-group > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--radius); }
   .doc-sidebar-title a:hover { color: var(--accent); }
   .doc-sidebar a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
   .doc-sidebar-links a[aria-current="page"] { border-left-color: var(--accent); border-radius: 0 var(--radius) var(--radius) 0; }
@@ -693,7 +703,7 @@
     .doc-pager { grid-template-columns: minmax(0, 1fr); gap: 10px; }
     .doc-pager-next { grid-column: auto; }
   }
-  @media (prefers-reduced-motion: reduce) { .doc-sidebar-summary::after, .doc-sidebar-links a, .doc-pager-link { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .doc-sidebar-summary::after, .doc-sidebar-links a, .doc-sidebar-group > summary, .doc-sidebar-group > summary::after, .doc-pager-link { transition: none; } }
 
   /* 注意書き（Callout。internal/markdown/callout.go の div.callout.callout-<種類>）。種類ごとの色は --callout-color で、
      テーマが :root の --callout-note・--callout-tip・--callout-important・--callout-warning・--callout-caution で変えてよい

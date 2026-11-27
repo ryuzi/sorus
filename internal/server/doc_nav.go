@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -25,6 +27,8 @@ type docNav struct {
 	TitleURL string
 	// TitleCurrent は表示中のページが親の項目そのものか（aria-current="page"）。
 	TitleCurrent bool
+	// Grouped は layout.front_sidebar の全体目次サイドバー（章グループを <details class="doc-sidebar-group"> で開閉する表示）か。
+	Grouped bool
 	// Links はセクションの子項目（メニューの並び順。外部のサイトへのリンクも含む）。
 	Links []docNavLink
 	// Prev・Next は前後のページ。セクションの親（リンクのあるとき）と子項目をこの順に並べ、表示中のページの前後にある
@@ -38,8 +42,11 @@ type docNavLink struct {
 	URL   string
 	// Current は表示中のページを指すリンクか（aria-current="page"）。
 	Current bool
-	// Children はサイドバーで入れ子にして出す子ページ（固定ページの階層だけ）。表示中のページとその祖先の子ページだけを
-	// 開き、ほかの枝は閉じたまま（空）にする。メニューから作るサイドバー・ページ送り・パンくずリストでは常に空。
+	// Open は子ページを持つ親項目（<details class="doc-sidebar-group">）を開いた状態で出すか（layout.front_sidebar の全体目次）。
+	Open bool
+	// Children はサイドバーで入れ子にして出す子ページ（固定ページの階層だけ）。従来のセクション別サイドバーでは表示中の
+	// ページとその祖先の子ページだけを開き、layout.front_sidebar の全体目次ではすべての公開固定ページの階層を入れる。
+	// メニューから作るサイドバー・ページ送り・パンくずリストでは常に空。
 	Children []docNavLink
 }
 
@@ -281,9 +288,19 @@ func isFrontPageOf(st SiteStructure, front publicArticle, hasFront bool, slug, g
 // 一覧から除き、トップレベルの各ページとその子孫を .Children としてツリー化する。
 // 表示できるページが1件も無ければ nil を返す（空のサイドバーを出さない）。
 func buildFrontPageHierarchyNav(pages []pageNavNode, frontID, title, titleURL string, isFront func(pageNavNode) bool, urlOf func(pageNavNode) string) *docNav {
+	return buildFullDocsHierarchyNav(pages, frontID, frontID, title, titleURL, isFront, urlOf)
+}
+
+// buildFullDocsHierarchyNav は固定ページの一覧 pages（同じ言語の、読者に見えるページ。article.PageOrder の順）から、
+// トップページと配下の固定ページで共通の全体階層目次サイドバーを作る。frontID 自身（および isFront が true のページ）は
+// 一覧から除き、トップレベルの各ページとその子孫を .Children としてツリー化する。
+// curID に一致するページに Current: true を付け、curID を含む親グループ（およびその祖先、または curID 自身が子を持つ場合）に
+// Open: true を付ける。トップページ（curID == frontID）表示時は TitleCurrent: true となり、各グループは閉じた状態になる。
+// 表示できるページが1件も無ければ nil を返す（空のサイドバーを出さない）。
+func buildFullDocsHierarchyNav(pages []pageNavNode, frontID, curID, title, titleURL string, isFront func(pageNavNode) bool, urlOf func(pageNavNode) string) *docNav {
 	byID := make(map[string]pageNavNode, len(pages))
 	for _, p := range pages {
-		if p.ID == frontID || (isFront != nil && isFront(p)) {
+		if (frontID != "" && p.ID == frontID) || (isFront != nil && isFront(p)) {
 			continue
 		}
 		byID[p.ID] = p
@@ -306,33 +323,43 @@ func buildFrontPageHierarchyNav(pages []pageNavNode, frontID, title, titleURL st
 		roots = append(roots, p)
 	}
 	visited := make(map[string]bool, len(byID))
-	var walk func(list []pageNavNode, depth int) []docNavLink
-	walk = func(list []pageNavNode, depth int) []docNavLink {
+	var walk func(list []pageNavNode, depth int) ([]docNavLink, bool)
+	walk = func(list []pageNavNode, depth int) ([]docNavLink, bool) {
 		if depth >= maxPageNavDepth {
-			return nil
+			return nil, false
 		}
 		var out []docNavLink
+		anyActive := false
 		for _, p := range list {
 			if visited[p.ID] {
 				continue
 			}
 			visited[p.ID] = true
+			sub, subActive := walk(children[p.ID], depth+1)
+			cur := curID != "" && p.ID == curID
+			open := len(sub) > 0 && (cur || subActive)
+			if cur || subActive {
+				anyActive = true
+			}
 			out = append(out, docNavLink{
 				Label:    p.Title,
 				URL:      urlOf(p),
-				Children: walk(children[p.ID], depth+1),
+				Current:  cur,
+				Open:     open,
+				Children: sub,
 			})
 		}
-		return out
+		return out, anyActive
 	}
-	links := walk(roots, 0)
+	links, _ := walk(roots, 0)
 	if len(links) == 0 {
 		return nil
 	}
 	return &docNav{
 		Title:        title,
 		TitleURL:     titleURL,
-		TitleCurrent: true,
+		TitleCurrent: frontID != "" && curID == frontID,
+		Grouped:      true,
 		Links:        links,
 	}
 }
@@ -341,6 +368,38 @@ func buildFrontPageHierarchyNav(pages []pageNavNode, frontID, title, titleURL st
 // 表示言語 lang の公開済み固定ページだけを article.PageOrder（sort_order / id）順で取得し、front 自身を除いてツリー化する。
 // ほかの公開固定ページが存在しない場合は nil を返す。
 func (s *Server) frontPageHierarchyNav(ctx context.Context, front publicArticle, lang string, st SiteStructure) (*docNav, error) {
+	return s.fullDocsHierarchyNavWithFront(ctx, front, true, front.ID, lang, st)
+}
+
+// fullDocsHierarchyNav は layout.front_sidebar が有効なテーマで、トップページと配下の固定ページの両方に共通の
+// 全体階層目次サイドバーを作る。curID は現在表示中のページの ID（トップなら front.ID、配下ページなら a.ID）。
+func (s *Server) fullDocsHierarchyNav(ctx context.Context, curID, lang string, st SiteStructure) (*docNav, error) {
+	front, hasFront, err := s.frontPage(st)
+	if err != nil {
+		return nil, err
+	}
+	if hasFront && lang == "en" && front.Lang != "en" {
+		var enFront publicArticle
+		err := s.db.GetContext(ctx, &enFront, `SELECT `+publicArticleColumns+publicArticleFrom+
+			`WHERE a.translation_group_id = ? AND a.lang = 'en' AND `+publishedCondition,
+			front.TranslationGroupID, article.StatusPublished, clockNow().UTC())
+		switch {
+		case err == nil:
+			front = enFront
+		case errors.Is(err, sql.ErrNoRows):
+			front = publicArticle{}
+			hasFront = false
+		default:
+			return nil, fmt.Errorf("server: front page hierarchy: en front: %w", err)
+		}
+	} else if hasFront && lang != "en" && front.Lang == "en" {
+		front = publicArticle{}
+		hasFront = false
+	}
+	return s.fullDocsHierarchyNavWithFront(ctx, front, hasFront, curID, lang, st)
+}
+
+func (s *Server) fullDocsHierarchyNavWithFront(ctx context.Context, front publicArticle, hasFront bool, curID, lang string, st SiteStructure) (*docNav, error) {
 	now := clockNow().UTC()
 	langCond := pageNavLangCondition(lang)
 	var pages []pageNavNode
@@ -349,12 +408,15 @@ func (s *Server) frontPageHierarchyNav(ctx context.Context, front publicArticle,
 			COALESCE(NULLIF(a.translation_group_id, ''), a.id) AS translation_group_id,
 			COALESCE(a.parent_id, '') AS parent_id
 		FROM articles a
-		WHERE a.kind = ? AND `+langCond+` AND `+publishedCondition+`
-		ORDER BY `+article.PageOrder, article.KindPage, article.StatusPublished, now)
+		WHERE a.kind = ? AND `+langCond+` AND (`+publishedCondition+` OR a.id = ?)
+		ORDER BY `+article.PageOrder, article.KindPage, article.StatusPublished, now, curID)
 	if err != nil {
 		return nil, fmt.Errorf("server: front page hierarchy: pages: %w", err)
 	}
 	title := strings.TrimSpace(front.Title)
+	if !hasFront && title == "" {
+		title = strings.TrimSpace(s.siteNameFor(lang))
+	}
 	titleURL := "/"
 	if lang == "en" {
 		titleURL = "/en/"
@@ -364,11 +426,15 @@ func (s *Server) frontPageHierarchyNav(ctx context.Context, front publicArticle,
 	} else if title == "" {
 		title = "ドキュメント"
 	}
+	frontID := ""
+	if hasFront {
+		frontID = front.ID
+	}
 	isFront := func(p pageNavNode) bool {
-		return isFrontPageOf(st, front, true, p.Slug, p.TranslationGroupID)
+		return isFrontPageOf(st, front, hasFront, p.Slug, p.TranslationGroupID)
 	}
 	urlOf := func(p pageNavNode) string {
 		return contentPath(article.KindPage, p.Slug, p.Lang)
 	}
-	return buildFrontPageHierarchyNav(pages, front.ID, title, titleURL, isFront, urlOf), nil
+	return buildFullDocsHierarchyNav(pages, frontID, curID, title, titleURL, isFront, urlOf), nil
 }

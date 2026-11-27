@@ -320,7 +320,7 @@ func TestPublicDocsStyles(t *testing.T) {
 	}
 	depths := cssLayerDepths(css)
 	for _, sel := range []string{
-		".doc-layout {", ".doc-sidebar {", ".doc-sidebar-collapsible {", ".doc-sidebar-summary {", ".doc-sidebar a[aria-current=\"page\"]",
+		".doc-layout {", ".doc-sidebar {", ".doc-sidebar-collapsible {", ".doc-sidebar-summary {", ".doc-sidebar-group {", ".doc-sidebar-group > summary {", ".doc-sidebar a[aria-current=\"page\"]",
 		".doc-pager {", ".doc-pager-prev", ".doc-pager-next {",
 		".callout {", ".callout-note {", ".callout-tip {", ".callout-important {", ".callout-warning {", ".callout-caution {",
 		".callout .callout-title {", ".callout-body > :last-child",
@@ -343,6 +343,8 @@ func TestPublicDocsStyles(t *testing.T) {
 		"--callout-color: var(--callout-note, var(--accent));",
 		".doc-tab[aria-selected=\"true\"] { border-bottom-color: var(--accent); color: var(--accent); }",
 		".doc-sidebar a[aria-current=\"page\"] { background: var(--accent-soft); color: var(--accent);",
+		".doc-sidebar-group > summary::after { content: \"\"; flex: 0 0 auto; width: 2rem; height: 2rem;",
+		".doc-sidebar-group > summary > a { flex: 1 1 auto; min-width: 0; padding: 5px 6px 5px 14px; border-left: 0; color: inherit; font-weight: inherit; user-select: text;",
 		"color-mix(in srgb, var(--callout-color) 62%, var(--fg))",
 	} {
 		if !strings.Contains(css, want) {
@@ -443,6 +445,7 @@ func TestBuildFrontPageHierarchyNav(t *testing.T) {
 		Title:        "ホーム",
 		TitleURL:     "/",
 		TitleCurrent: true,
+		Grouped:      true,
 		Links: []docNavLink{
 			{
 				Label: "ガイド",
@@ -462,11 +465,42 @@ func TestBuildFrontPageHierarchyNav(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("buildFrontPageHierarchyNav =\n%s\nwant\n%s", describeHierarchyNav(got), describeHierarchyNav(want))
 	}
+
+	// 配下ページ（孫ページ linux）表示時は、現在ページに Current: true、その祖先グループ（guide, install）に Open: true が付き、
+	// トップ見出しの TitleCurrent は false になる。
+	gotSub := buildFullDocsHierarchyNav(pages, "home-id", "linux", "ホーム", "/", isFront, urlOf)
+	wantSub := &docNav{
+		Title:        "ホーム",
+		TitleURL:     "/",
+		TitleCurrent: false,
+		Grouped:      true,
+		Links: []docNavLink{
+			{
+				Label: "ガイド",
+				URL:   "/guide",
+				Open:  true,
+				Children: []docNavLink{
+					{
+						Label:    "インストール",
+						URL:      "/guide-install",
+						Open:     true,
+						Children: []docNavLink{{Label: "Linux", URL: "/guide-install-linux", Current: true}},
+					},
+					{Label: "クイックスタート", URL: "/guide-quickstart"},
+				},
+			},
+			{Label: "リファレンス", URL: "/reference"},
+		},
+	}
+	if !reflect.DeepEqual(gotSub, wantSub) {
+		t.Errorf("buildFullDocsHierarchyNav(linux) =\n%s\nwant\n%s", describeHierarchyNav(gotSub), describeHierarchyNav(wantSub))
+	}
 }
 
-// TestFrontPageDocSidebarLayout は、theme.json の layout.front_sidebar が true のときに GET / と GET /en/ で
-// 該当言語の公開固定ページ階層が .doc-layout / .doc-sidebar に描画され、非公開ページや別言語ページが混入しないこと、
-// また front_sidebar が false（既定）のときはシングルカラムを維持することを確かめる。
+// TestFrontPageDocSidebarLayout は、theme.json の layout.front_sidebar が true のときに GET /・GET /<slug>・GET /en/・GET /en/<slug> で
+// 該当言語の同じ全体公開固定ページ階層が .doc-layout / .doc-sidebar に描画され、表示中ページの Current と親グループ <details> の open が
+// 正しく切り替わること（別章グループには open が付かないこと）、非公開ページや別言語ページが混入しないこと、
+// また front_sidebar が false（既定）のときは従来の動作を維持することを確かめる。
 func TestFrontPageDocSidebarLayout(t *testing.T) {
 	themesDir := t.TempDir()
 	docThemeDir := filepath.Join(themesDir, "docs-theme")
@@ -488,6 +522,16 @@ func TestFrontPageDocSidebarLayout(t *testing.T) {
 
 	env := newPagesEnv(t, Config{ThemesDir: themesDir})
 	seedHierarchy(t, env)
+
+	// 別章の親・子ページ（章ごとの open 独立性を検証するため）を追加する。
+	apiChapter := seedPage(t, env.db, article.Article{
+		Title: "API リファレンス", Slug: "api-ref", ContentMarkdown: "API 概要",
+		Lang: "ja", Status: article.StatusPublished, PublishedAt: ago(time.Hour), SortOrder: 10,
+	})
+	seedPage(t, env.db, article.Article{
+		Title: "認証", Slug: "api-auth", ContentMarkdown: "認証仕様",
+		Lang: "ja", Status: article.StatusPublished, PublishedAt: ago(time.Hour), ParentID: apiChapter, SortOrder: 1,
+	})
 
 	// 日本語と英語のフロント固定ページ（同じ translation_group_id で紐付け）を用意する。
 	homeJA := seedPage(t, env.db, article.Article{
@@ -531,14 +575,24 @@ func TestFrontPageDocSidebarLayout(t *testing.T) {
 	}
 	c := env.newClient()
 
-	// 1. 既定テーマ（front_sidebar: false）では / と /en/ に doc-sidebar / doc-layout を出さずシングルカラムを維持する。
+	// 1. 既定テーマ（front_sidebar: false）では / と /en/ に doc-sidebar / doc-layout を出さずシングルカラムを維持し、
+	//    配下の固定ページでは現在の章のみの従来サイドバー（doc-sidebar-group なし）を維持する。
 	for _, p := range []string{"/", "/en/"} {
 		res := c.get(p)
 		expectStatus(t, res, http.StatusOK)
 		expectNotContainsAny(t, "default theme "+p, res.Body, `class="doc-layout"`, `class="doc-sidebar"`, `class="doc-main"`)
 	}
+	defaultSub := c.get("/guide-quickstart")
+	expectStatus(t, defaultSub, http.StatusOK)
+	defaultSubSidebar := docSidebar(defaultSub.Body)
+	expectContains(t, defaultSubSidebar,
+		`<nav class="doc-sidebar-nav" aria-label="ガイド">`,
+		`<p class="doc-sidebar-title"><a href="/guide">ガイド</a></p>`,
+		`<li><a href="/guide-quickstart" aria-current="page">クイックスタート</a></li>`)
+	expectNotContainsAny(t, "default theme /guide-quickstart sidebar", defaultSubSidebar,
+		"doc-sidebar-group", "SORUS ドキュメント", "API リファレンス", "アクセス")
 
-	// 2. front_sidebar: true のテーマを適用すると、/ と /en/ に該当言語の公開固定ページ階層サイドバーが出る。
+	// 2. front_sidebar: true のテーマを適用すると、/・/<slug>・/en/・/en/<slug> に該当言語の公開固定ページ全体目次サイドバーが出る。
 	if _, err := env.db.Exec(`INSERT INTO settings (key, value, updated_at) VALUES ('theme', 'docs-theme', CURRENT_TIMESTAMP)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value`); err != nil {
 		t.Fatal(err)
@@ -576,13 +630,19 @@ func TestFrontPageDocSidebarLayout(t *testing.T) {
 	}
 	jaSidebar := docSidebar(jaHome.Body)
 	expectContains(t, jaSidebar,
+		`<summary class="doc-sidebar-summary">このサイトのページ</summary>`,
 		`<nav class="doc-sidebar-nav" aria-label="SORUS ドキュメント">`,
 		`<p class="doc-sidebar-title"><a href="/" aria-current="page">SORUS ドキュメント</a></p>`,
-		`<li><a href="/guide">ガイド</a>`,
-		`<li><a href="/guide-install">インストール</a>`,
+		`<li><details class="doc-sidebar-group"><summary><a href="/guide">ガイド</a></summary>`,
+		`<li><details class="doc-sidebar-group"><summary><a href="/guide-install">インストール</a></summary>`,
 		`<li><a href="/guide-install-linux">Linux へのインストール</a></li>`,
 		`<li><a href="/guide-quickstart">クイックスタート</a></li>`,
-		`<li><a href="/guide-faq">よくある質問</a></li>`)
+		`<li><a href="/guide-faq">よくある質問</a></li>`,
+		`<li><details class="doc-sidebar-group"><summary><a href="/api-ref">API リファレンス</a></summary>`,
+		`<li><a href="/api-auth">認証</a></li>`,
+		`<li><a href="/access">アクセス</a></li>`)
+	// トップページ表示時は章グループ <details class="doc-sidebar-group"> はすべて閉じた状態（open なし）。
+	expectNotContainsAny(t, "ja front sidebar on /", jaSidebar, `<details class="doc-sidebar-group" open>`)
 	// sort_order の並び順（install -> quickstart -> faq）が守られていること。
 	if i, j, k := strings.Index(jaSidebar, "/guide-install\""), strings.Index(jaSidebar, "/guide-quickstart\""), strings.Index(jaSidebar, "/guide-faq\""); !(i >= 0 && i < j && j < k) {
 		t.Errorf("ja front sidebar order install(%d) < quickstart(%d) < faq(%d) is broken:\n%s", i, j, k, jaSidebar)
@@ -593,18 +653,86 @@ func TestFrontPageDocSidebarLayout(t *testing.T) {
 		"Quickstart (EN)", "User Guide", "Installation", "CLI Reference", "Draft English Page",
 		`href="/home"`)
 
+	// 3. 配下ページ（/guide-quickstart）でもトップと同じ全体章立てがサイドバーに出て、
+	//    現在ページに aria-current="page"、親章（/guide）の <details> に open が付き、別グループ（/guide-install, /api-ref）には open が付かないこと。
+	jaQuick := c.get("/guide-quickstart")
+	expectStatus(t, jaQuick, http.StatusOK)
+	jaQuickSidebar := docSidebar(jaQuick.Body)
+	expectContains(t, jaQuickSidebar,
+		`<nav class="doc-sidebar-nav" aria-label="SORUS ドキュメント">`,
+		`<p class="doc-sidebar-title"><a href="/">SORUS ドキュメント</a></p>`,
+		`<li><details class="doc-sidebar-group" open><summary><a href="/guide">ガイド</a></summary>`,
+		`<li><details class="doc-sidebar-group"><summary><a href="/guide-install">インストール</a></summary>`,
+		`<li><a href="/guide-install-linux">Linux へのインストール</a></li>`,
+		`<li><a href="/guide-quickstart" aria-current="page">クイックスタート</a></li>`,
+		`<li><a href="/guide-faq">よくある質問</a></li>`,
+		`<li><details class="doc-sidebar-group"><summary><a href="/api-ref">API リファレンス</a></summary>`,
+		`<li><a href="/api-auth">認証</a></li>`,
+		`<li><a href="/access">アクセス</a></li>`)
+
+	// 孫ページ（/guide-install-linux）では親（/guide-install）と祖父（/guide）の両方の <details> に open が付き、別章（/api-ref）は閉じていること。
+	jaLinux := c.get("/guide-install-linux")
+	expectStatus(t, jaLinux, http.StatusOK)
+	jaLinuxSidebar := docSidebar(jaLinux.Body)
+	expectContains(t, jaLinuxSidebar,
+		`<li><details class="doc-sidebar-group" open><summary><a href="/guide">ガイド</a></summary>`,
+		`<li><details class="doc-sidebar-group" open><summary><a href="/guide-install">インストール</a></summary>`,
+		`<li><a href="/guide-install-linux" aria-current="page">Linux へのインストール</a></li>`,
+		`<li><details class="doc-sidebar-group"><summary><a href="/api-ref">API リファレンス</a></summary>`)
+
+	// 別章の子ページ（/api-auth）では /api-ref の <details> だけに open が付き、/guide と /guide-install には open が付かないこと。
+	jaAPIAuth := c.get("/api-auth")
+	expectStatus(t, jaAPIAuth, http.StatusOK)
+	jaAPIAuthSidebar := docSidebar(jaAPIAuth.Body)
+	expectContains(t, jaAPIAuthSidebar,
+		`<li><details class="doc-sidebar-group"><summary><a href="/guide">ガイド</a></summary>`,
+		`<li><details class="doc-sidebar-group"><summary><a href="/guide-install">インストール</a></summary>`,
+		`<li><details class="doc-sidebar-group" open><summary><a href="/api-ref">API リファレンス</a></summary>`,
+		`<li><a href="/api-auth" aria-current="page">認証</a></li>`)
+
+	// 4. 英語（/en/ と /en/installation）でも同じ英語全体目次が出力され、言語分離が守られること。
 	enHome := c.get("/en/")
 	expectStatus(t, enHome, http.StatusOK)
 	expectContains(t, enHome.Body, `<div class="doc-layout">`, `<div class="doc-main">`, `<section class="front-hero"`)
 	enSidebar := docSidebar(enHome.Body)
 	expectContains(t, enSidebar,
+		`<summary class="doc-sidebar-summary">On this site</summary>`,
 		`<nav class="doc-sidebar-nav" aria-label="SORUS Documentation">`,
 		`<p class="doc-sidebar-title"><a href="/en/" aria-current="page">SORUS Documentation</a></p>`,
-		`<li><a href="/en/user-guide">User Guide</a>`,
+		`<li><details class="doc-sidebar-group"><summary><a href="/en/user-guide">User Guide</a></summary>`,
 		`<li><a href="/en/installation">Installation</a></li>`,
 		`<li><a href="/en/cli-reference">CLI Reference</a></li>`)
+	expectNotContainsAny(t, "en front sidebar on /en/", enSidebar, `<details class="doc-sidebar-group" open>`)
 	// 英語トップページのサイドバーに日本語ページや非公開英語ページ、フロントページ自身（/en/home-en）が混入しないこと。
 	expectNotContainsAny(t, "en front sidebar", enSidebar,
-		"ガイド", "インストール", "クイックスタート", "よくある質問", "研究紹介", "アクセス", "メンバー紹介",
+		"ガイド", "インストール", "クイックスタート", "よくある質問", "API リファレンス", "研究紹介", "アクセス", "メンバー紹介",
 		"Draft English Page", `href="/en/home-en"`)
+
+	enInstall := c.get("/en/installation")
+	expectStatus(t, enInstall, http.StatusOK)
+	enInstallSidebar := docSidebar(enInstall.Body)
+	expectContains(t, enInstallSidebar,
+		`<summary class="doc-sidebar-summary">On this site</summary>`,
+		`<nav class="doc-sidebar-nav" aria-label="SORUS Documentation">`,
+		`<p class="doc-sidebar-title"><a href="/en/">SORUS Documentation</a></p>`,
+		`<li><details class="doc-sidebar-group" open><summary><a href="/en/user-guide">User Guide</a></summary>`,
+		`<li><a href="/en/installation" aria-current="page">Installation</a></li>`,
+		`<li><a href="/en/cli-reference">CLI Reference</a></li>`)
+	expectNotContainsAny(t, "en subpage sidebar", enInstallSidebar,
+		"ガイド", "インストール", "クイックスタート", "API リファレンス", "Draft English Page", `href="/en/home-en"`)
+
+	// 5. 英語フロント固定ページが未公開（下書き）で英語の配下ページが公開されている場合でも、
+	//    GET /en/<slug> の aside 内に日本語フロント固定ページのタイトル（"SORUS ドキュメント"）が漏れないこと。
+	if _, err := env.db.Exec(`UPDATE articles SET status = ? WHERE slug = 'home-en'`, article.StatusDraft); err != nil {
+		t.Fatal(err)
+	}
+	enInstallNoFront := c.get("/en/installation")
+	expectStatus(t, enInstallNoFront, http.StatusOK)
+	enInstallNoFrontSidebar := docSidebar(enInstallNoFront.Body)
+	expectContains(t, enInstallNoFrontSidebar,
+		`<summary class="doc-sidebar-summary">On this site</summary>`,
+		`<li><details class="doc-sidebar-group" open><summary><a href="/en/user-guide">User Guide</a></summary>`,
+		`<li><a href="/en/installation" aria-current="page">Installation</a></li>`)
+	expectNotContainsAny(t, "en subpage sidebar when en front is draft", enInstallNoFrontSidebar,
+		"SORUS ドキュメント", "SORUS Documentation", "ガイド", "インストール", "クイックスタート", `href="/en/home-en"`)
 }

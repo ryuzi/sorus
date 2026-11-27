@@ -1277,6 +1277,18 @@ func (s *Server) renderPageDetail(c echo.Context, a publicArticle, lang string, 
 		return err
 	}
 	p.DocNav = h.Nav
+	if s.publicTheme(c).Layout.FrontSidebar {
+		docNav, err := s.fullDocsHierarchyNav(c.Request().Context(), a.ID, lang, st)
+		if err != nil {
+			return err
+		}
+		if docNav != nil {
+			if h.Nav != nil {
+				docNav.Prev, docNav.Next = h.Nav.Prev, h.Nav.Next
+			}
+			p.DocNav = docNav
+		}
+	}
 	crumbs := []crumb{{homeLabel, topURL}}
 	homePath := strings.TrimPrefix(topURL, base)
 	for _, anc := range h.Ancestors {

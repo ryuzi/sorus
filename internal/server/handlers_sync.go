@@ -1165,6 +1165,8 @@ func (s *Server) syncSettings(c echo.Context, req *SyncRequest) error {
 				section.Layout = strings.TrimSpace(section.Layout)
 				section.LinkURL = strings.TrimSpace(section.LinkURL)
 				section.LinkLabel = strings.TrimSpace(section.LinkLabel)
+				section.SecondaryURL = strings.TrimSpace(section.SecondaryURL)
+				section.SecondaryLabel = strings.TrimSpace(section.SecondaryLabel)
 				section.ArticleTag = strings.TrimSpace(section.ArticleTag)
 			}
 		}
