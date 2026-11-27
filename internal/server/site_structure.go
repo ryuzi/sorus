@@ -1299,6 +1299,13 @@ func (s *Server) renderFront(c echo.Context, p publicPage, front publicArticle, 
 		}
 		data.Sections = append(data.Sections, view)
 	}
+	if s.publicTheme(c).Layout.FrontSidebar {
+		docNav, err := s.frontPageHierarchyNav(ctx, front, p.Lang, st)
+		if err != nil {
+			return err
+		}
+		p.DocNav = docNav
+	}
 	p.Data = data
 	return s.renderPublic(c, http.StatusOK, "front", p)
 }

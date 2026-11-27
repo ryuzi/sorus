@@ -47,10 +47,11 @@ my-theme/
 - description: {"ja": "日本語の説明", "en": "English description"}。ja は必須、en も必ず書く。
 - color_scheme: "light"・"dark"・"light dark" のどれか。
 - order: 整数（任意）。管理画面での並び順。100 以上を使う（標準テーマは 10〜40）。
-- layout: オブジェクト（任意）。ヘッダー・トップのヒーロー・記事一覧の骨格を選ぶ。省略した項目は既定値になる。
+- layout: オブジェクト（任意）。ヘッダー・トップのヒーロー・記事一覧・トップの目次サイドバーの骨格を選ぶ。省略した項目は既定値になる。
   - header_style: "inline"（既定）・"centered"・"minimal" のどれか。
   - hero_layout: "stacked"（既定）・"centered"・"split" のどれか。
   - article_list: "grid"（既定）・"list"・"magazine" のどれか。
+  - front_sidebar: false（既定）・true のどちらか（true のとき、固定ページをトップにしたトップページの左に全体の階層目次サイドバー .doc-sidebar を出す）。
 
 # theme.css の規則
 - 純粋な CSS だけ。@import を書かない。@layer で囲まない。
@@ -146,7 +147,7 @@ flowchart LR
 | `description` | `{"ja": 文字列, "en": 文字列}` | `ja` は必須。`en` は推奨 | 管理画面のカードに出す説明文。英語表示で `en` が無いときは `ja` を使う |
 | `color_scheme` | 文字列 | 必須 | `"light"`・`"dark"`・`"light dark"` のいずれか。公開ページの `<meta name="color-scheme">` になる |
 | `order` | 整数 | 任意 | 管理画面での並び順（小さい順。同じなら ID の順）。標準テーマは 10〜40 を使っているので、100 以上を勧める |
-| `layout` | オブジェクト | 任意 | 公開ページの宣言的レイアウト設定。下表の3項目を任意に組み合わせられる（省略時はすべて既定値） |
+| `layout` | オブジェクト | 任意 | 公開ページの宣言的レイアウト設定。下表の4項目を任意に組み合わせられる（省略時はすべて既定値） |
 | `source_url` | 文字列 | 書かない | 取り込み元の URL。URL から取り込んだとき sorus が自動で書き込む。作者が書く必要はない |
 
 ### `layout` オブジェクトの項目（すべて任意）
@@ -156,13 +157,14 @@ flowchart LR
 | `header_style` | `"inline"`・`"centered"`・`"minimal"` | `"inline"` | `"centered"` は `.site-header--centered`（サイト名とメニューを中央揃え）、`"minimal"` は `.site-header--minimal`（境界線と余白を抑えた簡潔なヘッダー）を `.site-header` に付ける |
 | `hero_layout` | `"stacked"`・`"centered"`・`"split"` | `"stacked"` | `"centered"` は `.front-hero--centered`（中央揃え）、`"split"` は `.front-hero--split`（アイキャッチ画像があるときはPCで2カラム、無いときは中央寄せ）をトップ固定ページの `.front-hero` に付ける |
 | `article_list` | `"grid"`・`"list"`・`"magazine"` | `"grid"` | `"list"` は `.card-grid--list`（1列の横長カード一覧）、`"magazine"` は `.card-grid--magazine`（先頭記事カードを大きく表示するマガジン配置）を `.card-grid` に付ける |
+| `front_sidebar` | `true`・`false` | `false` | `true` のとき、固定ページをトップにしたトップページ（`/`・`/en/`）を `.doc-layout` で囲み、左側に公開固定ページの階層目次サイドバー（`.doc-sidebar`）を表示する（公開固定ページが無いときは1カラムのまま） |
 
-* 既定値（`"inline"`・`"stacked"`・`"grid"`）のときは修飾クラスを付けません。
+* 既定値（`"inline"`・`"stacked"`・`"grid"`・`false`）のときは修飾クラスやサイドバーを付けません。
 * 修飾クラスのレスポンシブな骨格は本体の `public.css`（`@layer sorus-base`）に入っているため、`theme.json` の `layout` を書くだけで配置が切り替わります。`theme.css` から修飾クラスを上書きして細部を調整することもできます。
 
 検証の規則（`ValidateThemeDir`。標準テーマ・独自テーマ・取り込みのすべてが同じ検証を通ります）:
 
-* **上の表にない項目は拒否されます**（`DisallowUnknownFields`）。`version`・`author`・`license`・`homepage` なども書けません。`layout` の中も `header_style`・`hero_layout`・`article_list` 以外の項目があると拒否されます。版や作者は README.md に書いてください。
+* **上の表にない項目は拒否されます**（`DisallowUnknownFields`）。`version`・`author`・`license`・`homepage` なども書けません。`layout` の中も `header_style`・`hero_layout`・`article_list`・`front_sidebar` 以外の項目があると拒否されます。版や作者は README.md に書いてください。
 * JSON オブジェクトの後ろに余分なデータがあると拒否されます。
 * `name.ja`・`description.ja` が空（空白だけを含む）だと拒否されます。
 * `color_scheme` が3つの値のどれでもないと拒否されます（`"auto"`・`"Dark"` も不可）。
@@ -477,7 +479,7 @@ AI エージェントから操作する場合は、MCP ツール `cms_install_th
 ## 8. 提出前のチェックリスト
 
 * [ ] `theme.json` の項目は `name`・`description`・`color_scheme`・`order`・`layout`（任意）だけで、`name.ja`・`description.ja` がある
-* [ ] `layout` を書く場合、`header_style`・`hero_layout`・`article_list` が許可値だけで、未知の項目がない
+* [ ] `layout` を書く場合、`header_style`・`hero_layout`・`article_list`・`front_sidebar` が許可値だけで、未知の項目がない
 * [ ] `color_scheme` が `"light"`・`"dark"`・`"light dark"` のどれか
 * [ ] `theme.css` の `:root` に19個のトークンがすべてある
 * [ ] `color_scheme` に `dark` を含むなら、最上位の `@media (prefers-color-scheme: dark)` の `:root` に色の11個がある

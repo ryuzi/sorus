@@ -1,6 +1,7 @@
 {{define "head"}}{{template "content_head" .}}{{end}}
 {{define "content"}}
 {{with .Data}}
+{{if $.DocNav}}<div class="doc-layout">{{template "doc_sidebar" $}}<div class="doc-main">{{end}}
 {{range $section := .Sections}}
 {{if eq $section.Type "hero"}}
 <section class="front-hero{{if eq $.Layout.HeroLayout "centered"}} front-hero--centered{{else if eq $.Layout.HeroLayout "split"}} front-hero--split{{end}}" aria-labelledby="{{$section.ID}}">
@@ -32,5 +33,6 @@
 {{end}}
 {{end}}
 {{end}}
+{{if $.DocNav}}</div></div>{{end}}
 {{end}}
 {{end}}

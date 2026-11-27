@@ -10,7 +10,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	"sorus/internal/article"
 	"sorus/static"
 )
 
@@ -412,4 +414,197 @@ func TestPublicDocsScript(t *testing.T) {
 			t.Errorf("layout.html has no .%s used by public.js", class)
 		}
 	}
+}
+
+// TestBuildFrontPageHierarchyNav は、トップページ向けの全体固定ページ階層サイドバー構築で、
+// front ページ自身の除外・トップレベルと子ページの入れ子（.Children）・空のときの nil を確かめる。
+func TestBuildFrontPageHierarchyNav(t *testing.T) {
+	urlOf := func(p pageNavNode) string { return "/" + p.Slug }
+	isFront := func(p pageNavNode) bool { return p.Slug == "home" }
+
+	if got := buildFrontPageHierarchyNav(nil, "home-id", "ホーム", "/", isFront, urlOf); got != nil {
+		t.Errorf("empty pages = %+v, want nil", got)
+	}
+	onlyFront := []pageNavNode{{ID: "home-id", Title: "ホーム", Slug: "home"}}
+	if got := buildFrontPageHierarchyNav(onlyFront, "home-id", "ホーム", "/", isFront, urlOf); got != nil {
+		t.Errorf("only front page = %+v, want nil", got)
+	}
+
+	pages := []pageNavNode{
+		{ID: "home-id", Title: "ホーム", Slug: "home"},
+		{ID: "guide", Title: "ガイド", Slug: "guide"},
+		{ID: "install", Title: "インストール", Slug: "guide-install", ParentID: "guide"},
+		{ID: "linux", Title: "Linux", Slug: "guide-install-linux", ParentID: "install"},
+		{ID: "quickstart", Title: "クイックスタート", Slug: "guide-quickstart", ParentID: "guide"},
+		{ID: "ref", Title: "リファレンス", Slug: "reference", ParentID: "home-id"},
+	}
+	got := buildFrontPageHierarchyNav(pages, "home-id", "ホーム", "/", isFront, urlOf)
+	want := &docNav{
+		Title:        "ホーム",
+		TitleURL:     "/",
+		TitleCurrent: true,
+		Links: []docNavLink{
+			{
+				Label: "ガイド",
+				URL:   "/guide",
+				Children: []docNavLink{
+					{
+						Label:    "インストール",
+						URL:      "/guide-install",
+						Children: []docNavLink{{Label: "Linux", URL: "/guide-install-linux"}},
+					},
+					{Label: "クイックスタート", URL: "/guide-quickstart"},
+				},
+			},
+			{Label: "リファレンス", URL: "/reference"},
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("buildFrontPageHierarchyNav =\n%s\nwant\n%s", describeHierarchyNav(got), describeHierarchyNav(want))
+	}
+}
+
+// TestFrontPageDocSidebarLayout は、theme.json の layout.front_sidebar が true のときに GET / と GET /en/ で
+// 該当言語の公開固定ページ階層が .doc-layout / .doc-sidebar に描画され、非公開ページや別言語ページが混入しないこと、
+// また front_sidebar が false（既定）のときはシングルカラムを維持することを確かめる。
+func TestFrontPageDocSidebarLayout(t *testing.T) {
+	themesDir := t.TempDir()
+	docThemeDir := filepath.Join(themesDir, "docs-theme")
+	if err := os.MkdirAll(docThemeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docThemeDir, "theme.json"), []byte(`{
+		"name": {"ja": "ドキュメント", "en": "Docs"},
+		"description": {"ja": "ドキュメント用テーマ", "en": "Documentation theme"},
+		"color_scheme": "light dark",
+		"order": 100,
+		"layout": {"front_sidebar": true}
+	}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docThemeDir, "theme.css"), []byte(`:root { --bg: #ffffff; }`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	env := newPagesEnv(t, Config{ThemesDir: themesDir})
+	seedHierarchy(t, env)
+
+	// 日本語と英語のフロント固定ページ（同じ translation_group_id で紐付け）を用意する。
+	homeJA := seedPage(t, env.db, article.Article{
+		Title: "SORUS ドキュメント", Slug: "home", ContentMarkdown: "トップ本文",
+		Lang: "ja", TranslationGroupID: "grp-front-home",
+		Status: article.StatusPublished, PublishedAt: ago(time.Hour),
+	})
+	_ = homeJA
+	seedPage(t, env.db, article.Article{
+		Title: "SORUS Documentation", Slug: "home-en", ContentMarkdown: "English home body",
+		Lang: "en", TranslationGroupID: "grp-front-home",
+		Status: article.StatusPublished, PublishedAt: ago(time.Hour),
+	})
+
+	// 英語の公開固定ページ階層と、英語の下書き固定ページを用意する。
+	enGuide := seedPage(t, env.db, article.Article{
+		Title: "User Guide", Slug: "user-guide", ContentMarkdown: "Guide body",
+		Lang: "en", Status: article.StatusPublished, PublishedAt: ago(time.Hour), SortOrder: 1,
+	})
+	seedPage(t, env.db, article.Article{
+		Title: "Installation", Slug: "installation", ContentMarkdown: "Install body",
+		Lang: "en", Status: article.StatusPublished, PublishedAt: ago(time.Hour), ParentID: enGuide, SortOrder: 1,
+	})
+	seedPage(t, env.db, article.Article{
+		Title: "CLI Reference", Slug: "cli-reference", ContentMarkdown: "CLI body",
+		Lang: "en", Status: article.StatusPublished, PublishedAt: ago(time.Hour), SortOrder: 2,
+	})
+	seedPage(t, env.db, article.Article{
+		Title: "Draft English Page", Slug: "draft-en", ContentMarkdown: "Draft",
+		Lang: "en", Status: article.StatusDraft, ParentID: enGuide,
+	})
+
+	if err := env.server.saveSiteStructure(context.Background(), SiteStructure{
+		FrontPage: "home",
+		FrontSections: []FrontSection{
+			{Type: FrontSectionHero},
+			{Type: FrontSectionCards, Pages: []string{"guide", "access"}},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	c := env.newClient()
+
+	// 1. 既定テーマ（front_sidebar: false）では / と /en/ に doc-sidebar / doc-layout を出さずシングルカラムを維持する。
+	for _, p := range []string{"/", "/en/"} {
+		res := c.get(p)
+		expectStatus(t, res, http.StatusOK)
+		expectNotContainsAny(t, "default theme "+p, res.Body, `class="doc-layout"`, `class="doc-sidebar"`, `class="doc-main"`)
+	}
+
+	// 2. front_sidebar: true のテーマを適用すると、/ と /en/ に該当言語の公開固定ページ階層サイドバーが出る。
+	if _, err := env.db.Exec(`INSERT INTO settings (key, value, updated_at) VALUES ('theme', 'docs-theme', CURRENT_TIMESTAMP)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`); err != nil {
+		t.Fatal(err)
+	}
+
+	jaHome := c.get("/")
+	expectStatus(t, jaHome, http.StatusOK)
+	expectContains(t, jaHome.Body, `<div class="doc-layout">`, `<div class="doc-main">`, `<section class="front-hero"`, `<ul class="front-cards">`)
+	// hero と cards の複数セクションがいずれも <div class="doc-main"> の内側にあり、途中で閉じたり余分な </div></div> が出ないこと。
+	mainStart := strings.Index(jaHome.Body, `<main id="main" class="container">`)
+	mainEnd := strings.Index(jaHome.Body, `</main>`)
+	if mainStart < 0 || mainEnd <= mainStart {
+		t.Fatalf("main container not found in GET /")
+	}
+	mainHTML := jaHome.Body[mainStart:mainEnd]
+	docMainStart := strings.Index(mainHTML, `<div class="doc-main">`)
+	heroIdx := strings.Index(mainHTML, `<section class="front-hero"`)
+	cardsIdx := strings.Index(mainHTML, `<ul class="front-cards">`)
+	cardsEndIdx := -1
+	if cardsIdx >= 0 {
+		if rel := strings.Index(mainHTML[cardsIdx:], `</ul>`); rel >= 0 {
+			cardsEndIdx = cardsIdx + rel
+		}
+	}
+	docCloseIdx := strings.LastIndex(mainHTML, `</div></div>`)
+	if !(docMainStart >= 0 && docMainStart < heroIdx && heroIdx < cardsIdx && cardsIdx < cardsEndIdx && cardsEndIdx < docCloseIdx) {
+		t.Errorf("hero and cards must both be inside .doc-main before closing </div></div>: docMain=%d hero=%d cards=%d cardsEnd=%d docClose=%d\n%s",
+			docMainStart, heroIdx, cardsIdx, cardsEndIdx, docCloseIdx, mainHTML)
+	}
+	if strings.Contains(mainHTML[heroIdx:cardsIdx], "</div></div>") {
+		t.Errorf(".doc-main/.doc-layout closed prematurely between hero and cards:\n%s", mainHTML[heroIdx:cardsIdx])
+	}
+	if openDivs, closeDivs := strings.Count(mainHTML, "<div"), strings.Count(mainHTML, "</div>"); openDivs != closeDivs {
+		t.Errorf("unbalanced div tags in <main>: open=%d close=%d\n%s", openDivs, closeDivs, mainHTML)
+	}
+	jaSidebar := docSidebar(jaHome.Body)
+	expectContains(t, jaSidebar,
+		`<nav class="doc-sidebar-nav" aria-label="SORUS ドキュメント">`,
+		`<p class="doc-sidebar-title"><a href="/" aria-current="page">SORUS ドキュメント</a></p>`,
+		`<li><a href="/guide">ガイド</a>`,
+		`<li><a href="/guide-install">インストール</a>`,
+		`<li><a href="/guide-install-linux">Linux へのインストール</a></li>`,
+		`<li><a href="/guide-quickstart">クイックスタート</a></li>`,
+		`<li><a href="/guide-faq">よくある質問</a></li>`)
+	// sort_order の並び順（install -> quickstart -> faq）が守られていること。
+	if i, j, k := strings.Index(jaSidebar, "/guide-install\""), strings.Index(jaSidebar, "/guide-quickstart\""), strings.Index(jaSidebar, "/guide-faq\""); !(i >= 0 && i < j && j < k) {
+		t.Errorf("ja front sidebar order install(%d) < quickstart(%d) < faq(%d) is broken:\n%s", i, j, k, jaSidebar)
+	}
+	// 非公開ページ（下書き・予約中）、英語ページ、フロントページ自身（/home）がサイドバーリンクに混入しないこと。
+	expectNotContainsAny(t, "ja front sidebar", jaSidebar,
+		"準備中の子ページ", "準備中のページ", "予約中の子ページ",
+		"Quickstart (EN)", "User Guide", "Installation", "CLI Reference", "Draft English Page",
+		`href="/home"`)
+
+	enHome := c.get("/en/")
+	expectStatus(t, enHome, http.StatusOK)
+	expectContains(t, enHome.Body, `<div class="doc-layout">`, `<div class="doc-main">`, `<section class="front-hero"`)
+	enSidebar := docSidebar(enHome.Body)
+	expectContains(t, enSidebar,
+		`<nav class="doc-sidebar-nav" aria-label="SORUS Documentation">`,
+		`<p class="doc-sidebar-title"><a href="/en/" aria-current="page">SORUS Documentation</a></p>`,
+		`<li><a href="/en/user-guide">User Guide</a>`,
+		`<li><a href="/en/installation">Installation</a></li>`,
+		`<li><a href="/en/cli-reference">CLI Reference</a></li>`)
+	// 英語トップページのサイドバーに日本語ページや非公開英語ページ、フロントページ自身（/en/home-en）が混入しないこと。
+	expectNotContainsAny(t, "en front sidebar", enSidebar,
+		"ガイド", "インストール", "クイックスタート", "よくある質問", "研究紹介", "アクセス", "メンバー紹介",
+		"Draft English Page", `href="/en/home-en"`)
 }

@@ -275,3 +275,100 @@ func isFrontPageOf(st SiteStructure, front publicArticle, hasFront bool, slug, g
 	}
 	return hasFront && front.TranslationGroupID != "" && front.TranslationGroupID == groupID
 }
+
+// buildFrontPageHierarchyNav は固定ページの一覧 pages（同じ言語の、読者に見えるページ。article.PageOrder の順）から、
+// トップページ（frontID）の左に出す全体の階層目次サイドバーを作る。frontID 自身（および isFront が true のページ）は
+// 一覧から除き、トップレベルの各ページとその子孫を .Children としてツリー化する。
+// 表示できるページが1件も無ければ nil を返す（空のサイドバーを出さない）。
+func buildFrontPageHierarchyNav(pages []pageNavNode, frontID, title, titleURL string, isFront func(pageNavNode) bool, urlOf func(pageNavNode) string) *docNav {
+	byID := make(map[string]pageNavNode, len(pages))
+	for _, p := range pages {
+		if p.ID == frontID || (isFront != nil && isFront(p)) {
+			continue
+		}
+		byID[p.ID] = p
+	}
+	if len(byID) == 0 {
+		return nil
+	}
+	var roots []pageNavNode
+	children := make(map[string][]pageNavNode)
+	for _, p := range pages {
+		if _, ok := byID[p.ID]; !ok {
+			continue
+		}
+		if p.ParentID != "" && p.ParentID != p.ID {
+			if _, ok := byID[p.ParentID]; ok {
+				children[p.ParentID] = append(children[p.ParentID], p)
+				continue
+			}
+		}
+		roots = append(roots, p)
+	}
+	visited := make(map[string]bool, len(byID))
+	var walk func(list []pageNavNode, depth int) []docNavLink
+	walk = func(list []pageNavNode, depth int) []docNavLink {
+		if depth >= maxPageNavDepth {
+			return nil
+		}
+		var out []docNavLink
+		for _, p := range list {
+			if visited[p.ID] {
+				continue
+			}
+			visited[p.ID] = true
+			out = append(out, docNavLink{
+				Label:    p.Title,
+				URL:      urlOf(p),
+				Children: walk(children[p.ID], depth+1),
+			})
+		}
+		return out
+	}
+	links := walk(roots, 0)
+	if len(links) == 0 {
+		return nil
+	}
+	return &docNav{
+		Title:        title,
+		TitleURL:     titleURL,
+		TitleCurrent: true,
+		Links:        links,
+	}
+}
+
+// frontPageHierarchyNav はトップに固定ページ front を出しているときの、公開トップページ向けの全体階層目次サイドバーを作る。
+// 表示言語 lang の公開済み固定ページだけを article.PageOrder（sort_order / id）順で取得し、front 自身を除いてツリー化する。
+// ほかの公開固定ページが存在しない場合は nil を返す。
+func (s *Server) frontPageHierarchyNav(ctx context.Context, front publicArticle, lang string, st SiteStructure) (*docNav, error) {
+	now := clockNow().UTC()
+	langCond := pageNavLangCondition(lang)
+	var pages []pageNavNode
+	err := s.db.SelectContext(ctx, &pages, `SELECT a.id, a.title, a.slug,
+			COALESCE(NULLIF(a.lang, ''), 'ja') AS lang,
+			COALESCE(NULLIF(a.translation_group_id, ''), a.id) AS translation_group_id,
+			COALESCE(a.parent_id, '') AS parent_id
+		FROM articles a
+		WHERE a.kind = ? AND `+langCond+` AND `+publishedCondition+`
+		ORDER BY `+article.PageOrder, article.KindPage, article.StatusPublished, now)
+	if err != nil {
+		return nil, fmt.Errorf("server: front page hierarchy: pages: %w", err)
+	}
+	title := strings.TrimSpace(front.Title)
+	titleURL := "/"
+	if lang == "en" {
+		titleURL = "/en/"
+		if title == "" {
+			title = "Documentation"
+		}
+	} else if title == "" {
+		title = "ドキュメント"
+	}
+	isFront := func(p pageNavNode) bool {
+		return isFrontPageOf(st, front, true, p.Slug, p.TranslationGroupID)
+	}
+	urlOf := func(p pageNavNode) string {
+		return contentPath(article.KindPage, p.Slug, p.Lang)
+	}
+	return buildFrontPageHierarchyNav(pages, front.ID, title, titleURL, isFront, urlOf), nil
+}

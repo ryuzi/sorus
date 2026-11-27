@@ -58,18 +58,20 @@ var (
 )
 
 // ThemeLayout は theme.json の任意項目 layout で宣言する公開ページのレイアウト選択。
-// 未指定の項目は既定値（HeaderStyle: "inline", HeroLayout: "stacked", ArticleList: "grid"）として扱う。
+// 未指定の項目は既定値（HeaderStyle: "inline", HeroLayout: "stacked", ArticleList: "grid", FrontSidebar: false）として扱う。
 type ThemeLayout struct {
-	HeaderStyle string `json:"header_style,omitempty"`
-	HeroLayout  string `json:"hero_layout,omitempty"`
-	ArticleList string `json:"article_list,omitempty"`
+	HeaderStyle  string `json:"header_style,omitempty"`
+	HeroLayout   string `json:"hero_layout,omitempty"`
+	ArticleList  string `json:"article_list,omitempty"`
+	FrontSidebar bool   `json:"front_sidebar,omitempty"`
 }
 
 // isDefault はすべての項目が空または既定値であるかを返す。
 func (l ThemeLayout) isDefault() bool {
 	return (l.HeaderStyle == "" || l.HeaderStyle == HeaderStyleInline) &&
 		(l.HeroLayout == "" || l.HeroLayout == HeroLayoutStacked) &&
-		(l.ArticleList == "" || l.ArticleList == ArticleListGrid)
+		(l.ArticleList == "" || l.ArticleList == ArticleListGrid) &&
+		!l.FrontSidebar
 }
 
 // ErrInvalidTheme はテーマのディレクトリが検証を通らないときのエラー。errors.Is で判定できる。
@@ -368,6 +370,7 @@ func ValidateThemeDir(fsys fs.FS, dir string) (Theme, error) {
 		if m.Layout.ArticleList != "" {
 			layout.ArticleList = m.Layout.ArticleList
 		}
+		layout.FrontSidebar = m.Layout.FrontSidebar
 	}
 	switch {
 	case strings.TrimSpace(m.Name["ja"]) == "":

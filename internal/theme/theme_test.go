@@ -517,10 +517,14 @@ func TestBasePublicCSSEditorialFallbacks(t *testing.T) {
 	for _, sel := range []string{
 		".category-filter-pills", "select.year-filter-select", ".card--no-media", ".front-card--no-media", ".related-article-card--no-media", ".front-card-index",
 		".site-header--centered", ".site-header--minimal", ".front-hero--centered", ".front-hero--split", ".card-grid--list", ".card-grid--magazine",
+		".front-hero-actions", ".front-hero-btn", ".front-hero-btn--secondary",
 	} {
 		if len(selectorDecls(rules, sel)) == 0 {
 			t.Errorf("%s has no base style", sel)
 		}
+	}
+	if d := selectorDecls(rules, ".front-hero--centered .front-hero-actions"); d["justify-content"] != "center" {
+		t.Errorf(".front-hero--centered .front-hero-actions = %v, want justify-content: center", d)
 	}
 }
 
@@ -542,11 +546,18 @@ func TestValidateThemeDirLayout(t *testing.T) {
 			HeroLayout:  HeroLayoutStacked,
 			ArticleList: ArticleListGrid,
 		}},
-		{"all defaults explicit", `, "layout": {"header_style": "inline", "hero_layout": "stacked", "article_list": "grid"}`, defaultLayout},
-		{"all non-default values", `, "layout": {"header_style": "minimal", "hero_layout": "split", "article_list": "magazine"}`, ThemeLayout{
-			HeaderStyle: HeaderStyleMinimal,
-			HeroLayout:  HeroLayoutSplit,
-			ArticleList: ArticleListMagazine,
+		{"all defaults explicit", `, "layout": {"header_style": "inline", "hero_layout": "stacked", "article_list": "grid", "front_sidebar": false}`, defaultLayout},
+		{"front_sidebar enabled", `, "layout": {"front_sidebar": true}`, ThemeLayout{
+			HeaderStyle:  HeaderStyleInline,
+			HeroLayout:   HeroLayoutStacked,
+			ArticleList:  ArticleListGrid,
+			FrontSidebar: true,
+		}},
+		{"all non-default values", `, "layout": {"header_style": "minimal", "hero_layout": "split", "article_list": "magazine", "front_sidebar": true}`, ThemeLayout{
+			HeaderStyle:  HeaderStyleMinimal,
+			HeroLayout:   HeroLayoutSplit,
+			ArticleList:  ArticleListMagazine,
+			FrontSidebar: true,
 		}},
 		{"centered and list", `, "layout": {"header_style": "centered", "hero_layout": "centered", "article_list": "list"}`, ThemeLayout{
 			HeaderStyle: HeaderStyleCentered,
@@ -578,6 +589,7 @@ func TestValidateThemeDirLayout(t *testing.T) {
 		{"invalid header_style", `, "layout": {"header_style": "floating"}`, "layout.header_style"},
 		{"invalid hero_layout", `, "layout": {"hero_layout": "fullbleed"}`, "layout.hero_layout"},
 		{"invalid article_list", `, "layout": {"article_list": "masonry"}`, "layout.article_list"},
+		{"invalid front_sidebar", `, "layout": {"front_sidebar": "left"}`, "front_sidebar"},
 		{"unknown layout field", `, "layout": {"sidebar": "left"}`, "sidebar"},
 		{"layout not an object", `, "layout": "centered"`, "theme.json"},
 	} {
@@ -592,5 +604,11 @@ func TestValidateThemeDirLayout(t *testing.T) {
 				t.Fatalf("ValidateThemeDir(%s) = %v, want ErrInvalidTheme mentioning %q", tc.name, err, tc.wantErr)
 			}
 		})
+	}
+	if !defaultLayout.isDefault() {
+		t.Errorf("defaultLayout.isDefault() = false, want true")
+	}
+	if (ThemeLayout{FrontSidebar: true}).isDefault() {
+		t.Errorf("ThemeLayout{FrontSidebar: true}.isDefault() = true, want false")
 	}
 }
