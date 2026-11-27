@@ -540,3 +540,42 @@ func TestAdminTemplatesParse(t *testing.T) {
 		}
 	}
 }
+
+func TestSettingsStructureSectionEditorConventions(t *testing.T) {
+	structure := readTemplate(t, "admin", "settings_structure.html")
+	expectAll(t, "settings_structure.html", structure,
+		`{{$.T "structure_sections_title"}}`,
+		`{{$.T "structure_section_row" $section.Number}}`,
+		`{{$.T "structure_section_add"}}`,
+		`{{$.T $type.LabelKey}}`,
+		`data-section-row`,
+		`data-section-type`,
+		`data-section-show-for="hero"`,
+		`data-section-show-for="cards"`,
+		`data-section-show-for="gallery"`,
+		`data-section-show-for="gallery article_list"`,
+		`data-section-show-for="article_list"`,
+		`value="section-delete:{{$section.Index}}" class="btn btn-danger btn-sm"`,
+		`name="section_type"`,
+		`name="section_pages"`,
+		`name="section_tag"`,
+		`name="section_title"`,
+		`name="section_limit" type="number" min="0" max="24"`,
+		`name="section_layout"`,
+		`name="section_article_tag"`,
+		`name="section_link_url"`,
+		`name="section_link_label"`,
+	)
+	expectNone(t, "settings_structure.html", structure,
+		`>Front page sections<`,
+		`Section {{$section.Index}}`,
+		`>Move up<`,
+		`>Move down<`,
+		`>Add section<`,
+		`Page slugs (comma separated)`,
+		`>Media tag`,
+		`>Article tag`,
+		`>Link URL`,
+		`>Link label`,
+	)
+}

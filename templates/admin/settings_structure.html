@@ -63,37 +63,83 @@
         {{with $d.FrontPage.Missing}}<option value="{{.}}" selected>{{$.T "structure_missing_option" .}}</option>{{end}}
       </select>
 
-      <h2 class="mt-6 text-sm font-semibold text-neutral-800">Front page sections</h2>
+      <h2 class="mt-6 flex items-center text-sm font-semibold text-neutral-800">{{$.T "structure_sections_title"}}<span class="help-tip"><button type="button" class="help-tip-btn" aria-expanded="false" aria-label="{{$help}}">?</button><span class="help-tip-pop" hidden>{{$.T "structure_sections_desc" $d.MaxFrontSections}}</span></span></h2>
+      {{if $d.Pages}}<datalist id="structure-page-slugs">{{range $d.Pages}}<option value="{{.Slug}}">{{.Title}}</option>{{end}}</datalist>{{end}}
+      {{if $d.GalleryTags}}<datalist id="structure-gallery-tags">{{range $d.GalleryTags}}<option value="{{.}}"></option>{{end}}</datalist>{{end}}
       <ol class="mt-3 space-y-4">
         {{range $section := $d.Sections}}
-        <li class="rounded-lg border border-neutral-200 p-4">
-          <div class="mb-3 flex items-center justify-between">
-            <span class="text-sm font-medium text-neutral-800">Section {{$section.Index}}</span>
-            <div class="flex gap-2">
-              {{if gt $section.Index 0}}<button type="submit" name="op" value="section-up:{{$section.Index}}" class="btn btn-secondary btn-sm">Move up</button>{{end}}
-              <button type="submit" name="op" value="section-delete:{{$section.Index}}" class="btn btn-secondary btn-sm">Delete</button>
-              <button type="submit" name="op" value="section-down:{{$section.Index}}" class="btn btn-secondary btn-sm">Move down</button>
+        <li class="rounded-lg border border-neutral-200 p-4" data-section-row>
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span class="text-sm font-semibold text-neutral-800">{{$.T "structure_section_row" $section.Number}}</span>
+            <div class="flex flex-wrap gap-1 text-sm">
+              <button type="submit" name="op" value="section-up:{{$section.Index}}" {{if $section.First}}disabled{{end}} class="btn btn-secondary btn-sm">{{$.T "structure_move_up"}}</button>
+              <button type="submit" name="op" value="section-down:{{$section.Index}}" {{if $section.Last}}disabled{{end}} class="btn btn-secondary btn-sm">{{$.T "structure_move_down"}}</button>
+              <button type="submit" name="op" value="section-delete:{{$section.Index}}" class="btn btn-danger btn-sm">{{$.T "structure_delete"}}</button>
             </div>
           </div>
-          <label class="block text-sm font-medium text-neutral-800">Type
-            <select name="section_type" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
-              {{range $type := $d.FrontSectionTypes}}<option value="{{$type}}"{{if eq $section.Type $type}} selected{{end}}>{{$type}}</option>{{end}}
+          <div>
+            <label for="section-type-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_col_type"}}</label>
+            <select id="section-type-{{$section.Index}}" name="section_type" data-section-type class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm sm:w-2/3">
+              {{range $type := $d.FrontSectionTypes}}<option value="{{$type}}"{{if eq $section.Type $type}} selected{{end}}>{{$.T $type.LabelKey}}</option>{{end}}
             </select>
-          </label>
+          </div>
+          <p class="mt-3 text-sm text-neutral-600" data-section-show-for="hero">{{$.T "structure_section_hero_note"}}</p>
           <div class="mt-3 grid gap-3 sm:grid-cols-2">
-            <label class="text-sm">Page slugs (comma separated)<input name="section_pages" value="{{$section.PagesText}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
-            <label class="text-sm">Media tag<input name="section_tag" value="{{$section.Tag}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
-            <label class="text-sm">Title<input name="section_title" value="{{$section.Title}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
-            <label class="text-sm">Limit<input name="section_limit" type="number" min="0" max="24" value="{{$section.Limit}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
-            <label class="text-sm">Layout<input name="section_layout" value="{{$section.Layout}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
-            <label class="text-sm">Article tag<input name="section_article_tag" value="{{$section.ArticleTag}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
-            <label class="text-sm">Link URL<input name="section_link_url" value="{{$section.LinkURL}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
-            <label class="text-sm">Link label<input name="section_link_label" value="{{$section.LinkLabel}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5"></label>
+            <div class="sm:col-span-2" data-section-show-for="cards">
+              <label for="section-pages-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_section_pages"}}</label>
+              <input id="section-pages-{{$section.Index}}" name="section_pages" value="{{$section.PagesText}}"{{if $d.Pages}} list="structure-page-slugs"{{end}} class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+              {{if $d.Pages}}
+              <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <span class="text-xs text-neutral-500">{{$.T "structure_section_pages_pick"}}</span>
+                {{range $d.Pages}}<button type="button" class="btn btn-secondary btn-sm" data-section-page-chip="{{.Slug}}">{{.Title}}{{if $ja}}（/{{.Slug}}）{{else}} (/{{.Slug}}){{end}}</button>{{end}}
+              </div>
+              {{end}}
+            </div>
+            <div data-section-show-for="gallery">
+              <label for="section-tag-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_tag"}}</label>
+              <input id="section-tag-{{$section.Index}}" name="section_tag" value="{{$section.Tag}}"{{if $d.GalleryTags}} list="structure-gallery-tags"{{end}} class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+              {{if $d.GalleryTags}}
+              <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                {{range $d.GalleryTags}}<button type="button" class="btn btn-secondary btn-sm" data-section-tag-chip="{{.}}">{{.}}</button>{{end}}
+              </div>
+              {{end}}
+            </div>
+            <div data-section-show-for="gallery article_list">
+              <label for="section-title-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_section_title"}}</label>
+              <input id="section-title-{{$section.Index}}" name="section_title" value="{{$section.Title}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+            </div>
+            <div data-section-show-for="gallery">
+              <label for="section-limit-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_section_limit"}}</label>
+              <input id="section-limit-{{$section.Index}}" name="section_limit" type="number" min="0" max="24" value="{{$section.Limit}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+            </div>
+            <div data-section-show-for="gallery">
+              <label for="section-layout-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_layout"}}</label>
+              <select id="section-layout-{{$section.Index}}" name="section_layout" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+                <option value=""{{if ne $section.Type "gallery"}} selected{{end}} hidden></option>
+                {{range $layout := $d.TopGalleryLayouts}}<option value="{{$layout}}"{{if and (eq $section.Type "gallery") (eq $section.EffectiveLayout $layout)}} selected{{end}}>{{$.T (printf "structure_gallery_layout_%s" $layout)}}</option>{{end}}
+              </select>
+            </div>
+            <div data-section-show-for="article_list">
+              <label for="section-article-tag-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_section_article_tag"}}</label>
+              <select id="section-article-tag-{{$section.Index}}" name="section_article_tag" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+                <option value="">{{$.T "structure_section_article_tag_all"}}</option>
+                {{range $d.Categories}}<option value="{{.Slug}}"{{if eq .Slug $section.ArticleTag}} selected{{end}}>{{.Title}}</option>{{end}}
+                {{with $section.MissingArticleTag}}<option value="{{.}}" selected>{{$.T "structure_missing_option" .}}</option>{{end}}
+              </select>
+            </div>
+            <div data-section-show-for="gallery">
+              <label for="section-link-url-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_link_url"}}</label>
+              <input id="section-link-url-{{$section.Index}}" name="section_link_url" value="{{$section.LinkURL}}" placeholder="https://" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+            </div>
+            <div data-section-show-for="gallery">
+              <label for="section-link-label-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_link_label"}}</label>
+              <input id="section-link-label-{{$section.Index}}" name="section_link_label" maxlength="{{$d.MaxGalleryLinkLabelRunes}}" value="{{$section.LinkLabel}}" placeholder="{{$.T "structure_gallery_link_label_default"}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+            </div>
           </div>
         </li>
         {{end}}
       </ol>
-      {{if lt (len $d.Sections) 12}}<button type="submit" name="op" value="section-add" class="btn btn-secondary btn-sm mt-4">Add section</button>{{end}}
+      {{if lt (len $d.Sections) $d.MaxFrontSections}}<button type="submit" name="op" value="section-add" class="btn btn-secondary btn-sm mt-4">{{if $ja}}＋{{else}}+{{end}} {{$.T "structure_section_add"}}</button>{{end}}
     </fieldset>
 
     <div class="flex justify-end">
@@ -212,6 +258,55 @@
     }
     type.addEventListener('change', sync);
     sync();
+  });
+
+  // トップページのセクションの種類に合わせて、必要な入力欄だけを表示する（JavaScript なしでは全部の欄を出す）。
+  document.querySelectorAll('[data-section-row]').forEach(function (row) {
+    var type = row.querySelector('[data-section-type]');
+    if (!type) return;
+    var layoutSelect = row.querySelector('select[name="section_layout"]');
+    function syncSection() {
+      var cur = type.value;
+      row.querySelectorAll('[data-section-show-for]').forEach(function (el) {
+        var allowed = (el.getAttribute('data-section-show-for') || '').split(/\s+/);
+        el.hidden = allowed.indexOf(cur) === -1;
+      });
+      if (layoutSelect) {
+        if (cur === 'gallery' && !layoutSelect.value) {
+          layoutSelect.value = 'justified';
+        } else if (cur !== 'gallery') {
+          layoutSelect.value = '';
+        }
+      }
+    }
+    type.addEventListener('change', syncSection);
+    syncSection();
+
+    var pagesInput = row.querySelector('input[name="section_pages"]');
+    if (pagesInput) {
+      row.querySelectorAll('[data-section-page-chip]').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          var slug = chip.getAttribute('data-section-page-chip') || '';
+          if (!slug) return;
+          var parts = pagesInput.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+          if (parts.indexOf(slug) === -1) {
+            parts.push(slug);
+            pagesInput.value = parts.join(', ');
+          }
+          pagesInput.focus();
+        });
+      });
+    }
+
+    var sectionTagInput = row.querySelector('input[name="section_tag"]');
+    if (sectionTagInput) {
+      row.querySelectorAll('[data-section-tag-chip]').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          sectionTagInput.value = chip.getAttribute('data-section-tag-chip') || '';
+          sectionTagInput.focus();
+        });
+      });
+    }
   });
 
   // トップページのフォトギャラリー: 候補のタグを押すと入力欄に入れ、入力したタグの写真の枚数と、トップページに出る

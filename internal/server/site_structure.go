@@ -111,6 +111,37 @@ func normalizeGalleryLayout(layout string) string {
 	return galleryLayoutJustified
 }
 
+// clearUnusedFrontSectionFields はセクションの種別で使わないフィールドをゼロ値にする。
+func clearUnusedFrontSectionFields(section FrontSection) FrontSection {
+	switch section.Type {
+	case FrontSectionHero:
+		return FrontSection{Type: FrontSectionHero}
+	case FrontSectionCards:
+		return FrontSection{
+			Type:  FrontSectionCards,
+			Pages: section.Pages,
+		}
+	case FrontSectionArticleList:
+		return FrontSection{
+			Type:       FrontSectionArticleList,
+			Title:      section.Title,
+			ArticleTag: section.ArticleTag,
+		}
+	case FrontSectionGallery:
+		return FrontSection{
+			Type:      FrontSectionGallery,
+			Tag:       section.Tag,
+			Title:     section.Title,
+			Limit:     section.Limit,
+			Layout:    section.Layout,
+			LinkURL:   section.LinkURL,
+			LinkLabel: section.LinkLabel,
+		}
+	default:
+		return section
+	}
+}
+
 const (
 	// maxMenuItems はメニューの最上位の最大項目数。スマートフォンでも迷わない数にとどめる。
 	maxMenuItems = 8
@@ -195,6 +226,7 @@ func validateSiteStructure(st SiteStructure) error {
 		return structureErr("structure_err_sections_count", maxFrontSections)
 	}
 	for _, section := range st.FrontSections {
+		section = clearUnusedFrontSectionFields(section)
 		switch section.Type {
 		case FrontSectionHero, FrontSectionCards, FrontSectionGallery, FrontSectionArticleList:
 		default:
@@ -415,6 +447,7 @@ func (s *Server) loadSiteStructure(ctx context.Context) SiteStructure {
 			} else {
 				for i := range st.FrontSections {
 					section := &st.FrontSections[i]
+					*section = clearUnusedFrontSectionFields(*section)
 					if section.Type == FrontSectionGallery && (section.Layout == "" || !slices.Contains(galleryLayouts, section.Layout)) {
 						section.Layout = galleryLayoutJustified
 					}
@@ -460,6 +493,9 @@ func (s *Server) saveSiteStructureTx(ctx context.Context, tx *sqlx.Tx, st SiteSt
 			st.FrontSections = []FrontSection{{Type: FrontSectionArticleList}}
 		}
 	}
+	for i := range st.FrontSections {
+		st.FrontSections[i] = clearUnusedFrontSectionFields(st.FrontSections[i])
+	}
 	if err := validateSiteStructure(st); err != nil {
 		return err
 	}
@@ -473,6 +509,7 @@ func (s *Server) saveSiteStructureTx(ctx context.Context, tx *sqlx.Tx, st SiteSt
 		section.LinkURL = strings.TrimSpace(section.LinkURL)
 		section.LinkLabel = strings.TrimSpace(section.LinkLabel)
 		section.ArticleTag = strings.TrimSpace(section.ArticleTag)
+		*section = clearUnusedFrontSectionFields(*section)
 	}
 	menu, footer := st.Menu, st.FooterMenu
 	if menu == nil {
@@ -1346,6 +1383,7 @@ type structureSettingsData struct {
 	MaxMenuChildren  int
 	MaxFooterColumns int
 	MaxFrontCards    int
+	MaxFrontSections int
 	MaxLabelRunes    int
 	CanPushSettings  bool
 	PushConfirm      string
@@ -1354,8 +1392,13 @@ type structureSettingsData struct {
 
 type frontSectionForm struct {
 	FrontSection
-	Index     int
-	PagesText string
+	Index             int
+	Number            int
+	First             bool
+	Last              bool
+	PagesText         string
+	EffectiveLayout   string
+	MissingArticleTag string
 }
 
 func (s *Server) handleStructureSettings(c echo.Context) error {
@@ -1473,7 +1516,7 @@ func structureFromForm(c echo.Context) (SiteStructure, error) {
 				}
 			}
 		}
-		st.FrontSections = append(st.FrontSections, section)
+		st.FrontSections = append(st.FrontSections, clearUnusedFrontSectionFields(section))
 	}
 	return st, nil
 }
@@ -1721,6 +1764,7 @@ func (s *Server) renderStructure(c echo.Context, code int, st SiteStructure, uns
 		MaxMenuChildren:   maxMenuChildren,
 		MaxFooterColumns:  maxFooterColumns,
 		MaxFrontCards:     maxFrontCards,
+		MaxFrontSections:  maxFrontSections,
 		MaxLabelRunes:     maxMenuLabelRunes,
 		CanPushSettings:   remote.CanPushSettings,
 		PushConfirm:       remote.PushConfirm,
@@ -1800,8 +1844,30 @@ func (s *Server) renderStructure(c echo.Context, code int, st SiteStructure, uns
 		// 打ち間違い・まだ写真にタグを付けていないタグでは、トップページにギャラリーが出ない。
 		d.Warnings = append(d.Warnings, i18n.Translate(lang, "structure_warn_gallery_empty", gallery.Tag))
 	}
+	knownCategories := make(map[string]bool, len(d.Categories))
+	for _, cat := range d.Categories {
+		knownCategories[cat.Slug] = true
+	}
 	for i, section := range st.FrontSections {
-		d.Sections = append(d.Sections, frontSectionForm{FrontSection: section, Index: i, PagesText: strings.Join(section.Pages, ", ")})
+		section = clearUnusedFrontSectionFields(section)
+		missingArticleTag := ""
+		if section.ArticleTag != "" && !knownCategories[section.ArticleTag] {
+			missingArticleTag = section.ArticleTag
+		}
+		effectiveLayout := ""
+		if section.Type == FrontSectionGallery {
+			effectiveLayout = normalizeGalleryLayout(section.Layout)
+		}
+		d.Sections = append(d.Sections, frontSectionForm{
+			FrontSection:      section,
+			Index:             i,
+			Number:            i + 1,
+			First:             i == 0,
+			Last:              i == len(st.FrontSections)-1,
+			PagesText:         strings.Join(section.Pages, ", "),
+			EffectiveLayout:   effectiveLayout,
+			MissingArticleTag: missingArticleTag,
+		})
 		for _, slug := range section.Pages {
 			if _, ok := refs.Pages[slug]; !ok {
 				d.Warnings = append(d.Warnings, i18n.Translate(lang, "structure_warn_front_card", slug))
@@ -1830,3 +1896,6 @@ func topGalleryStatus(lang, tag string, count, limit int) string {
 
 // LabelKey は管理画面に出す種類の名前の翻訳キー。
 func (t MenuItemType) LabelKey() string { return fmt.Sprintf("structure_type_%s", t) }
+
+// LabelKey は管理画面に出すセクションの種類の名前の翻訳キー。
+func (t FrontSectionType) LabelKey() string { return fmt.Sprintf("structure_section_type_%s", t) }

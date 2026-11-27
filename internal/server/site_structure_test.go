@@ -870,3 +870,157 @@ func TestFrontPageViewsAreCounted(t *testing.T) {
 		t.Error("dashboard links the front page as /research, want /")
 	}
 }
+
+func TestSiteStructureSectionEditorUIAndI18n(t *testing.T) {
+	env := newPagesEnv(t, Config{})
+	env.insertMedia("sec-photo", "sec-photo.webp", "校舎", "", "学校")
+	adm := env.loggedIn(admin)
+
+	if err := env.server.saveSiteStructure(context.Background(), SiteStructure{
+		FrontPage: "research",
+		FrontSections: []FrontSection{
+			{Type: FrontSectionHero},
+			{Type: FrontSectionCards, Pages: []string{"access"}},
+			{Type: FrontSectionGallery, Tag: "学校", Title: "キャンパスの風景", Limit: 8, Layout: "masonry", LinkURL: "/articles", LinkLabel: "一覧を見る"},
+			{Type: FrontSectionArticleList, Title: "お知らせ", ArticleTag: "circle"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// 日本語表示: 1始まりのセクション番号、日英翻訳済みの種別・ラベル、選択式コントロール、ボタンの disabled / danger クラス
+	res := adm.get("/admin/settings/structure")
+	expectStatus(t, res, http.StatusOK)
+	expectContains(t, res.Body,
+		"トップページのセクション",
+		"セクション 1", "セクション 2", "セクション 3", "セクション 4",
+		"ヒーロー（トップ固定ページ本文）",
+		"固定ページカード一覧",
+		"フォトギャラリー",
+		"記事一覧",
+		"上の「トップに出すページ」で選んだ固定ページの本文とアイキャッチを表示します。",
+		"並べる固定ページのスラッグ（カンマ区切り）",
+		"公開中のページ（押すと追加）:",
+		"表示するメディアタグ",
+		"見出し（任意）",
+		"表示枚数（0で既定の6枚、最大24枚）",
+		"並べ方",
+		"行揃え（おすすめ）",
+		"段組み",
+		"絞り込むカテゴリ",
+		"すべてのカテゴリ（新着順）",
+		`value="section-up:0" disabled`,
+		`value="section-down:3" disabled`,
+		`value="section-delete:0" class="btn btn-danger btn-sm"`,
+		`data-section-row`,
+		`data-section-type`,
+		`data-section-show-for="hero"`,
+		`data-section-show-for="cards"`,
+		`data-section-show-for="gallery"`,
+		`data-section-show-for="gallery article_list"`,
+		`data-section-show-for="article_list"`,
+		`data-section-page-chip="research"`,
+		`data-section-tag-chip="学校"`,
+		`<option value="masonry" selected>段組み</option>`,
+		`<option value="circle" selected>サークル</option>`,
+		"＋ セクションを追加",
+	)
+	expectNotContainsAny(t, "Japanese section editor", res.Body,
+		"Front page sections", "Section 0", "Move up", "Move down", "Add section",
+		"Page slugs (comma separated)", "Media tag", "Article tag", "Link URL", "Link label",
+	)
+
+	// 英語表示: 英語ラベルに切り替わり、0始まりの Section 0 が出ないこと
+	adm.useEnglish()
+	enRes := adm.get("/admin/settings/structure")
+	expectStatus(t, enRes, http.StatusOK)
+	expectContains(t, enRes.Body,
+		"Front page sections",
+		"Section 1", "Section 2", "Section 3", "Section 4",
+		"Hero (front page body)",
+		"Page cards",
+		"Photo gallery",
+		"Article list",
+		"Page slugs to show as cards (comma-separated)",
+		"Published pages (click to add):",
+		"Media tag to show",
+		"Heading (optional)",
+		"Number of images (0 for default 6, up to 24)",
+		"Filter by category",
+		"All categories (newest first)",
+		`<option value="masonry" selected>Masonry</option>`,
+		"+ Add section",
+	)
+	expectNotContainsAny(t, "English section editor", enRes.Body,
+		"Section 0", "Move up", "Move down", "Page slugs (comma separated)", "トップページのセクション",
+	)
+}
+
+func TestSiteStructureFormSaveClearsUnusedFieldsOnNonGallerySections(t *testing.T) {
+	env := newPagesEnv(t, Config{})
+	adm := env.loggedIn(admin)
+
+	if err := env.server.saveSiteStructure(context.Background(), SiteStructure{
+		FrontPage: "research",
+		FrontSections: []FrontSection{
+			{Type: FrontSectionHero},
+			{Type: FrontSectionCards, Pages: []string{"access"}},
+			{Type: FrontSectionArticleList, Title: "お知らせ", ArticleTag: "circle"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// 非ギャラリー行の section_layout <select> は空値が選択され、justified が selected にならないことを確認。
+	page := adm.get("/admin/settings/structure")
+	expectStatus(t, page, http.StatusOK)
+	expectContains(t, page.Body, `<option value="" selected hidden></option>`)
+	expectNotContainsAny(t, "non-gallery layout select", page.Body, `<option value="justified" selected>`)
+
+	// メニュー保存時に非ギャラリー行へ section_layout="justified" 等の不要フィールドが送信されてもクリアされることを確認。
+	form := url.Values{
+		"front_page":          {"research"},
+		"menu_type":           {"page", "articles"},
+		"menu_page":           {"research", ""},
+		"menu_category":       {"", ""},
+		"menu_url":            {"", ""},
+		"menu_label":          {"研究", "記事一覧"},
+		"section_type":        {string(FrontSectionHero), string(FrontSectionCards), string(FrontSectionArticleList)},
+		"section_pages":       {"access", "access", "access"},
+		"section_tag":         {"学校", "学校", "学校"},
+		"section_title":       {"不要タイトル", "不要タイトル", "お知らせ"},
+		"section_limit":       {"6", "6", "12"},
+		"section_layout":      {"justified", "justified", "justified"},
+		"section_link_url":    {"/articles", "/articles", "/articles"},
+		"section_link_label":  {"一覧", "一覧", "一覧"},
+		"section_article_tag": {"circle", "circle", "circle"},
+	}
+	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure?flash=structure_saved")
+
+	wantJSON := `[{"type":"hero"},{"type":"cards","pages":["access"]},{"type":"article_list","title":"お知らせ","article_tag":"circle"}]`
+	if got := env.setting(settingFrontSections); got != wantJSON {
+		t.Fatalf("saved front_sections JSON = %s, want %s", got, wantJSON)
+	}
+
+	st := env.server.loadSiteStructure(context.Background())
+	if len(st.FrontSections) != 3 {
+		t.Fatalf("len(FrontSections) = %d, want 3", len(st.FrontSections))
+	}
+	hero := st.FrontSections[0]
+	if hero.Type != FrontSectionHero || len(hero.Pages) != 0 || hero.Tag != "" || hero.Title != "" ||
+		hero.Limit != 0 || hero.Layout != "" || hero.ArticleTag != "" || hero.LinkURL != "" || hero.LinkLabel != "" {
+		t.Errorf("hero section = %+v, want only Type=hero", hero)
+	}
+	cards := st.FrontSections[1]
+	if cards.Type != FrontSectionCards || cards.Layout != "" || cards.Tag != "" || cards.Title != "" ||
+		cards.Limit != 0 || cards.ArticleTag != "" || cards.LinkURL != "" ||
+		cards.LinkLabel != "" || strings.Join(cards.Pages, ",") != "access" {
+		t.Errorf("cards section = %+v", cards)
+	}
+	articles := st.FrontSections[2]
+	if articles.Type != FrontSectionArticleList || len(articles.Pages) != 0 || articles.Tag != "" ||
+		articles.Title != "お知らせ" || articles.Limit != 0 || articles.Layout != "" ||
+		articles.ArticleTag != "circle" || articles.LinkURL != "" || articles.LinkLabel != "" {
+		t.Errorf("article_list section = %+v", articles)
+	}
+}
