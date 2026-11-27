@@ -1,6 +1,9 @@
 package server
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -8,9 +11,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 
 	"sorus/internal/auth"
+	"sorus/internal/markdown"
 )
 
 const (
@@ -38,6 +43,7 @@ type setupData struct {
 	DisplayName string
 	Username    string
 	SiteName    string
+	Starter     string
 	// Errors は入力の誤り（画面の上にまとめて出す）。
 	Errors []string
 	// Done は、すでに管理者がいるため登録できないことを伝える表示か。
@@ -123,6 +129,13 @@ func (s *Server) handleSetup(c echo.Context) error {
 		DisplayName: strings.TrimSpace(c.FormValue("display_name")),
 		Username:    strings.TrimSpace(c.FormValue("username")),
 		SiteName:    strings.TrimSpace(c.FormValue("site_name")),
+		Starter:     c.FormValue("site_starter"),
+	}
+	if d.Starter == "" {
+		d.Starter = "blog"
+	}
+	if !slices.Contains([]string{"blog", "docs", "site", "empty"}, d.Starter) {
+		d.Starter = "blog"
 	}
 	password := c.FormValue("password")
 	if done, err := s.setupDone(); err != nil {
@@ -156,6 +169,9 @@ func (s *Server) handleSetup(c echo.Context) error {
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`, d.SiteName); err != nil {
 		return err
 	}
+	if err := applySetupStarter(tx, user.ID, d.Starter); err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
@@ -167,6 +183,58 @@ func (s *Server) handleSetup(c echo.Context) error {
 	}
 	auth.SetSessionCookie(c, s.cookies.Session, session, s.cfg.SecureCookie)
 	return c.Redirect(http.StatusSeeOther, "/admin")
+}
+
+// applySetupStarter stores the selected starter's initial public structure and sample pages.
+func applySetupStarter(tx *sqlx.Tx, userID, starter string) error {
+	sections := []FrontSection{{Type: FrontSectionArticleList}}
+	menu := []MenuItem{}
+	theme := "modern"
+	var pages []struct{ title, slug, body, parent string }
+	switch starter {
+	case "docs":
+		theme = "tech"
+		pages = append(pages, struct{ title, slug, body, parent string }{"はじめに", "guide", "# はじめに\n\nこのサイトの使い方をまとめます。", ""}, struct{ title, slug, body, parent string }{"インストール", "installation", "# インストール\n\n導入手順をここに記載します。", "guide"})
+		sections = []FrontSection{{Type: FrontSectionHero, Pages: []string{"guide"}}, {Type: FrontSectionCards, Pages: []string{"guide", "installation"}}}
+		menu = []MenuItem{{Label: "ガイド", Type: MenuItemGroup, Children: []MenuItem{{Label: "はじめに", Type: MenuItemPage, Target: "guide"}, {Label: "インストール", Type: MenuItemPage, Target: "installation"}}}}
+	case "site":
+		theme = "portal"
+		pages = append(pages, struct{ title, slug, body, parent string }{"紹介", "about", "# このサイトについて\n\n活動や作品をご紹介します。", ""}, struct{ title, slug, body, parent string }{"お問い合わせ", "contact", "# お問い合わせ\n\n連絡先をご案内します。", ""})
+		sections = []FrontSection{{Type: FrontSectionHero, Pages: []string{"about"}}, {Type: FrontSectionCards, Pages: []string{"about", "contact"}}, {Type: FrontSectionArticleList}}
+		menu = []MenuItem{{Label: "紹介", Type: MenuItemPage, Target: "about"}, {Label: "お問い合わせ", Type: MenuItemPage, Target: "contact"}}
+	case "empty":
+		sections = []FrontSection{}
+	}
+	pageIDs := map[string]string{}
+	for _, p := range pages {
+		idBytes := make([]byte, 16)
+		if _, err := rand.Read(idBytes); err != nil {
+			return err
+		}
+		id := hex.EncodeToString(idBytes)
+		pageIDs[p.slug] = id
+		rendered, err := markdown.Render(p.body)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO articles (id,title,slug,content_markdown,content_html,author_id,category_id,status,kind,parent_id,published_at)
+			VALUES (?,?,?,?,?,?,1,'published','page',NULLIF(?,''),CURRENT_TIMESTAMP)`, id, p.title, p.slug, p.body, rendered.HTML, userID, pageIDs[p.parent]); err != nil {
+			return err
+		}
+	}
+	menuJSON, _ := json.Marshal(menu)
+	sectionsJSON, _ := json.Marshal(sections)
+	settings := map[string]string{settingSiteMenu: string(menuJSON), settingFrontSections: string(sectionsJSON)}
+	if starter == "docs" || starter == "site" {
+		settings["theme"] = theme
+		settings[settingFrontPage] = map[string]string{"docs": "guide", "site": "about"}[starter]
+	}
+	for key, value := range settings {
+		if _, err := tx.Exec(`INSERT INTO settings(key,value,updated_at) VALUES(?,?,CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=CURRENT_TIMESTAMP`, key, value); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // handleSetupRestore は「はじめに」画面の「バックアップから始める」。別の PC で作ったバックアップ（Zip）を、

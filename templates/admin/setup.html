@@ -3,7 +3,7 @@
   <div class="w-full max-w-md">
     <div class="mb-6 text-center">
       <h1 class="text-2xl font-bold">{{if $ja}}はじめに{{else}}Getting started{{end}}</h1>
-      {{if not $d.Done}}<p class="mt-2 text-sm text-neutral-500">{{if $ja}}2つのことを決めると、すぐに記事を書き始められます。どれもあとで変えられます。{{else}}Decide two things and you can start writing right away. You can change both later.{{end}}</p>
+      {{if not $d.Done}}<p class="mt-2 text-sm text-neutral-500">{{if $ja}}2つのことを決めると始められます。サイトのたたき台も選べます。どれもあとで変えられます。{{else}}Decide two things to get started, then choose a starter. You can change them later.{{end}}</p>
       {{if $d.CanRestore}}<p class="mt-1 text-sm"><a href="#setup-restore" class="text-neutral-600 underline hover:text-neutral-900">{{if $ja}}前の PC のバックアップがあるときは、こちらから始められます{{else}}If you have a backup from your previous PC, you can start from it here{{end}}</a></p>{{end}}{{end}}
     </div>
     {{if $d.Done}}
@@ -57,6 +57,14 @@
         <input id="site_name" name="site_name" type="text" required maxlength="100" value="{{$d.SiteName}}" placeholder="{{if $ja}}サイトの名前（あとで変えられます）{{else}}Site name (you can change it later){{end}}"
                class="mt-2 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200">
         <p class="mt-1 text-xs text-neutral-500">{{if $ja}}あとで「サイト基本設定」から変えられます。{{else}}You can change it later in General settings.{{end}}</p>
+      </fieldset>
+
+      <fieldset class="space-y-2">
+        <legend class="text-sm font-bold text-neutral-900">3. {{.T "setup_starter"}}</legend>
+        <label class="flex gap-2 text-sm"><input type="radio" name="site_starter" value="blog" {{if or (eq $d.Starter "") (eq $d.Starter "blog")}}checked{{end}}><span>{{.T "setup_starter_blog"}}</span></label>
+        <label class="flex gap-2 text-sm"><input type="radio" name="site_starter" value="docs" {{if eq $d.Starter "docs"}}checked{{end}}><span>{{.T "setup_starter_docs"}}</span></label>
+        <label class="flex gap-2 text-sm"><input type="radio" name="site_starter" value="site" {{if eq $d.Starter "site"}}checked{{end}}><span>{{.T "setup_starter_site"}}</span></label>
+        <label class="flex gap-2 text-sm"><input type="radio" name="site_starter" value="empty" {{if eq $d.Starter "empty"}}checked{{end}}><span>{{.T "setup_starter_empty"}}</span></label>
       </fieldset>
 
       <button type="submit" class="btn btn-primary btn-md w-full">{{if $ja}}はじめる{{else}}Get started{{end}}</button>

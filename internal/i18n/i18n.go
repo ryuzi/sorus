@@ -520,6 +520,11 @@ var catalog = map[Lang]map[string]string{
 		"import_err_too_large":           "ファイルが大きすぎます。100 MB までのファイルを選んでください。",
 		"import_err_not_wxr":             "WordPress の書き出しファイル（WXR）ではありません。WordPress の「ツール」→「エクスポート」で作ったファイルを選んでください。",
 		"import_err_invalid_xml":         "ファイルを XML として読み取れませんでした。ファイルが壊れていないか、WordPress で書き出したファイルそのものか確認してください。",
+		"import_err_invalid_markdown":    "Markdown ファイルを読み取れませんでした。形式や frontmatter を確認してください。",
+		"import_err_invalid_zip":         "Zip ファイルを読み取れませんでした。破損していないか、Markdown と画像を含む Zip か確認してください。",
+		"import_err_zip_too_large":       "Zip ファイルの展開後サイズまたはファイル数が上限を超えています。",
+		"import_err_zip_no_markdown":     "Zip ファイルの中に取り込める Markdown ファイル（.md）が見つかりませんでした。",
+		"import_err_zip_unsafe_path":     "Zip ファイルの中に不正なパスが含まれているため取り込めません。",
 		"import_err_no_posts":            "取り込める記事や固定ページが見つかりませんでした。WordPress で「すべてのコンテンツ」を選んで書き出したか確認してください。",
 		"import_err_expired":             "確認した内容の有効期限が切れたか、すでに取り込み済みです。もう一度ファイルを選んでください。",
 		"import_err_busy":                "ほかの取り込み、またはバックアップからの復元を実行中です。終わってからもう一度やり直してください。",
@@ -766,6 +771,7 @@ var catalog = map[Lang]map[string]string{
 
 		// 管理画面のページの題名（<title>）。
 		"media_library_title": "メディアライブラリ", "setup_title": "はじめに", "forgot_password_title": "パスワードを忘れたとき",
+		"setup_starter": "サイトのたたき台", "setup_starter_blog": "ブログ", "setup_starter_docs": "ドキュメント", "setup_starter_site": "Webサイト・ポートフォリオ", "setup_starter_empty": "空のサイト",
 		"general_settings_title": "サイト基本設定", "ai_settings_title": "AIの設定",
 		// 管理画面のスクリプト（static/js の reflect.js・manuscript.js・remote_invite.js）が window.sorusT で引く文言。
 		"js_pub_enter_site_url":         "「公開サイトのURL」を入力する",
@@ -1583,6 +1589,11 @@ var catalog = map[Lang]map[string]string{
 		"import_err_too_large":           "The file is too large. Choose a file of 100 MB or less.",
 		"import_err_not_wxr":             "This is not a WordPress export file (WXR). Choose a file created with Tools → Export in WordPress.",
 		"import_err_invalid_xml":         "The file could not be read as XML. Check that it is not damaged and that it is the file exported from WordPress.",
+		"import_err_invalid_markdown":    "The Markdown file could not be read. Check its format and frontmatter.",
+		"import_err_invalid_zip":         "The Zip file could not be read. Check that it is not damaged and contains Markdown and images.",
+		"import_err_zip_too_large":       "The extracted size or number of files in the Zip file exceeds the limit.",
+		"import_err_zip_no_markdown":     "No Markdown files (.md) to import were found in the Zip file.",
+		"import_err_zip_unsafe_path":     "The Zip file contains an unsafe file path and cannot be imported.",
 		"import_err_no_posts":            "No posts or pages to import were found. Check that you chose \"All content\" when exporting from WordPress.",
 		"import_err_expired":             "The review has expired or was already imported. Choose the file again.",
 		"import_err_busy":                "Another import or a restore from backup is running. Try again when it has finished.",
@@ -1825,6 +1836,7 @@ var catalog = map[Lang]map[string]string{
 
 		// 管理画面のページの題名（<title>）。
 		"media_library_title": "Media library", "setup_title": "Getting started", "forgot_password_title": "Forgot your password",
+		"setup_starter": "Starter site", "setup_starter_blog": "Blog", "setup_starter_docs": "Documentation", "setup_starter_site": "Website / portfolio", "setup_starter_empty": "Empty site",
 		"general_settings_title": "General Settings", "ai_settings_title": "AI Settings",
 		// 管理画面のスクリプト（static/js の reflect.js・manuscript.js・remote_invite.js）が window.sorusT で引く文言。
 		"js_pub_enter_site_url":         "Enter the \"Public site URL\"",

@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"image/gif"
+	"image/png"
 	"io"
 	"net"
 	"net/http"
@@ -40,6 +42,9 @@ const (
 // markdownImage は Markdown の画像構文 ![alt](url) / ![alt](<url>) / ![alt](url "title") の外部 URL。
 var markdownImage = regexp.MustCompile(`!\[[^\]]*\]\(\s*<?(https?://[^\s<>)]+)>?(?:\s+"[^"]*")?\s*\)`)
 
+// markdownAnyImage は Markdown の画像構文 ![alt](path) / ![alt](<path>) / ![alt](path "title") の任意のパス。
+var markdownAnyImage = regexp.MustCompile(`!\[[^\]]*\]\(\s*<?([^\s<>)]+)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)`)
+
 // ExternalImageURLs は Markdown 本文の画像構文から外部画像 (http/https) の URL を出現順・重複なしで返す。
 func ExternalImageURLs(md string) []string {
 	var urls []string
@@ -51,6 +56,106 @@ func ExternalImageURLs(md string) []string {
 		}
 	}
 	return urls
+}
+
+// RelativeImagePaths は Markdown 本文の画像構文から相対パス（外部 URL や / 始まりを除いたもの）を出現順・重複なしで返す。
+func RelativeImagePaths(md string) []string {
+	var paths []string
+	seen := map[string]bool{}
+	for _, m := range markdownAnyImage.FindAllStringSubmatch(md, -1) {
+		raw := strings.TrimSpace(m[1])
+		lower := strings.ToLower(raw)
+		if raw == "" || strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") ||
+			strings.HasPrefix(lower, "data:") || strings.HasPrefix(raw, "/") {
+			continue
+		}
+		if !seen[raw] {
+			seen[raw] = true
+			paths = append(paths, raw)
+		}
+	}
+	return paths
+}
+
+// ResolveZipImagePath は記事の Zip 内基準パス sourcePath から相対画像パス raw を解決し、localImages に一致するエントリを返す。
+func ResolveZipImagePath(sourcePath, raw string, localImages map[string][]byte) (string, []byte, bool) {
+	if len(localImages) == 0 {
+		return "", nil, false
+	}
+	ref := strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/")
+	if u, err := url.Parse(ref); err == nil && u.Scheme == "" && u.Host == "" && u.Path != "" {
+		ref = u.Path
+	}
+	if ref == "" || strings.HasPrefix(ref, "/") {
+		return "", nil, false
+	}
+	baseDir := "."
+	if sourcePath != "" {
+		baseDir = path.Dir(strings.ReplaceAll(sourcePath, "\\", "/"))
+	}
+	resolved := path.Clean(path.Join(baseDir, ref))
+	if resolved == "." || resolved == ".." || strings.HasPrefix(resolved, "../") || strings.HasPrefix(resolved, "/") {
+		return "", nil, false
+	}
+	if data, ok := localImages[resolved]; ok {
+		return resolved, data, true
+	}
+	if !strings.HasPrefix(ref, "../") && ref != ".." {
+		rootResolved := path.Clean(ref)
+		if rootResolved != "." && rootResolved != ".." && !strings.HasPrefix(rootResolved, "../") && !strings.HasPrefix(rootResolved, "/") {
+			if data, ok := localImages[rootResolved]; ok {
+				return rootResolved, data, true
+			}
+		}
+	}
+	return "", nil, false
+}
+
+// ProcessLocalImage は Zip 内の画像バイト列を image.Process で WebP 化して uploadDir に保存する。
+func ProcessLocalImage(resolvedPath string, data []byte, uploadDir string, maxSize int64) (*FetchedImage, error) {
+	if maxSize <= 0 {
+		maxSize = image.DefaultMaxUploadSize
+	}
+	filename := path.Base(resolvedPath)
+	if filename == "." || filename == "/" || filename == "" {
+		filename = "image"
+	}
+	stem := strings.TrimSuffix(filename, path.Ext(filename))
+	imgBytes := data
+	if image.DetectMIME(imgBytes) == "" && (bytes.HasPrefix(imgBytes, []byte("GIF87a")) || bytes.HasPrefix(imgBytes, []byte("GIF89a"))) {
+		cfg, err := gif.DecodeConfig(bytes.NewReader(imgBytes))
+		if err != nil || cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > image.MaxPixels {
+			return nil, fmt.Errorf("importer: decode gif %s: invalid or too large", resolvedPath)
+		}
+		decoded, err := gif.Decode(bytes.NewReader(imgBytes))
+		if err != nil {
+			return nil, fmt.Errorf("importer: decode gif %s: %w", resolvedPath, err)
+		}
+		var pngBuf bytes.Buffer
+		if err := png.Encode(&pngBuf, decoded); err != nil {
+			return nil, fmt.Errorf("importer: encode gif %s: %w", resolvedPath, err)
+		}
+		imgBytes = pngBuf.Bytes()
+	}
+	processed, err := image.Process(bytes.NewReader(imgBytes), stem, image.ProcessOptions{
+		MaxUploadSize: maxSize,
+		OutputDir:     uploadDir,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("importer: process local image %s: %w", resolvedPath, err)
+	}
+	id, err := newHexID()
+	if err != nil {
+		RemoveImageFiles(processed)
+		return nil, err
+	}
+	return &FetchedImage{
+		MediaID:   id,
+		SourceURL: resolvedPath,
+		Filename:  filename,
+		URL:       UploadURLPrefix + path.Base(processed.LargePath),
+		Processed: processed,
+	}, nil
 }
 
 // ReplaceURLs は本文中の旧 URL を新 URL に一括置換する。長い URL から置換し、

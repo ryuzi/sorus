@@ -26,8 +26,9 @@ type Export struct {
 	Authors     []Author
 	Categories  []Term
 	Tags        []Term
-	Posts       []Post // post_type が post / page の項目（ファイル内の順）
-	Attachments []Post // post_type が attachment の項目
+	Posts       []Post            // post_type が post / page の項目（ファイル内の順）
+	Attachments []Post            // post_type が attachment の項目
+	LocalImages map[string][]byte // Markdown Zip 内の画像（Zip 内正規化パス → バイト列）
 }
 
 // Author は wp:author。
@@ -45,21 +46,25 @@ type Term struct {
 
 // Post は WXR の item 1件。
 type Post struct {
-	ID            int64
-	Title         string
-	Link          string // 旧パーマリンク（絶対 URL または /?p=123）
-	Creator       string // dc:creator（著者のログイン名）
-	ContentHTML   string
-	ExcerptHTML   string
-	Date          time.Time // UTC。wp:post_date_gmt を優先し、無効なら wp:post_date を Location で解釈する
-	Slug          string    // wp:post_name（パーセントデコード済み）
-	Status        string    // wp:status（publish, draft, private, future, ...）
-	Type          string    // wp:post_type（post, page, attachment, ...）
-	ParentID      int64
-	AttachmentURL string
-	Categories    []Term
-	Tags          []Term
-	Meta          map[string]string // wp:postmeta（_thumbnail_id など）
+	ID              int64
+	Title           string
+	Link            string // 旧パーマリンク（絶対 URL または /?p=123）
+	Creator         string // dc:creator（著者のログイン名）
+	ContentHTML     string
+	ContentMarkdown string
+	ExcerptHTML     string
+	Date            time.Time // UTC。wp:post_date_gmt を優先し、無効なら wp:post_date を Location で解釈する
+	Slug            string    // wp:post_name（パーセントデコード済み）
+	Status          string    // wp:status（publish, draft, private, future, ...）
+	Type            string    // wp:post_type（post, page, attachment, ...）
+	ParentID        int64
+	AttachmentURL   string
+	Categories      []Term
+	Tags            []Term
+	Lang            string
+	Description     string
+	SourcePath      string            // Zip 内の元ファイルパス（相対画像パスの解決用）
+	Meta            map[string]string // wp:postmeta（_thumbnail_id など）
 }
 
 // ParseOptions は Parse の設定。

@@ -199,6 +199,7 @@ func (im *Importer) ImportExport(ctx context.Context, exp *Export) (*Summary, er
 
 	var items []*pending
 	var fetched []*FetchedImage
+	localCache := map[string]fetchResult{}
 	seenPaths := map[string]bool{}
 	for _, p := range exp.Posts {
 		if err := ctx.Err(); err != nil {
@@ -226,13 +227,21 @@ func (im *Importer) ImportExport(ctx context.Context, exp *Export) (*Summary, er
 		}
 
 		it := &pending{
-			post:     p,
-			markdown: HTMLToMarkdown(p.ContentHTML),
+			post: p,
+			markdown: func() string {
+				if p.ContentMarkdown != "" {
+					return p.ContentMarkdown
+				}
+				return HTMLToMarkdown(p.ContentHTML)
+			}(),
 			excerpt:  plainText(p.ExcerptHTML),
 			oldPaths: unique,
 		}
 		if thumb := attachments[parseInt(p.Meta["_thumbnail_id"])]; thumb != "" {
 			it.featuredImage = thumb
+		}
+		if !im.opts.DryRun && len(exp.LocalImages) > 0 && im.opts.UploadDir != "" {
+			fetched = append(fetched, im.localizeZipImages(exp, localCache, it, sum)...)
 		}
 		if fetcher != nil {
 			fetched = append(fetched, im.localizeImages(ctx, fetcher, it, sum)...)
@@ -305,11 +314,49 @@ func (im *Importer) localizeImages(ctx context.Context, f *MediaFetcher, it *pen
 		}
 		replacements[u] = img.URL
 	}
-	it.images = fresh
+	it.images = append(it.images, fresh...)
 	it.markdown = ReplaceURLs(it.markdown, replacements)
 	if r, ok := replacements[it.featuredImage]; ok {
 		it.featuredImage = r
 	}
+	return fresh
+}
+
+// localizeZipImages は Markdown 内の相対画像パスを Zip 内の画像（exp.LocalImages）から解決し、
+// WebP 化して UploadDir に保存した上で本文の相対パスを /uploads/... に置き換える。
+func (im *Importer) localizeZipImages(exp *Export, cache map[string]fetchResult, it *pending, sum *Summary) []*FetchedImage {
+	refs := RelativeImagePaths(it.markdown)
+	if len(refs) == 0 {
+		return nil
+	}
+	var fresh []*FetchedImage
+	replacements := map[string]string{}
+	for _, raw := range refs {
+		resolved, data, ok := ResolveZipImagePath(it.post.SourcePath, raw, exp.LocalImages)
+		if !ok {
+			continue
+		}
+		res, cached := cache[resolved]
+		if !cached {
+			img, err := ProcessLocalImage(resolved, data, im.opts.UploadDir, im.opts.MaxImageSize)
+			res = fetchResult{img: img, err: err}
+			cache[resolved] = res
+		}
+		if res.err != nil {
+			if !cached {
+				sum.ImagesFailed++
+				im.warnf(sum, "画像の取り込みに失敗しました（元のパスを維持します）: %v", res.err)
+			}
+			continue
+		}
+		if !cached {
+			sum.ImagesSucceeded++
+			fresh = append(fresh, res.img)
+		}
+		replacements[raw] = res.img.URL
+	}
+	it.images = append(it.images, fresh...)
+	it.markdown = ReplaceURLs(it.markdown, replacements)
 	return fresh
 }
 
@@ -477,6 +524,10 @@ func (tx *txWriter) writeArticle(it *pending, defaultAuthor string, account *use
 	if date.IsZero() {
 		date = now
 	}
+	lang := strings.ToLower(strings.TrimSpace(p.Lang))
+	if lang == "" {
+		lang = "ja"
+	}
 	a := &article.Article{
 		ID:              id,
 		Title:           title,
@@ -484,6 +535,7 @@ func (tx *txWriter) writeArticle(it *pending, defaultAuthor string, account *use
 		ContentMarkdown: it.markdown,
 		ContentHTML:     rendered.HTML,
 		Excerpt:         it.excerpt,
+		Lang:            lang,
 		FeaturedImage:   it.featuredImage,
 		AuthorID:        author.id,
 		CategoryID:      cat.id,
@@ -492,13 +544,16 @@ func (tx *txWriter) writeArticle(it *pending, defaultAuthor string, account *use
 		CreatedAt:       date,
 		UpdatedAt:       now,
 	}
+	if p.Description != "" {
+		a.Excerpt = p.Description
+	}
 	if p.Status == "publish" {
 		a.Status = article.StatusPublished
 		a.PublishedAt = &date
 	}
-	q, args, err := sqlx.Named(`INSERT INTO articles (id, title, slug, content_markdown, content_html, excerpt,
+	q, args, err := sqlx.Named(`INSERT INTO articles (id, title, slug, content_markdown, content_html, excerpt, lang,
 			featured_image_url, author_id, category_id, status, kind, published_at, created_at, updated_at)
-		VALUES (:id, :title, :slug, :content_markdown, :content_html, :excerpt,
+		VALUES (:id, :title, :slug, :content_markdown, :content_html, :excerpt, :lang,
 			:featured_image_url, :author_id, :category_id, :status, :kind, :published_at, :created_at, :updated_at)`, a)
 	if err != nil {
 		return createdArticle{}, false, fmt.Errorf("bind article: %w", err)

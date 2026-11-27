@@ -38,7 +38,7 @@
         <span class="text-xs text-neutral-500">{{.T "import_drop_hint" $d.MaxSize}}</span>
         <span id="import-file-name" class="mt-2 break-all font-mono text-sm text-neutral-800"></span>
       </label>
-      <input id="import-file" name="wxr" type="file" accept=".xml,text/xml,application/xml" class="sr-only">
+      <input id="import-file" name="wxr" type="file" accept=".xml,.md,.zip,text/xml,application/xml,text/markdown,application/zip" class="sr-only">
 
       <fieldset class="mt-6">
         <legend class="text-sm font-semibold text-neutral-900">{{.T "import_options"}}</legend>
@@ -124,7 +124,7 @@
     nameEl.textContent = '';
     submit.disabled = true;
     if (!f) return;
-    if (!/\.xml$/i.test(f.name)) {
+    if (!/\.(xml|md|zip)$/i.test(f.name)) {
       window.cmsToast(form.getAttribute('data-err-type'), 'error');
       return;
     }

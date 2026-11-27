@@ -166,6 +166,59 @@ func TestDesktopSetupCreatesUserAndLogsIn(t *testing.T) {
 	expectRedirect(t, other.login("hanako", "password123"), "/admin/articles")
 }
 
+func TestDesktopSetupStarterChoices(t *testing.T) {
+	for _, starter := range []string{"blog", "docs", "site", "empty"} {
+		t.Run(starter, func(t *testing.T) {
+			env, _ := newDesktopEnv(t)
+			c := env.newClient()
+			c.setupCSRF()
+			form := setupForm()
+			form.Set("site_starter", starter)
+			expectRedirect(t, c.postForm(SetupPath, form), "/admin")
+			pages := env.countRows(`SELECT COUNT(*) FROM articles WHERE kind='page'`)
+			wantPages := 0
+			if starter == "docs" {
+				wantPages = 2
+			}
+			if starter == "site" {
+				wantPages = 2
+			}
+			if pages != wantPages {
+				t.Errorf("pages = %d, want %d", pages, wantPages)
+			}
+			var sections string
+			if err := env.db.Get(&sections, `SELECT value FROM settings WHERE key='front_sections'`); err != nil {
+				t.Fatal(err)
+			}
+			if starter == "empty" && sections != "[]" {
+				t.Errorf("empty front_sections = %s", sections)
+			}
+			if starter == "docs" && env.server.getSetting("theme", "") != "tech" {
+				t.Errorf("docs theme = %q", env.server.getSetting("theme", ""))
+			}
+			if starter == "site" && env.server.getSetting("theme", "") != "portal" {
+				t.Errorf("site theme = %q", env.server.getSetting("theme", ""))
+			}
+			if starter == "docs" || starter == "site" {
+				wantFront := map[string]string{"docs": "guide", "site": "about"}[starter]
+				if got := env.server.getSetting(settingFrontPage, ""); got != wantFront {
+					t.Errorf("front_page = %q, want %q", got, wantFront)
+				}
+				if n := env.countRows(`SELECT COUNT(*) FROM articles WHERE kind='page' AND status='published' AND published_at IS NOT NULL`); n != wantPages {
+					t.Errorf("published pages = %d, want %d", n, wantPages)
+				}
+				res := c.get("/")
+				expectStatus(t, res, http.StatusOK)
+				if starter == "docs" {
+					expectContains(t, res.Body, "このサイトの使い方をまとめます", "ガイド", `class="front-cards"`, `href="/installation"`, "インストール", "導入手順をここに記載します")
+				} else {
+					expectContains(t, res.Body, "活動や作品をご紹介します", "お問い合わせ", `class="front-cards"`, `href="/contact"`)
+				}
+			}
+		})
+	}
+}
+
 // 「はじめに」では立場（自分で公開する／原稿を書いて渡す）を尋ねない。名前・パスワードとサイト名だけで始められる。
 func TestDesktopSetupHasNoIntentQuestion(t *testing.T) {
 	env, _ := newDesktopEnv(t)

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,14 +65,19 @@ type importError struct {
 func (e *importError) Error() string { return "import: " + e.Key }
 
 var (
-	errImportMissingFile = &importError{http.StatusBadRequest, "import_err_missing_file"}
-	errImportTooLarge    = &importError{http.StatusRequestEntityTooLarge, "import_err_too_large"}
-	errImportNotWXR      = &importError{http.StatusBadRequest, "import_err_not_wxr"}
-	errImportInvalidXML  = &importError{http.StatusBadRequest, "import_err_invalid_xml"}
-	errImportNoPosts     = &importError{http.StatusBadRequest, "import_err_no_posts"}
-	errImportExpired     = &importError{http.StatusBadRequest, "import_err_expired"}
-	errImportBusy        = &importError{http.StatusConflict, "import_err_busy"}
-	errImportFailed      = &importError{http.StatusInternalServerError, "import_err_failed"}
+	errImportMissingFile     = &importError{http.StatusBadRequest, "import_err_missing_file"}
+	errImportTooLarge        = &importError{http.StatusRequestEntityTooLarge, "import_err_too_large"}
+	errImportNotWXR          = &importError{http.StatusBadRequest, "import_err_not_wxr"}
+	errImportInvalidXML      = &importError{http.StatusBadRequest, "import_err_invalid_xml"}
+	errImportInvalidMarkdown = &importError{http.StatusBadRequest, "import_err_invalid_markdown"}
+	errImportInvalidZip      = &importError{http.StatusBadRequest, "import_err_invalid_zip"}
+	errImportZipTooLarge     = &importError{http.StatusRequestEntityTooLarge, "import_err_zip_too_large"}
+	errImportZipNoMarkdown   = &importError{http.StatusBadRequest, "import_err_zip_no_markdown"}
+	errImportZipUnsafePath   = &importError{http.StatusBadRequest, "import_err_zip_unsafe_path"}
+	errImportNoPosts         = &importError{http.StatusBadRequest, "import_err_no_posts"}
+	errImportExpired         = &importError{http.StatusBadRequest, "import_err_expired"}
+	errImportBusy            = &importError{http.StatusConflict, "import_err_busy"}
+	errImportFailed          = &importError{http.StatusInternalServerError, "import_err_failed"}
 )
 
 // importForm は取り込みのオプション。フォームのフィールド名は download_images・skip_pages・account_mode・dry_run。
@@ -284,7 +290,7 @@ func (s *Server) handleImportPreview(c echo.Context) error {
 		return s.renderImportError(c, form, err)
 	}
 	defer release()
-	exp, err := parseImportFile(path, s.timeLocation())
+	exp, err := parseImportFile(path, filename, s.timeLocation())
 	if err != nil {
 		return s.renderImportError(c, form, err)
 	}
@@ -323,7 +329,7 @@ func (s *Server) handleImportRun(c echo.Context) error {
 		return s.renderImportError(c, form, err)
 	}
 	defer release()
-	exp, err := parseImportFile(path, s.timeLocation())
+	exp, err := parseImportFile(path, filename, s.timeLocation())
 	if err != nil {
 		return s.renderImportError(c, form, err)
 	}
@@ -348,7 +354,7 @@ func (s *Server) runStagedImport(c echo.Context, token string) error {
 		return s.renderImportError(c, form, err)
 	}
 	defer release()
-	exp, err := parseImportFile(stage.Path, s.timeLocation())
+	exp, err := parseImportFile(stage.Path, stage.Filename, s.timeLocation())
 	if err != nil {
 		return s.renderImportError(c, form, err)
 	}
@@ -390,7 +396,7 @@ func receiveImportUpload(c echo.Context) (path, filename string, err error) {
 		return "", "", fmt.Errorf("import: open upload: %w", err)
 	}
 	defer src.Close()
-	dst, err := os.CreateTemp("", "sorus-import-*.xml")
+	dst, err := os.CreateTemp("", "sorus-import-*")
 	if err != nil {
 		return "", "", fmt.Errorf("import: create temp file: %w", err)
 	}
@@ -413,12 +419,45 @@ func receiveImportUpload(c echo.Context) (path, filename string, err error) {
 }
 
 // parseImportFile は path の WXR を解析する。WXR でない・XML として読めない・記事が1件も無いときは画面に出すエラーを返す。
-func parseImportFile(path string, loc *time.Location) (*importer.Export, error) {
+func parseImportFile(path, filename string, loc *time.Location) (*importer.Export, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("import: open %s: %w", path, err)
 	}
 	defer f.Close()
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".md":
+		exp, err := importer.ParseMarkdown(f, filename)
+		switch {
+		case errors.Is(err, importer.ErrZipTooLarge):
+			return nil, errImportTooLarge
+		case err != nil:
+			return nil, errImportInvalidMarkdown
+		}
+		return exp, nil
+	case ".zip":
+		st, err := f.Stat()
+		if err != nil {
+			return nil, errImportInvalidZip
+		}
+		exp, err := importer.ParseMarkdownZip(f, st.Size())
+		switch {
+		case errors.Is(err, importer.ErrZipTooLarge):
+			return nil, errImportZipTooLarge
+		case errors.Is(err, importer.ErrNoMarkdownFiles):
+			return nil, errImportZipNoMarkdown
+		case errors.Is(err, importer.ErrUnsafeZipPath):
+			return nil, errImportZipUnsafePath
+		case errors.Is(err, importer.ErrInvalidMarkdown):
+			return nil, errImportInvalidMarkdown
+		case err != nil:
+			return nil, errImportInvalidZip
+		}
+		return exp, nil
+	case ".xml":
+	default:
+		return nil, errImportNotWXR
+	}
 	exp, err := importer.Parse(f, importer.ParseOptions{Location: loc})
 	switch {
 	case errors.Is(err, importer.ErrNotWXR):

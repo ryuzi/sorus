@@ -1,6 +1,7 @@
 package server
 
 import (
+	"archive/zip"
 	"bytes"
 	"mime/multipart"
 	"net/http"
@@ -280,6 +281,67 @@ func TestImportPreviewDoesNotChangeDatabase(t *testing.T) {
 	// 確認した人のほかは、預かったファイルを取り込めない。
 	if _, ok := env.server.imports.get(m[1], chief.ID); ok {
 		t.Error("another user could use the staged file")
+	}
+}
+
+func TestMarkdownImportPreview(t *testing.T) {
+	env := newTestEnv(t)
+	c := env.loggedIn(admin)
+	res := c.postImport(importPreviewPath, importDefaults, "welcome.md", "# Welcome\n\nMarkdown body")
+	expectStatus(t, res, http.StatusOK)
+	expectContains(t, res.Body, "welcome.md", "id=\"import-stat-articles\"", ">1</p>")
+	if n := env.countRows(`SELECT COUNT(*) FROM articles`); n != 0 {
+		t.Errorf("articles after Markdown preview = %d, want 0", n)
+	}
+}
+
+func TestImportMarkdownZipErrorsAndLang(t *testing.T) {
+	env := newTestEnv(t)
+	c := env.loggedIn(admin)
+
+	makeZip := func(files map[string]string) string {
+		var buf bytes.Buffer
+		w := zip.NewWriter(&buf)
+		for name, content := range files {
+			f, err := w.Create(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = f.Write([]byte(content))
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return buf.String()
+	}
+
+	// 1. 不正な Zip
+	res := c.postImport(importPreviewPath, importDefaults, "broken.zip", "not a zip archive")
+	expectStatus(t, res, http.StatusBadRequest)
+	expectContains(t, res.Body, "Zip ファイルを読み取れませんでした")
+
+	// 2. Markdown が1件もない Zip
+	res = c.postImport(importPreviewPath, importDefaults, "empty.zip", makeZip(map[string]string{"readme.txt": "hello"}))
+	expectStatus(t, res, http.StatusBadRequest)
+	expectContains(t, res.Body, "取り込める Markdown ファイル（.md）が見つかりませんでした")
+
+	// 3. Zip Slip
+	res = c.postImport(importPreviewPath, importDefaults, "slip.zip", makeZip(map[string]string{"../evil.md": "# evil"}))
+	expectStatus(t, res, http.StatusBadRequest)
+	expectContains(t, res.Body, "不正なパスが含まれているため取り込めません")
+
+	// 4. frontmatter 構文エラー
+	res = c.postImport(importPreviewPath, importDefaults, "bad-fm.zip", makeZip(map[string]string{"bad.md": "---\ntitle: [broken\n---\nbody"}))
+	expectStatus(t, res, http.StatusBadRequest)
+	expectContains(t, res.Body, "Markdown ファイルを読み取れませんでした")
+
+	// 5. lang: en の Markdown Zip 取り込み
+	res = c.postImport(importRunPath, importDefaults, "docs.zip", makeZip(map[string]string{
+		"en-doc.md": "---\ntitle: English Doc\nslug: en-doc\nlang: en\nstatus: publish\n---\nHello world",
+	}))
+	expectStatus(t, res, http.StatusOK)
+	if n := env.countRows(`SELECT COUNT(*) FROM articles WHERE slug = 'en-doc' AND lang = 'en'`); n != 1 {
+		t.Errorf("en-doc with lang='en' count = %d, want 1", n)
 	}
 }
 
