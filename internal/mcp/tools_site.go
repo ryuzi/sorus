@@ -35,15 +35,17 @@ type SiteStructure struct {
 }
 
 type FrontSection struct {
-	Type       string   `json:"type"`
-	Pages      []string `json:"pages,omitempty"`
-	Tag        string   `json:"tag,omitempty"`
-	Limit      int      `json:"limit,omitempty"`
-	Title      string   `json:"title,omitempty"`
-	Layout     string   `json:"layout,omitempty"`
-	LinkURL    string   `json:"link_url,omitempty"`
-	LinkLabel  string   `json:"link_label,omitempty"`
-	ArticleTag string   `json:"article_tag,omitempty"`
+	Type           string   `json:"type"`
+	Pages          []string `json:"pages,omitempty"`
+	Tag            string   `json:"tag,omitempty"`
+	Limit          int      `json:"limit,omitempty"`
+	Title          string   `json:"title,omitempty"`
+	Layout         string   `json:"layout,omitempty"`
+	LinkURL        string   `json:"link_url,omitempty"`
+	LinkLabel      string   `json:"link_label,omitempty"`
+	SecondaryURL   string   `json:"secondary_url,omitempty"`
+	SecondaryLabel string   `json:"secondary_label,omitempty"`
+	ArticleTag     string   `json:"article_tag,omitempty"`
 }
 
 // SiteStructureUpdate はサイト構成の部分的な更新。nil の項目は今の値を保つ。
@@ -104,7 +106,7 @@ func (s *Server) siteTools() []*tool {
 				InputSchema: objectSchema(map[string]any{
 					"site_menu":        menuArraySchema("ナビゲーションメニュー（最上位の項目の配列）。"+menuDesc, true),
 					"site_footer_menu": menuArraySchema("フッターのサイトマップ。最上位の項目が列（見出し）で、その children が列のリンク。"+menuDesc, true),
-					"front_sections":   map[string]any{"type": "array", "description": "トップページの表示順セクション。type は hero/cards/gallery/article_list", "items": objectSchema(map[string]any{"type": enumProp("種類", "hero", "cards", "gallery", "article_list"), "pages": map[string]any{"type": "array", "items": map[string]any{"type": "string"}}, "tag": stringProp("画像タグ"), "limit": integerProp("表示件数", 0, 24), "title": stringProp("見出し"), "layout": enumProp("並べ方", "justified", "masonry", "cards"), "link_url": stringProp("リンク先"), "link_label": stringProp("リンク文言"), "article_tag": stringProp("記事タグ")}, "type")},
+					"front_sections":   map[string]any{"type": "array", "description": "トップページの表示順セクション。type は hero/cards/gallery/article_list", "items": objectSchema(map[string]any{"type": enumProp("種類", "hero", "cards", "gallery", "article_list"), "pages": map[string]any{"type": "array", "items": map[string]any{"type": "string"}}, "tag": stringProp("画像タグ"), "limit": integerProp("表示件数", 0, 24), "title": stringProp("見出し"), "layout": enumProp("並べ方", "justified", "masonry", "cards"), "link_url": stringProp("リンク先"), "link_label": stringProp("リンク文言"), "secondary_url": stringProp("副ボタンのリンク先"), "secondary_label": stringProp("副ボタンの文言"), "article_tag": stringProp("記事タグ")}, "type")},
 				}),
 				Annotations: &toolAnnotations{Title: "サイト構成の変更", IdempotentHint: true},
 			},

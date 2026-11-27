@@ -909,16 +909,26 @@ func TestSiteStructureSectionEditorUIAndI18n(t *testing.T) {
 		"段組み",
 		"絞り込むカテゴリ",
 		"すべてのカテゴリ（新着順）",
+		"「詳しく見る」のリンク先（任意）",
+		`placeholder="詳しく見る"`,
+		"「すべて見る」のリンク先（任意）",
+		`placeholder="すべて見る"`,
+		"副ボタンのリンク先（任意）",
+		"副ボタンの文言",
+		`placeholder="詳細を見る"`,
 		`value="section-up:0" disabled`,
 		`value="section-down:3" disabled`,
 		`value="section-delete:0" class="btn btn-danger btn-sm"`,
 		`data-section-row`,
 		`data-section-type`,
 		`data-section-show-for="hero"`,
+		`data-section-show-for="hero gallery"`,
 		`data-section-show-for="cards"`,
 		`data-section-show-for="gallery"`,
 		`data-section-show-for="gallery article_list"`,
 		`data-section-show-for="article_list"`,
+		`name="section_secondary_url"`,
+		`name="section_secondary_label"`,
 		`data-section-page-chip="research"`,
 		`data-section-tag-chip="学校"`,
 		`<option value="masonry" selected>段組み</option>`,
@@ -948,6 +958,13 @@ func TestSiteStructureSectionEditorUIAndI18n(t *testing.T) {
 		"Number of images (0 for default 6, up to 24)",
 		"Filter by category",
 		"All categories (newest first)",
+		`&#34;Learn more&#34; link destination (optional)`,
+		`placeholder="Learn more"`,
+		`&#34;View all&#34; link destination (optional)`,
+		`placeholder="View all"`,
+		"Secondary button destination (optional)",
+		"Secondary button text",
+		`placeholder="View details"`,
 		`<option value="masonry" selected>Masonry</option>`,
 		"+ Add section",
 	)
@@ -979,21 +996,23 @@ func TestSiteStructureFormSaveClearsUnusedFieldsOnNonGallerySections(t *testing.
 
 	// メニュー保存時に非ギャラリー行へ section_layout="justified" 等の不要フィールドが送信されてもクリアされることを確認。
 	form := url.Values{
-		"front_page":          {"research"},
-		"menu_type":           {"page", "articles"},
-		"menu_page":           {"research", ""},
-		"menu_category":       {"", ""},
-		"menu_url":            {"", ""},
-		"menu_label":          {"研究", "記事一覧"},
-		"section_type":        {string(FrontSectionHero), string(FrontSectionCards), string(FrontSectionArticleList)},
-		"section_pages":       {"access", "access", "access"},
-		"section_tag":         {"学校", "学校", "学校"},
-		"section_title":       {"不要タイトル", "不要タイトル", "お知らせ"},
-		"section_limit":       {"6", "6", "12"},
-		"section_layout":      {"justified", "justified", "justified"},
-		"section_link_url":    {"/articles", "/articles", "/articles"},
-		"section_link_label":  {"一覧", "一覧", "一覧"},
-		"section_article_tag": {"circle", "circle", "circle"},
+		"front_page":              {"research"},
+		"menu_type":               {"page", "articles"},
+		"menu_page":               {"research", ""},
+		"menu_category":           {"", ""},
+		"menu_url":                {"", ""},
+		"menu_label":              {"研究", "記事一覧"},
+		"section_type":            {string(FrontSectionHero), string(FrontSectionCards), string(FrontSectionArticleList)},
+		"section_pages":           {"access", "access", "access"},
+		"section_tag":             {"学校", "学校", "学校"},
+		"section_title":           {"不要タイトル", "不要タイトル", "お知らせ"},
+		"section_limit":           {"6", "6", "12"},
+		"section_layout":          {"justified", "justified", "justified"},
+		"section_link_url":        {"", "/articles", "/articles"},
+		"section_link_label":      {"", "一覧", "一覧"},
+		"section_secondary_url":   {"", "/access", "/access"},
+		"section_secondary_label": {"", "詳細", "詳細"},
+		"section_article_tag":     {"circle", "circle", "circle"},
 	}
 	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure?flash=structure_saved")
 
@@ -1008,19 +1027,172 @@ func TestSiteStructureFormSaveClearsUnusedFieldsOnNonGallerySections(t *testing.
 	}
 	hero := st.FrontSections[0]
 	if hero.Type != FrontSectionHero || len(hero.Pages) != 0 || hero.Tag != "" || hero.Title != "" ||
-		hero.Limit != 0 || hero.Layout != "" || hero.ArticleTag != "" || hero.LinkURL != "" || hero.LinkLabel != "" {
+		hero.Limit != 0 || hero.Layout != "" || hero.ArticleTag != "" || hero.LinkURL != "" || hero.LinkLabel != "" ||
+		hero.SecondaryURL != "" || hero.SecondaryLabel != "" {
 		t.Errorf("hero section = %+v, want only Type=hero", hero)
 	}
 	cards := st.FrontSections[1]
 	if cards.Type != FrontSectionCards || cards.Layout != "" || cards.Tag != "" || cards.Title != "" ||
 		cards.Limit != 0 || cards.ArticleTag != "" || cards.LinkURL != "" ||
-		cards.LinkLabel != "" || strings.Join(cards.Pages, ",") != "access" {
+		cards.LinkLabel != "" || cards.SecondaryURL != "" || cards.SecondaryLabel != "" ||
+		strings.Join(cards.Pages, ",") != "access" {
 		t.Errorf("cards section = %+v", cards)
 	}
 	articles := st.FrontSections[2]
 	if articles.Type != FrontSectionArticleList || len(articles.Pages) != 0 || articles.Tag != "" ||
 		articles.Title != "お知らせ" || articles.Limit != 0 || articles.Layout != "" ||
-		articles.ArticleTag != "circle" || articles.LinkURL != "" || articles.LinkLabel != "" {
+		articles.ArticleTag != "circle" || articles.LinkURL != "" || articles.LinkLabel != "" ||
+		articles.SecondaryURL != "" || articles.SecondaryLabel != "" {
 		t.Errorf("article_list section = %+v", articles)
 	}
+}
+
+func TestFrontHeroCTAValidationSaveAndRender(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		section FrontSection
+		wantKey string
+	}{
+		{"primary and secondary valid", FrontSection{Type: FrontSectionHero, LinkURL: "/access", LinkLabel: "はじめる", SecondaryURL: "https://github.com/example/sorus", SecondaryLabel: "GitHub"}, ""},
+		{"primary bad scheme", FrontSection{Type: FrontSectionHero, LinkURL: "javascript:alert(1)"}, "structure_err_gallery_link_url"},
+		{"secondary bad scheme", FrontSection{Type: FrontSectionHero, SecondaryURL: "javascript:alert(1)"}, "structure_err_gallery_link_url"},
+		{"secondary protocol relative", FrontSection{Type: FrontSectionHero, SecondaryURL: "//evil.example/x"}, "structure_err_gallery_link_url"},
+		{"primary label too long", FrontSection{Type: FrontSectionHero, LinkURL: "/access", LinkLabel: strings.Repeat("あ", maxGalleryLinkLabelRunes+1)}, "structure_err_gallery_link_label"},
+		{"secondary label too long", FrontSection{Type: FrontSectionHero, SecondaryURL: "/access", SecondaryLabel: strings.Repeat("あ", maxGalleryLinkLabelRunes+1)}, "structure_err_gallery_link_label"},
+		{"secondary label control char", FrontSection{Type: FrontSectionHero, SecondaryURL: "/access", SecondaryLabel: "bad\nlabel"}, "structure_err_gallery_link_label"},
+		{"gallery ignores invalid secondary url", FrontSection{Type: FrontSectionGallery, LinkURL: "/articles", SecondaryURL: "javascript:alert(1)"}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateSiteStructure(SiteStructure{FrontPage: "research", FrontSections: []FrontSection{tc.section}})
+			if tc.wantKey == "" {
+				if err != nil {
+					t.Fatalf("validateSiteStructure = %v, want nil", err)
+				}
+				return
+			}
+			var se *siteStructureError
+			if !errors.As(err, &se) || se.Key != tc.wantKey {
+				t.Fatalf("validateSiteStructure = %v, want %s", err, tc.wantKey)
+			}
+		})
+	}
+
+	env := newFrontEnv(t)
+	enableMultilingual(t, env.db)
+	group := "hero-cta-translation"
+	if _, err := env.db.Exec(`UPDATE articles SET translation_group_id = ? WHERE slug = 'research'`, group); err != nil {
+		t.Fatal(err)
+	}
+	seedPage(t, env.db, article.Article{Title: "Research Lab", Slug: "research-en", Lang: "en", TranslationGroupID: group,
+		ContentMarkdown: "Quantum computing research.", Status: article.StatusPublished, PublishedAt: ago(time.Hour)})
+
+	adm := env.loggedIn(admin)
+	form := url.Values{
+		"front_page":              {"research"},
+		"section_type":            {string(FrontSectionHero), string(FrontSectionGallery), string(FrontSectionArticleList)},
+		"section_pages":           {"", "", ""},
+		"section_tag":             {"", "学校", ""},
+		"section_title":           {"", "写真", ""},
+		"section_limit":           {"", "6", ""},
+		"section_layout":          {"", "justified", ""},
+		"section_link_url":        {" /access ", "/articles", "/ignored"},
+		"section_link_label":      {" 詳しくはこちら ", "一覧", "無視"},
+		"section_secondary_url":   {" https://example.com/docs ", "https://example.com/ignored", "https://example.com/ignored"},
+		"section_secondary_label": {" ドキュメント ", "無視される副ボタン", "無視される副ボタン"},
+		"section_article_tag":     {"", "", ""},
+	}
+	expectRedirect(t, adm.postForm("/admin/settings/structure", form), "/admin/settings/structure?flash=structure_saved")
+
+	st := env.server.loadSiteStructure(context.Background())
+	if len(st.FrontSections) != 3 {
+		t.Fatalf("len(FrontSections) = %d, want 3", len(st.FrontSections))
+	}
+	if got := st.FrontSections[0]; got.LinkURL != "/access" || got.LinkLabel != "詳しくはこちら" ||
+		got.SecondaryURL != "https://example.com/docs" || got.SecondaryLabel != "ドキュメント" {
+		t.Fatalf("saved hero section = %+v", got)
+	}
+	if got := st.FrontSections[1]; got.SecondaryURL != "" || got.SecondaryLabel != "" || got.LinkURL != "/articles" {
+		t.Fatalf("saved gallery section should clear secondary CTA: %+v", got)
+	}
+	if got := st.FrontSections[2]; got.LinkURL != "" || got.LinkLabel != "" || got.SecondaryURL != "" || got.SecondaryLabel != "" {
+		t.Fatalf("saved article_list section should clear all CTA fields: %+v", got)
+	}
+
+	// 管理画面のフォームにも保存値が書き戻される。
+	adminBody := adm.get("/admin/settings/structure").Body
+	expectContains(t, adminBody,
+		`name="section_link_url" value="/access"`,
+		`name="section_link_label" maxlength="40" value="詳しくはこちら"`,
+		`name="section_secondary_url" value="https://example.com/docs"`,
+		`name="section_secondary_label" maxlength="40" value="ドキュメント"`,
+	)
+
+	// 公開トップページで主・副 CTA ボタンが描画される。
+	c := env.newClient()
+	home := c.get("/")
+	expectStatus(t, home, http.StatusOK)
+	expectContains(t, home.Body,
+		`<div class="front-hero-actions">`,
+		`<a href="/access" class="front-hero-btn">詳しくはこちら</a>`,
+		`<a href="https://example.com/docs" class="front-hero-btn front-hero-btn--secondary">ドキュメント</a>`,
+	)
+
+	// hero_layout: "centered" のテーマでも front-hero--centered と front-hero-actions が組み合わさって描画される。
+	customDir := t.TempDir()
+	centeredThemeDir := filepath.Join(customDir, "centeredhero")
+	if err := os.MkdirAll(centeredThemeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(centeredThemeDir, "theme.json"), []byte(`{"name":{"ja":"中央ヒーロー","en":"Centered Hero"},"description":{"ja":"テスト","en":"Test"},"color_scheme":"light","layout":{"hero_layout":"centered"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(centeredThemeDir, "theme.css"), []byte(`:root { --bg:#fff; --surface:#f8fafc; --fg:#0f172a; --muted:#475569; --border:#e2e8f0; --accent:#2563eb; --accent-fg:#fff; --accent-soft:#dbeafe; --mark:#fef08a; --code-bg:#0f172a; --code-fg:#e2e8f0; --font-body:sans-serif; --font-heading:sans-serif; --font-mono:monospace; --radius:8px; --radius-lg:12px; --content-width:1080px; --prose-width:760px; --shadow:none; }`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cat, err := theme.LoadComposite(os.DirFS("../../static"), customDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.server.themes = cat
+	rec := env.server.serveInternal(httptest.NewRequest(http.MethodGet, "/", nil), &themeOverride{ID: "centeredhero"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("serveInternal centeredhero: status %d", rec.Code)
+	}
+	expectContains(t, rec.Body.String(),
+		`<section class="front-hero front-hero--centered" aria-labelledby="front-hero-title">`,
+		`<div class="front-hero-actions">`,
+		`<a href="/access" class="front-hero-btn">詳しくはこちら</a>`,
+		`<a href="https://example.com/docs" class="front-hero-btn front-hero-btn--secondary">ドキュメント</a>`,
+	)
+
+	// ラベル省略時は日英の既定文言が使われ、URL が片方のみなら設定された側のみ描画される。
+	if err := env.server.saveSiteStructure(context.Background(), SiteStructure{
+		FrontPage: "research",
+		FrontSections: []FrontSection{
+			{Type: FrontSectionHero, LinkURL: "/access", SecondaryURL: "https://example.com/docs"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	expectContains(t, c.get("/").Body,
+		`<a href="/access" class="front-hero-btn">詳しく見る</a>`,
+		`<a href="https://example.com/docs" class="front-hero-btn front-hero-btn--secondary">詳細を見る</a>`,
+	)
+	expectContains(t, c.get("/en/").Body,
+		`<a href="/access" class="front-hero-btn">Learn more</a>`,
+		`<a href="https://example.com/docs" class="front-hero-btn front-hero-btn--secondary">View details</a>`,
+	)
+
+	// 副ボタンの URL のみ設定・主ボタンはラベルのみ（URL 空）の場合、副ボタンのみ描画される。
+	if err := env.server.saveSiteStructure(context.Background(), SiteStructure{
+		FrontPage: "research",
+		FrontSections: []FrontSection{
+			{Type: FrontSectionHero, LinkLabel: "URLなし主ラベル", SecondaryURL: "/access", SecondaryLabel: "アクセスを見る"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	onlySecondary := c.get("/").Body
+	expectContains(t, onlySecondary, `<div class="front-hero-actions">`, `<a href="/access" class="front-hero-btn front-hero-btn--secondary">アクセスを見る</a>`)
+	expectNotContainsAny(t, "only secondary CTA", onlySecondary, "URLなし主ラベル", `class="front-hero-btn"`)
 }

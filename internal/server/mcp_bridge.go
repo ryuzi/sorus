@@ -40,7 +40,7 @@ func (s *Server) mcpUpdateSiteStructure(ctx context.Context, upd mcp.SiteStructu
 					pages = append(pages, slug)
 				}
 			}
-			st.FrontSections = append(st.FrontSections, FrontSection{Type: FrontSectionType(strings.TrimSpace(section.Type)), Pages: pages, Tag: strings.TrimSpace(section.Tag), Limit: section.Limit, Title: strings.TrimSpace(section.Title), Layout: strings.TrimSpace(section.Layout), LinkURL: strings.TrimSpace(section.LinkURL), LinkLabel: strings.TrimSpace(section.LinkLabel), ArticleTag: strings.TrimSpace(section.ArticleTag)})
+			st.FrontSections = append(st.FrontSections, FrontSection{Type: FrontSectionType(strings.TrimSpace(section.Type)), Pages: pages, Tag: strings.TrimSpace(section.Tag), Limit: section.Limit, Title: strings.TrimSpace(section.Title), Layout: strings.TrimSpace(section.Layout), LinkURL: strings.TrimSpace(section.LinkURL), LinkLabel: strings.TrimSpace(section.LinkLabel), SecondaryURL: strings.TrimSpace(section.SecondaryURL), SecondaryLabel: strings.TrimSpace(section.SecondaryLabel), ArticleTag: strings.TrimSpace(section.ArticleTag)})
 		}
 	}
 	if err := s.saveSiteStructure(ctx, st); err != nil {
@@ -94,7 +94,7 @@ func (s *Server) siteStructureWarnings(ctx context.Context, st SiteStructure) ([
 func toMCPSiteStructure(st SiteStructure) mcp.SiteStructure {
 	sections := make([]mcp.FrontSection, 0, len(st.FrontSections))
 	for _, section := range st.FrontSections {
-		sections = append(sections, mcp.FrontSection{Type: string(section.Type), Pages: slices.Clone(section.Pages), Tag: section.Tag, Limit: section.Limit, Title: section.Title, Layout: section.Layout, LinkURL: section.LinkURL, LinkLabel: section.LinkLabel, ArticleTag: section.ArticleTag})
+		sections = append(sections, mcp.FrontSection{Type: string(section.Type), Pages: slices.Clone(section.Pages), Tag: section.Tag, Limit: section.Limit, Title: section.Title, Layout: section.Layout, LinkURL: section.LinkURL, LinkLabel: section.LinkLabel, SecondaryURL: section.SecondaryURL, SecondaryLabel: section.SecondaryLabel, ArticleTag: section.ArticleTag})
 	}
 	return mcp.SiteStructure{SiteMenu: toMCPMenu(st.Menu), SiteFooterMenu: toMCPMenu(st.FooterMenu), FrontSections: sections}
 }

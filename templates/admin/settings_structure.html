@@ -127,13 +127,21 @@
                 {{with $section.MissingArticleTag}}<option value="{{.}}" selected>{{$.T "structure_missing_option" .}}</option>{{end}}
               </select>
             </div>
-            <div data-section-show-for="gallery">
-              <label for="section-link-url-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_link_url"}}</label>
+            <div data-section-show-for="hero gallery">
+              <label for="section-link-url-{{$section.Index}}" data-hero-text="{{$.T "structure_section_hero_link_url"}}" data-gallery-text="{{$.T "structure_gallery_link_url"}}" class="block text-sm font-medium text-neutral-800">{{if eq $section.Type "hero"}}{{$.T "structure_section_hero_link_url"}}{{else}}{{$.T "structure_gallery_link_url"}}{{end}}</label>
               <input id="section-link-url-{{$section.Index}}" name="section_link_url" value="{{$section.LinkURL}}" placeholder="https://" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
             </div>
-            <div data-section-show-for="gallery">
+            <div data-section-show-for="hero gallery">
               <label for="section-link-label-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_gallery_link_label"}}</label>
-              <input id="section-link-label-{{$section.Index}}" name="section_link_label" maxlength="{{$d.MaxGalleryLinkLabelRunes}}" value="{{$section.LinkLabel}}" placeholder="{{$.T "structure_gallery_link_label_default"}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+              <input id="section-link-label-{{$section.Index}}" name="section_link_label" maxlength="{{$d.MaxGalleryLinkLabelRunes}}" value="{{$section.LinkLabel}}" placeholder="{{if eq $section.Type "hero"}}{{$.T "structure_section_hero_link_label_default"}}{{else}}{{$.T "structure_gallery_link_label_default"}}{{end}}" data-hero-placeholder="{{$.T "structure_section_hero_link_label_default"}}" data-gallery-placeholder="{{$.T "structure_gallery_link_label_default"}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+            </div>
+            <div data-section-show-for="hero">
+              <label for="section-secondary-url-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_section_secondary_url"}}</label>
+              <input id="section-secondary-url-{{$section.Index}}" name="section_secondary_url" value="{{$section.SecondaryURL}}" placeholder="https://" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
+            </div>
+            <div data-section-show-for="hero">
+              <label for="section-secondary-label-{{$section.Index}}" class="block text-sm font-medium text-neutral-800">{{$.T "structure_section_secondary_label"}}</label>
+              <input id="section-secondary-label-{{$section.Index}}" name="section_secondary_label" maxlength="{{$d.MaxGalleryLinkLabelRunes}}" value="{{$section.SecondaryLabel}}" placeholder="{{$.T "structure_section_secondary_label_default"}}" class="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm">
             </div>
           </div>
         </li>
@@ -266,12 +274,20 @@
     var type = row.querySelector('[data-section-type]');
     if (!type) return;
     var layoutSelect = row.querySelector('select[name="section_layout"]');
+    var linkUrlLabel = row.querySelector('[data-hero-text]');
+    var linkLabelInput = row.querySelector('input[name="section_link_label"]');
     function syncSection() {
       var cur = type.value;
       row.querySelectorAll('[data-section-show-for]').forEach(function (el) {
         var allowed = (el.getAttribute('data-section-show-for') || '').split(/\s+/);
         el.hidden = allowed.indexOf(cur) === -1;
       });
+      if (linkUrlLabel) {
+        linkUrlLabel.textContent = linkUrlLabel.getAttribute(cur === 'hero' ? 'data-hero-text' : 'data-gallery-text') || linkUrlLabel.textContent;
+      }
+      if (linkLabelInput) {
+        linkLabelInput.placeholder = linkLabelInput.getAttribute(cur === 'hero' ? 'data-hero-placeholder' : 'data-gallery-placeholder') || linkLabelInput.placeholder;
+      }
       if (layoutSelect) {
         if (cur === 'gallery' && !layoutSelect.value) {
           layoutSelect.value = 'justified';

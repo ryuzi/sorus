@@ -242,19 +242,27 @@
   .front-hero { max-width: var(--prose-width); margin: 0 auto 32px; }
   .front-hero > .hero:first-child { margin-top: 0; }
   .front-hero .article-title { margin: 0 0 12px; }
+  .front-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 20px; }
+  .front-hero-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: .6em 1.4em; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent); color: var(--accent-fg); font-weight: 650; line-height: 1.4; text-decoration: none; box-shadow: var(--shadow); transition: color .15s ease, border-color .15s ease, background-color .15s ease, box-shadow .15s ease; }
+  .front-hero-btn:hover { color: var(--accent-fg); opacity: .92; }
+  .front-hero-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .front-hero-btn--secondary { border-color: var(--border); background: var(--surface); color: var(--fg); box-shadow: none; }
+  .front-hero-btn--secondary:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); opacity: 1; }
   /* テーマの宣言的トップヒーローレイアウト（theme.json の layout.hero_layout: "centered"・"split"）。 */
   .front-hero--centered { max-width: var(--prose-width); margin: 0 auto 40px; text-align: center; }
   .front-hero--centered .prose { text-align: center; }
   .front-hero--centered .prose ul, .front-hero--centered .prose ol, .front-hero--centered .prose pre, .front-hero--centered .prose table, .front-hero--centered .prose blockquote { text-align: left; }
-  .front-hero--centered .doc-cta-actions { justify-content: center; }
+  .front-hero--centered .doc-cta-actions, .front-hero--centered .front-hero-actions { justify-content: center; }
   .front-hero--split { max-width: var(--content-width); margin: 0 auto 40px; padding: 16px 0; }
   .front-hero--split:not(:has(> .hero)) { max-width: var(--prose-width); padding: 28px 0; text-align: center; }
   .front-hero--split:not(:has(> .hero)) .prose ul, .front-hero--split:not(:has(> .hero)) .prose ol, .front-hero--split:not(:has(> .hero)) .prose pre, .front-hero--split:not(:has(> .hero)) .prose table, .front-hero--split:not(:has(> .hero)) .prose blockquote { text-align: left; }
+  .front-hero--split:not(:has(> .hero)) .front-hero-actions { justify-content: center; }
   @media (min-width: 768px) {
     .front-hero--split:has(> .hero) { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); column-gap: 36px; row-gap: 12px; align-items: center; }
     .front-hero--split:has(> .hero) > .article-title { grid-column: 1; align-self: end; margin: 0; }
     .front-hero--split:has(> .hero) > .prose { grid-column: 1; align-self: start; }
-    .front-hero--split:has(> .hero) > .hero { grid-column: 2; grid-row: 1 / span 2; margin: 0; }
+    .front-hero--split:has(> .hero) > .front-hero-actions { grid-column: 1; align-self: start; margin-top: 4px; }
+    .front-hero--split:has(> .hero) > .hero { grid-column: 2; grid-row: 1 / span 3; margin: 0; }
   }
   .front-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(200px, calc((100% - 60px) / 4)), 1fr)); gap: 20px; list-style: none; margin: 0 0 40px; padding: 0; }
   .front-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }

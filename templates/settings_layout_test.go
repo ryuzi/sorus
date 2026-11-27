@@ -551,6 +551,7 @@ func TestSettingsStructureSectionEditorConventions(t *testing.T) {
 		`data-section-row`,
 		`data-section-type`,
 		`data-section-show-for="hero"`,
+		`data-section-show-for="hero gallery"`,
 		`data-section-show-for="cards"`,
 		`data-section-show-for="gallery"`,
 		`data-section-show-for="gallery article_list"`,
@@ -565,6 +566,8 @@ func TestSettingsStructureSectionEditorConventions(t *testing.T) {
 		`name="section_article_tag"`,
 		`name="section_link_url"`,
 		`name="section_link_label"`,
+		`name="section_secondary_url"`,
+		`name="section_secondary_label"`,
 	)
 	expectNone(t, "settings_structure.html", structure,
 		`>Front page sections<`,

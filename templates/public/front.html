@@ -7,6 +7,7 @@
   {{with $section.Hero.Article.ImageHTML}}<figure class="hero">{{.}}</figure>{{end}}
   <h1 id="{{$section.ID}}" class="article-title">{{$section.Hero.Article.Title}}</h1>
   <div class="prose" data-math-root>{{$section.Hero.HTML}}</div>
+  {{if or $section.LinkURL $section.SecondaryURL}}<div class="front-hero-actions">{{if $section.LinkURL}}<a href="{{$section.LinkURL}}" class="front-hero-btn">{{if $section.LinkLabel}}{{$section.LinkLabel}}{{else if eq $.Lang "en"}}Learn more{{else}}詳しく見る{{end}}</a>{{end}}{{if $section.SecondaryURL}}<a href="{{$section.SecondaryURL}}" class="front-hero-btn front-hero-btn--secondary">{{if $section.SecondaryLabel}}{{$section.SecondaryLabel}}{{else if eq $.Lang "en"}}View details{{else}}詳細を見る{{end}}</a>{{end}}</div>{{end}}
 </section>
 {{else if eq $section.Type "cards"}}
 {{if $section.Cards}}

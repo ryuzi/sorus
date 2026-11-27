@@ -140,15 +140,30 @@ func TestUpdateSiteStructure(t *testing.T) {
 
 	// 指定した項目だけを渡し、省略した項目は nil（今の値を保つ）。
 	var res updateSiteStructureResult
-	env.toolOK(editor.ID, "cms_update_site_structure", map[string]any{"front_sections": []map[string]any{{"type": "cards", "pages": []string{"about", "missing"}}}}, &res)
+	env.toolOK(editor.ID, "cms_update_site_structure", map[string]any{"front_sections": []map[string]any{
+		{"type": "hero", "link_url": "/access", "link_label": "詳しくはこちら", "secondary_url": "https://example.jp/docs", "secondary_label": "ドキュメント"},
+		{"type": "cards", "pages": []string{"about", "missing"}},
+	}}, &res)
 	updates := f.getUpdates()
+	wantSections := []FrontSection{
+		{Type: "hero", LinkURL: "/access", LinkLabel: "詳しくはこちら", SecondaryURL: "https://example.jp/docs", SecondaryLabel: "ドキュメント"},
+		{Type: "cards", Pages: []string{"about", "missing"}},
+	}
 	if len(updates) != 1 || updates[0].SiteMenu != nil || updates[0].SiteFooterMenu != nil ||
-		updates[0].FrontSections == nil || len(*updates[0].FrontSections) != 1 || !reflect.DeepEqual((*updates[0].FrontSections)[0].Pages, []string{"about", "missing"}) {
+		updates[0].FrontSections == nil || !reflect.DeepEqual(*updates[0].FrontSections, wantSections) {
 		t.Fatalf("update = %+v", updates)
 	}
 	if !reflect.DeepEqual(res.Updated, []string{"front_sections"}) || !reflect.DeepEqual(res.Warnings, f.warnings) ||
-		!reflect.DeepEqual(res.SiteStructure.SiteMenu, []SiteMenuItem{{Type: "articles"}}) || res.Message == "" {
+		!reflect.DeepEqual(res.SiteStructure.SiteMenu, []SiteMenuItem{{Type: "articles"}}) ||
+		!reflect.DeepEqual(res.SiteStructure.FrontSections, wantSections) || res.Message == "" {
 		t.Errorf("result = %+v", res)
+	}
+	var ctxAfter struct {
+		SiteStructure *SiteStructure `json:"site_structure"`
+	}
+	env.toolOK(writerA.ID, "cms_get_site_context", map[string]any{}, &ctxAfter)
+	if ctxAfter.SiteStructure == nil || !reflect.DeepEqual(ctxAfter.SiteStructure.FrontSections, wantSections) {
+		t.Errorf("round-trip site_structure = %+v, want %+v", ctxAfter.SiteStructure, wantSections)
 	}
 
 	// 子項目付きのメニューと、空配列での消去（フッター）。

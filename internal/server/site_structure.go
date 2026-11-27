@@ -68,15 +68,17 @@ const (
 
 // FrontSection はトップページの1つのセクション。
 type FrontSection struct {
-	Type       FrontSectionType `json:"type"`
-	Pages      []string         `json:"pages,omitempty"`
-	Tag        string           `json:"tag,omitempty"`
-	Limit      int              `json:"limit,omitempty"`
-	Title      string           `json:"title,omitempty"`
-	Layout     string           `json:"layout,omitempty"`
-	LinkURL    string           `json:"link_url,omitempty"`
-	LinkLabel  string           `json:"link_label,omitempty"`
-	ArticleTag string           `json:"article_tag,omitempty"`
+	Type           FrontSectionType `json:"type"`
+	Pages          []string         `json:"pages,omitempty"`
+	Tag            string           `json:"tag,omitempty"`
+	Limit          int              `json:"limit,omitempty"`
+	Title          string           `json:"title,omitempty"`
+	Layout         string           `json:"layout,omitempty"`
+	LinkURL        string           `json:"link_url,omitempty"`
+	LinkLabel      string           `json:"link_label,omitempty"`
+	SecondaryURL   string           `json:"secondary_url,omitempty"`
+	SecondaryLabel string           `json:"secondary_label,omitempty"`
+	ArticleTag     string           `json:"article_tag,omitempty"`
 }
 
 // SiteStructure はサイト構成（メニュー・フッターのサイトマップ・トップページ）。
@@ -115,7 +117,13 @@ func normalizeGalleryLayout(layout string) string {
 func clearUnusedFrontSectionFields(section FrontSection) FrontSection {
 	switch section.Type {
 	case FrontSectionHero:
-		return FrontSection{Type: FrontSectionHero}
+		return FrontSection{
+			Type:           FrontSectionHero,
+			LinkURL:        section.LinkURL,
+			LinkLabel:      section.LinkLabel,
+			SecondaryURL:   section.SecondaryURL,
+			SecondaryLabel: section.SecondaryLabel,
+		}
 	case FrontSectionCards:
 		return FrontSection{
 			Type:  FrontSectionCards,
@@ -259,6 +267,12 @@ func validateSiteStructure(st SiteStructure) error {
 			return structureErr("structure_err_gallery_link_url")
 		}
 		if utf8.RuneCountInString(section.LinkLabel) > maxGalleryLinkLabelRunes || hasControl(section.LinkLabel) {
+			return structureErr("structure_err_gallery_link_label", maxGalleryLinkLabelRunes)
+		}
+		if section.SecondaryURL != "" && !validGalleryLinkURL(section.SecondaryURL) {
+			return structureErr("structure_err_gallery_link_url")
+		}
+		if utf8.RuneCountInString(section.SecondaryLabel) > maxGalleryLinkLabelRunes || hasControl(section.SecondaryLabel) {
 			return structureErr("structure_err_gallery_link_label", maxGalleryLinkLabelRunes)
 		}
 		if section.ArticleTag != "" && (utf8.RuneCountInString(section.ArticleTag) > maxGalleryTagRunes || hasControl(section.ArticleTag)) {
@@ -457,6 +471,12 @@ func (s *Server) loadSiteStructure(ctx context.Context) SiteStructure {
 					if hasControl(section.LinkLabel) || utf8.RuneCountInString(section.LinkLabel) > maxGalleryLinkLabelRunes {
 						section.LinkLabel = ""
 					}
+					if section.SecondaryURL != "" && !validGalleryLinkURL(section.SecondaryURL) {
+						section.SecondaryURL = ""
+					}
+					if hasControl(section.SecondaryLabel) || utf8.RuneCountInString(section.SecondaryLabel) > maxGalleryLinkLabelRunes {
+						section.SecondaryLabel = ""
+					}
 				}
 			}
 		}
@@ -508,6 +528,8 @@ func (s *Server) saveSiteStructureTx(ctx context.Context, tx *sqlx.Tx, st SiteSt
 		}
 		section.LinkURL = strings.TrimSpace(section.LinkURL)
 		section.LinkLabel = strings.TrimSpace(section.LinkLabel)
+		section.SecondaryURL = strings.TrimSpace(section.SecondaryURL)
+		section.SecondaryLabel = strings.TrimSpace(section.SecondaryLabel)
 		section.ArticleTag = strings.TrimSpace(section.ArticleTag)
 		*section = clearUnusedFrontSectionFields(*section)
 	}
@@ -1054,22 +1076,24 @@ type frontData struct {
 }
 
 type renderedFrontSection struct {
-	Type          FrontSectionType
-	Page          publicPage
-	Hero          articleData
-	Cards         []publicArticle
-	News          []publicArticle
-	ShowNews      bool
-	Tag           string
-	Limit         int
-	Title         string
-	Layout        string
-	LinkURL       string
-	LinkLabel     string
-	Index         bool
-	ID            string
-	IndexArticles []publicArticle
-	Pagination    pagination
+	Type           FrontSectionType
+	Page           publicPage
+	Hero           articleData
+	Cards          []publicArticle
+	News           []publicArticle
+	ShowNews       bool
+	Tag            string
+	Limit          int
+	Title          string
+	Layout         string
+	LinkURL        string
+	LinkLabel      string
+	SecondaryURL   string
+	SecondaryLabel string
+	Index          bool
+	ID             string
+	IndexArticles  []publicArticle
+	Pagination     pagination
 }
 
 func sectionID(kind FrontSectionType, occurrence int) string {
@@ -1232,7 +1256,7 @@ func (s *Server) renderFront(c echo.Context, p publicPage, front publicArticle, 
 		if section.Type == FrontSectionGallery && limit <= 0 {
 			limit = 6
 		}
-		view := renderedFrontSection{Type: section.Type, Page: p, Hero: body, Tag: section.Tag, Limit: limit, Title: section.Title, Layout: layout, LinkURL: section.LinkURL, LinkLabel: section.LinkLabel, ID: sectionID(section.Type, sectionOccurrences[section.Type])}
+		view := renderedFrontSection{Type: section.Type, Page: p, Hero: body, Tag: section.Tag, Limit: limit, Title: section.Title, Layout: layout, LinkURL: section.LinkURL, LinkLabel: section.LinkLabel, SecondaryURL: section.SecondaryURL, SecondaryLabel: section.SecondaryLabel, ID: sectionID(section.Type, sectionOccurrences[section.Type])}
 		switch section.Type {
 		case FrontSectionCards:
 			for _, slug := range section.Pages {
@@ -1501,7 +1525,7 @@ func structureFromForm(c echo.Context) (SiteStructure, error) {
 			}
 			return ""
 		}
-		section.Tag, section.Title, section.Layout, section.LinkURL, section.LinkLabel, section.ArticleTag = at("tag"), at("title"), at("layout"), at("link_url"), at("link_label"), at("article_tag")
+		section.Tag, section.Title, section.Layout, section.LinkURL, section.LinkLabel, section.SecondaryURL, section.SecondaryLabel, section.ArticleTag = at("tag"), at("title"), at("layout"), at("link_url"), at("link_label"), at("secondary_url"), at("secondary_label"), at("article_tag")
 		if raw := at("limit"); raw != "" {
 			limit, err := strconv.Atoi(raw)
 			if err != nil {

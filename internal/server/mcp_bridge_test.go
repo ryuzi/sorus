@@ -84,7 +84,12 @@ func TestMCPSiteStructureUsesAdminValidationAndStorage(t *testing.T) {
 		{"type": "page", "target": "about"}, {"type": "category", "target": "no-such-category"},
 	}}}
 	if isErr, text := env.mcpToolJSON(editorToken, "cms_update_site_structure", map[string]any{
-		"site_footer_menu": footer, "front_sections": []map[string]any{{"type": "gallery", "tag": "風景", "limit": 12}, {"type": "cards", "pages": []string{" about ", "about", "missing-page"}}},
+		"site_footer_menu": footer,
+		"front_sections": []map[string]any{
+			{"type": "hero", "link_url": " /about ", "link_label": " 詳しくはこちら ", "secondary_url": " https://example.jp/docs ", "secondary_label": " ドキュメント "},
+			{"type": "gallery", "tag": "風景", "limit": 12},
+			{"type": "cards", "pages": []string{" about ", "about", "missing-page"}},
+		},
 	}, &upd); isErr {
 		t.Fatalf("cms_update_site_structure: %s", text)
 	}
@@ -93,8 +98,10 @@ func TestMCPSiteStructureUsesAdminValidationAndStorage(t *testing.T) {
 		saved.FrontPage != "about" || frontGallery(saved).Tag != "風景" || frontGallery(saved).Limit != 12 {
 		t.Errorf("untouched settings changed: %+v", saved)
 	}
-	if len(saved.FrontSections) != 2 || saved.FrontSections[1].Type != FrontSectionCards || !reflect.DeepEqual(saved.FrontSections[1].Pages, []string{"about", "missing-page"}) {
-		t.Errorf("front cards = %v", saved.FrontSections)
+	wantHero := FrontSection{Type: FrontSectionHero, LinkURL: "/about", LinkLabel: "詳しくはこちら", SecondaryURL: "https://example.jp/docs", SecondaryLabel: "ドキュメント"}
+	if len(saved.FrontSections) != 3 || !reflect.DeepEqual(saved.FrontSections[0], wantHero) ||
+		saved.FrontSections[2].Type != FrontSectionCards || !reflect.DeepEqual(saved.FrontSections[2].Pages, []string{"about", "missing-page"}) {
+		t.Errorf("front sections = %+v", saved.FrontSections)
 	}
 	wantFooter := []MenuItem{{Type: MenuItemGroup, Label: "研究室", Children: []MenuItem{
 		{Type: MenuItemPage, Target: "about"}, {Type: MenuItemCategory, Target: "no-such-category"},
@@ -104,6 +111,16 @@ func TestMCPSiteStructureUsesAdminValidationAndStorage(t *testing.T) {
 	}
 	if !reflect.DeepEqual(upd.SiteStructure, toMCPSiteStructure(saved)) {
 		t.Errorf("returned structure = %+v, saved %+v", upd.SiteStructure, saved)
+	}
+	var roundTrip struct {
+		SiteStructure mcp.SiteStructure `json:"site_structure"`
+	}
+	if isErr, text := env.mcpToolJSON(writerToken, "cms_get_site_context", map[string]any{}, &roundTrip); isErr {
+		t.Fatalf("cms_get_site_context after update: %s", text)
+	}
+	wantMCPHero := mcp.FrontSection{Type: "hero", LinkURL: "/about", LinkLabel: "詳しくはこちら", SecondaryURL: "https://example.jp/docs", SecondaryLabel: "ドキュメント"}
+	if len(roundTrip.SiteStructure.FrontSections) != 3 || !reflect.DeepEqual(roundTrip.SiteStructure.FrontSections[0], wantMCPHero) {
+		t.Errorf("round-trip front_sections = %+v, want first %+v", roundTrip.SiteStructure.FrontSections, wantMCPHero)
 	}
 	// 参照先の無いカテゴリ・ページは保存したうえで、管理画面と同じ警告を返す。
 	if len(upd.Warnings) != 2 || !strings.Contains(strings.Join(upd.Warnings, "\n"), "no-such-category") ||
