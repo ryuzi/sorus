@@ -346,6 +346,21 @@ func TestPublicDocsStyles(t *testing.T) {
 		".doc-sidebar-group > summary::after { content: \"\"; flex: 0 0 auto; width: 2rem; height: 2rem;",
 		".doc-sidebar-group > summary > a { flex: 1 1 auto; min-width: 0; padding: 5px 6px 5px 14px; border-left: 0; color: inherit; font-weight: inherit; user-select: text;",
 		"color-mix(in srgb, var(--callout-color) 62%, var(--fg))",
+		"overflow-x: clip;",
+		".doc-main, .prose, .doc-tabs, .doc-tab-panel, .doc-cta { max-width: 100%; min-width: 0; }",
+		".front-hero { max-width: min(var(--prose-width), 100%); min-width: 0; margin: 0 auto 32px; }",
+		".front-hero { min-width: 0; }",
+		"--doc-sidebar-width: clamp(220px, 19vw, 272px);",
+		"grid-template-columns: var(--doc-sidebar-width) minmax(0, 1fr);",
+		"body:has(.doc-layout) .site-header > .header-inner { max-width: var(--doc-layout-width, max(var(--content-width), 1280px)); display: grid; grid-template-columns: var(--doc-sidebar-width, clamp(220px, 19vw, 272px)) minmax(0, 1fr); column-gap: clamp(28px, 3vw, 48px); align-items: center; }",
+		"body:has(.doc-layout) .site-header > .header-inner > .site-title { grid-column: 1; justify-self: start; }",
+		"body:has(.doc-layout) .site-header > .header-inner > .header-tools { grid-column: 2; justify-self: start; width: min(440px, 100%); }",
+		"body:has(.doc-layout) .site-header > .header-inner > .header-tools .search-form { flex: 1 1 auto; width: 100%; }",
+		"body:has(.doc-layout) .site-header:not(.site-header--minimal) > .header-inner > .header-tools .search-form { max-width: none; }",
+		"body:has(.doc-layout) .site-header--minimal > .header-inner > .search-form { max-width: 260px; }",
+		"border-left: 1px solid var(--border);",
+		"color-mix(in srgb, var(--accent) 8%, transparent)",
+		"border-left: 2px solid var(--accent);",
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("public.css lacks %q", want)
