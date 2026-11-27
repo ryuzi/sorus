@@ -350,6 +350,7 @@ func TestPublicDocsStyles(t *testing.T) {
 		"overflow-x: clip;",
 		".header-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; max-width: 100%;",
 		".header-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: flex-end; flex: 1 1 auto; min-width: 0; max-width: 100%; }",
+		".site-header:not(.is-nav-ready) .header-inner > .search-form, .site-header:not(.is-nav-ready) .header-tools { flex: 1 1 100%; max-width: 100%; }",
 		".site-header:not(.is-nav-ready) .header-tools { flex: 1 1 100%; max-width: 100%; }",
 		".site-header:not(.is-nav-ready) .search-form { max-width: none; width: 100%; }",
 		".doc-main, .prose, .doc-tabs, .doc-tab-panel, .doc-cta { max-width: 100%; min-width: 0; }",

@@ -107,7 +107,7 @@
     .site-header.is-nav-ready .category-nav .site-submenu a { font-size: .95rem; font-weight: 500; }
   }
   @media (max-width: 640px) {
-    .site-header:not(.is-nav-ready) .header-tools { flex: 1 1 100%; max-width: 100%; }
+    .site-header:not(.is-nav-ready) .header-inner > .search-form, .site-header:not(.is-nav-ready) .header-tools { flex: 1 1 100%; max-width: 100%; }
     .site-header:not(.is-nav-ready) .search-form { max-width: none; width: 100%; }
   }
   @media (prefers-reduced-motion: reduce) { .submenu-caret, .nav-toggle-icon, .nav-toggle-icon::before, .nav-toggle-icon::after { transition: none; } }
